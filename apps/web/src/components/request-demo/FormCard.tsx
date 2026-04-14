@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { InputField } from "@/components/request-demo/InputField";
 import { SelectField } from "@/components/request-demo/SelectField";
@@ -58,13 +59,28 @@ export function FormCard() {
   }
 
   return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.08)] md:p-10">
+    <motion.div
+      id="demo-form"
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.3)] md:p-10"
+    >
+      {/* Gradient top bar */}
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
+
       <div>
-        <h2 className="text-[26px] font-bold tracking-[-0.02em] text-slate-950 md:text-[28px]">
-          Request a Free Demo
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          Demo request
+        </div>
+        <h2 className="mt-3 text-[26px] font-bold tracking-[-0.02em] text-[var(--foreground)] md:text-[28px]">
+          Tell us about your school
         </h2>
-        <p className="mt-2 text-[15px] leading-7 text-slate-600">
-          Fill in your school details and we&apos;ll set up a personalized demo for you.
+        <p className="mt-2 text-[15px] leading-7 text-[var(--muted-foreground)]">
+          A specialist from your region will reach out within one business day
+          to confirm a time that works.
         </p>
       </div>
 
@@ -141,20 +157,29 @@ export function FormCard() {
           options={boardOptions}
         />
 
+        <div className="flex items-center gap-2 rounded-xl bg-[var(--muted)]/60 px-4 py-3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0 text-primary">
+            <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Your details stay confidential — we never share them with third parties.
+          </p>
+        </div>
+
         <div className="pt-1">
           <Button
             type="submit"
             size="lg"
-            className="h-14 w-full rounded-[18px] text-[17px] font-semibold shadow-[0_8px_20px_rgba(37,99,235,0.22)]"
+            className="group h-14 w-full rounded-[18px] text-[17px] font-semibold shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
           >
-            Submit Request
-            <span aria-hidden="true" className="ml-2">
-              →
-            </span>
+            Submit request
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2 transition-transform group-hover:translate-x-1">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
           </Button>
         </div>
 
-        <p className="text-center text-sm leading-6 text-slate-500">
+        <p className="text-center text-sm leading-6 text-[var(--muted-foreground)]">
           By submitting, you agree to our{" "}
           <Link href="/terms" className="text-primary hover:text-primary-700">
             Terms of Service
@@ -165,6 +190,6 @@ export function FormCard() {
           </Link>
         </p>
       </form>
-    </div>
+    </motion.div>
   );
 }

@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { isRoleAllowed } from "@/lib/role-guard";
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminTopbar } from "@/components/admin/AdminTopbar";
 
 export default function AdminLayout({
   children,
@@ -20,7 +22,7 @@ export default function AdminLayout({
       if (!isAuthenticated) {
         router.replace("/login");
       } else if (!isRoleAllowed(user?.role, "admin")) {
-        router.replace("/unauthorized"); // or to their default route
+        router.replace("/unauthorized");
       }
     }
   }, [isAuthenticated, isLoading, user, router]);
@@ -28,10 +30,18 @@ export default function AdminLayout({
   if (!isAuthenticated || !isRoleAllowed(user?.role, "admin")) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--nav)] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
-  return <div className="admin-layout">{children}</div>;
+  return (
+    <div className="flex min-h-screen bg-[var(--muted)]/30">
+      <AdminSidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AdminTopbar />
+        <main className="flex-1 p-6 lg:p-8">{children}</main>
+      </div>
+    </div>
+  );
 }

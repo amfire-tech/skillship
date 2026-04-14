@@ -33,7 +33,7 @@ export function Footer() {
   ];
 
   return (
-    <footer className="bg-[#1E293B] text-white" role="contentinfo">
+    <footer className="bg-[#0C1F1A] text-white" role="contentinfo">
       <div className="mx-auto max-w-container px-6 lg:px-8">
         <div className="grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand Column */}
@@ -49,7 +49,7 @@ export function Footer() {
                 {siteConfig.name}
               </span>
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-400">
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-emerald-200/60">
               AI-powered school management and career guidance for Indian schools
               delivering future-ready education.
             </p>
@@ -66,7 +66,7 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-slate-400 transition-colors hover:text-white"
+                      className="text-sm text-emerald-200/60 transition-colors hover:text-white"
                     >
                       {link.label}
                     </Link>
@@ -78,12 +78,12 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-700 py-6 md:flex-row">
-          <p className="text-sm text-slate-500">
-            © {new Date().getFullYear()} Skillship Technologies Pvt. Ltd. All rights reserved.
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-emerald-800/30 py-6 md:flex-row">
+          <p className="text-sm text-emerald-200/50">
+            {new Date().getFullYear()} Skillship Technologies Pvt. Ltd. All rights reserved.
           </p>
-          <p className="text-sm text-slate-500">
-            Made with <span className="text-red-400">❤️</span> for Indian Education
+          <p className="text-sm text-emerald-200/50">
+            Made for Indian Education
           </p>
         </div>
       </div>

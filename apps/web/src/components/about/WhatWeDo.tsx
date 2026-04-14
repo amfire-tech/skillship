@@ -104,7 +104,7 @@ export function WhatWeDo() {
           <Reveal key={item.title} delay={index * 120} className="h-full">
             <Card
               hoverable
-              className="group relative h-full overflow-hidden rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] transition-all duration-300 hover:-translate-y-2 hover:scale-[1.01] hover:border-primary/35 hover:shadow-[0_24px_60px_-30px_rgba(37,99,235,0.25)]"
+              className="group relative h-full overflow-hidden rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] transition-all duration-300 hover:-translate-y-2 hover:scale-[1.01] hover:border-primary/35 hover:shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)]"
             >
               <CardContent className="p-8 md:p-9">
                 <div className="flex items-center justify-between gap-4">

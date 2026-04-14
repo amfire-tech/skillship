@@ -28,9 +28,9 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
   return (
     <Card
       hoverable
-      className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_50px_-35px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-1"
+      className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-[var(--border)] bg-white shadow-[0_18px_50px_-35px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-1"
     >
-      <div className="relative aspect-[16/9] overflow-hidden border-b border-slate-200 bg-slate-50">
+      <div className="relative aspect-[16/9] overflow-hidden border-b border-[var(--border)] bg-[var(--muted)]">
         <Image
           src={workshop.image}
           alt={workshop.imageAlt}
@@ -45,15 +45,15 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
           <Badge variant={categoryVariants[workshop.category]}>
             {categoryLabels[workshop.category]}
           </Badge>
-          <Badge className="bg-slate-100 text-slate-700">Skillship</Badge>
+          <Badge className="bg-[var(--muted)] text-[var(--card-foreground)]">Skillship</Badge>
         </div>
 
         <div className="mt-4 flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-xl font-bold tracking-tight text-slate-950">
+            <h3 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
               {workshop.title}
             </h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
               {workshop.description}
             </p>
           </div>
@@ -62,26 +62,26 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-600">
               Price
             </p>
-            <p className="mt-1 text-lg font-bold text-slate-950">
+            <p className="mt-1 text-lg font-bold text-[var(--foreground)]">
               ₹{workshop.price.toLocaleString("en-IN")}
             </p>
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[var(--muted)] p-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
               Duration
             </p>
-            <p className="mt-1.5 text-sm font-semibold text-slate-900">
+            <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">
               {workshop.duration}
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
               Class range
             </p>
-            <p className="mt-1.5 text-sm font-semibold text-slate-900">
+            <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">
               {workshop.classRange}
             </p>
           </div>

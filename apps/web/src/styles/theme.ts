@@ -1,16 +1,16 @@
 export const theme = {
   colors: {
-    primary: "#2563EB",
-    accent: "#10B981",
+    primary: "#059669",
+    accent: "#0D9488",
     warning: "#F59E0B",
     danger: "#EF4444",
-    background: "#F8FAFC",
+    background: "#FAFFFE",
     card: "#FFFFFF",
     dark: {
-      background: "#0F172A",
-      card: "#1E293B",
-      text: "#F1F5F9",
-      border: "#334155",
+      background: "#0C1220",
+      card: "#162032",
+      text: "#F0FDF4",
+      border: "#1E3A3A",
     },
   },
   font: {
@@ -29,8 +29,8 @@ export const theme = {
     gutter: "24px",
   },
   shadow: {
-    card: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
-    cardHover: "0 4px 12px rgba(0,0,0,0.1)",
+    card: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+    cardHover: "0 8px 25px -5px rgba(5,150,105,0.12)",
   },
   borderRadius: {
     sm: "6px",

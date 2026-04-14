@@ -19,7 +19,7 @@ export function MarketplaceFeaturedStrip({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">
               Featured workshops
             </p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-[var(--foreground)]">
               Most requested by partner schools
             </h2>
           </div>
@@ -29,9 +29,9 @@ export function MarketplaceFeaturedStrip({
           {workshops.map((workshop) => (
             <Card
               key={workshop.id}
-              className="overflow-hidden rounded-[26px] border-slate-200 bg-white"
+              className="overflow-hidden rounded-[26px] border-[var(--border)] bg-white"
             >
-              <div className="relative aspect-[16/8.8] border-b border-slate-200 bg-slate-50">
+              <div className="relative aspect-[16/8.8] border-b border-[var(--border)] bg-[var(--muted)]">
                 <Image
                   src={workshop.image}
                   alt={workshop.imageAlt}
@@ -43,14 +43,14 @@ export function MarketplaceFeaturedStrip({
               <CardContent className="p-5">
                 <div className="flex items-center justify-between gap-3">
                   <Badge variant="info">Featured</Badge>
-                  <p className="text-sm font-semibold text-slate-950">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
                     ₹{workshop.price.toLocaleString("en-IN")}
                   </p>
                 </div>
-                <h3 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
+                <h3 className="mt-4 text-xl font-bold tracking-tight text-[var(--foreground)]">
                   {workshop.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
                   {workshop.description}
                 </p>
               </CardContent>

@@ -21,7 +21,7 @@ export function BenefitItem({ text }: BenefitItemProps) {
           <circle cx="12" cy="12" r="9" />
         </svg>
       </span>
-      <span className="text-[17px] leading-8 text-slate-800">{text}</span>
+      <span className="text-[17px] leading-8 text-[var(--foreground)]">{text}</span>
     </li>
   );
 }

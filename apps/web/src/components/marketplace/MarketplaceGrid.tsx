@@ -17,11 +17,11 @@ export function MarketplaceGrid({ workshops }: MarketplaceGridProps) {
             ))}
           </div>
         ) : (
-          <div className="rounded-[28px] border border-dashed border-slate-300 bg-white px-8 py-14 text-center">
-            <h3 className="text-2xl font-bold tracking-tight text-slate-950">
+          <div className="rounded-[28px] border border-dashed border-[var(--border)] bg-white px-8 py-14 text-center">
+            <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
               No workshops match these filters
             </h3>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--muted-foreground)]">
               Try a broader subject or duration to see more options from the marketplace catalog.
             </p>
           </div>

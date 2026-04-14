@@ -24,14 +24,14 @@ export function SelectField({
     <div className="space-y-2">
       <label
         htmlFor={id}
-        className="block text-[15px] font-medium leading-6 text-slate-950"
+        className="block text-[15px] font-medium leading-6 text-[var(--foreground)]"
       >
         {label}
       </label>
       <select
         id={id}
         className={cn(
-          "h-[52px] w-full rounded-[16px] border border-slate-200 bg-white px-4 text-[15px] text-slate-950",
+          "h-[52px] w-full rounded-[16px] border border-[var(--border)] bg-white px-4 text-[15px] text-[var(--foreground)]",
           "outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10",
           error && "border-danger focus:border-danger focus:ring-danger/10",
           className

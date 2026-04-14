@@ -8,7 +8,7 @@ export function CTABanner() {
 
       <div className="relative mx-auto max-w-container px-6 lg:px-8">
         <div className="relative rounded-[32px] border border-white/10 bg-white/5 px-6 py-12 text-center shadow-[0_35px_90px_-45px_rgba(15,23,42,0.75)] backdrop-blur md:px-12 md:py-14">
-          <div className="absolute inset-0 rounded-[32px] bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_55%,#0f172a_100%)]" />
+          <div className="absolute inset-0 rounded-[32px] bg-[linear-gradient(135deg,#064E3B_0%,#059669_55%,#064E3B_100%)]" />
           <div className="absolute inset-0 rounded-[32px] bg-grid-pattern opacity-15" />
           <div className="absolute left-[-5rem] top-10 h-64 w-64 rounded-full bg-white/10 blur-3xl animate-float-slow" />
           <div className="absolute right-[-4rem] bottom-0 h-56 w-56 rounded-full bg-accent/20 blur-3xl animate-float-delay" />
@@ -39,7 +39,7 @@ export function CTABanner() {
               <Button
                 variant="secondary"
                 size="lg"
-                className="rounded-full border-0 bg-white px-8 text-primary shadow-[0_20px_40px_-20px_rgba(255,255,255,0.9)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/90"
+                className="rounded-full border-0 bg-white px-8 text-primary shadow-[0_20px_40px_-20px_rgba(255,255,255,0.7)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/95"
               >
                 Get Started Today
                 <svg

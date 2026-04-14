@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { MarketplaceBenefits } from "@/components/marketplace/MarketplaceBenefits";
 import { MarketplaceCTA } from "@/components/marketplace/MarketplaceCTA";
 import { MarketplaceFeaturedStrip } from "@/components/marketplace/MarketplaceFeaturedStrip";
 import { MarketplaceFilters } from "@/components/marketplace/MarketplaceFilters";
@@ -29,6 +30,7 @@ export default function MarketplacePage({
   return (
     <>
       <MarketplaceHero totalCount={catalog.totalCount} />
+      <MarketplaceBenefits />
       <MarketplaceFeaturedStrip workshops={catalog.featuredWorkshops} />
 
       <section className="pb-10 pt-2">

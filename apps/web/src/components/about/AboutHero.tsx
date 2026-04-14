@@ -1,117 +1,91 @@
-import Link from "next/link";
-import { SectionWrapper } from "@/components/ui/SectionWrapper";
-import { Heading } from "@/components/ui/Heading";
-import { Button } from "@/components/ui/Button";
-import { Reveal } from "@/components/ui/Reveal";
-import { siteConfig } from "@/config/site";
+"use client";
 
-const trustSignals = [
-  { value: "500+", label: "schools trust Skillship" },
-  { value: "1,00,000+", label: "students reached" },
-  { value: "98%", label: "partner satisfaction" },
-];
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/Button";
+import { Container } from "@/components/ui/Container";
+import { MotionSection } from "@/components/ui/MotionWrapper";
+import { siteConfig } from "@/config/site";
 
 export function AboutHero() {
   return (
-    <SectionWrapper
-      background="default"
-      aria-label="About Skillship"
-      className="relative overflow-hidden py-24 md:py-32 lg:py-36"
-    >
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute left-[-8rem] top-8 h-72 w-72 rounded-full bg-primary/10 blur-3xl animate-float-slow" />
-        <div className="absolute right-[-5rem] top-24 h-64 w-64 rounded-full bg-accent/10 blur-3xl animate-float-delay" />
-        <div
-          className="absolute inset-0 bg-grid-pattern opacity-60"
-          style={{
-            maskImage: "linear-gradient(to bottom, rgba(255,255,255,0.95), transparent)",
-          }}
-        />
-      </div>
+    <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_left,_rgba(5,150,105,0.08),_transparent_55%),radial-gradient(ellipse_at_top_right,_rgba(13,148,136,0.06),_transparent_50%)] pb-16 pt-20 md:pb-24 md:pt-28 lg:pt-32">
+      <div
+        className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-30"
+        style={{ maskImage: "linear-gradient(to bottom, rgba(255,255,255,0.9), transparent 70%)" }}
+        aria-hidden="true"
+      />
 
-      <div className="relative">
-        <Reveal className="mx-auto max-w-4xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/80 px-4 py-1.5 text-sm font-medium text-primary shadow-[0_12px_30px_-20px_rgba(37,99,235,0.5)] backdrop-blur">
-            <span className="h-2 w-2 rounded-full bg-primary" />
-            Trusted by school leaders building AI-ready classrooms
-          </div>
-        </Reveal>
-
-        <Reveal delay={100} className="mx-auto mt-8 max-w-4xl text-center">
-          <Heading
-            as="h1"
-            className="text-4xl font-bold tracking-tight md:text-5xl lg:text-[56px] lg:leading-[1.08]"
-          >
-            Building the operating system for
-            <span className="text-primary"> modern, AI-ready schools</span>
-          </Heading>
-        </Reveal>
-
-        <Reveal delay={180} className="mx-auto mt-6 max-w-2xl text-center">
-          <p className="text-base leading-relaxed text-[var(--muted-foreground)] md:text-lg">
-            Skillship helps schools turn AI learning from a one-time workshop into
-            a complete, measurable student journey with teacher-friendly tools,
-            hands-on experiences, and clear outcomes for every stakeholder.
-          </p>
-        </Reveal>
-
-        <Reveal
-          delay={260}
-          className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
-        >
-          <Link href={siteConfig.cta.href}>
-            <Button
-              size="lg"
-              className="rounded-full px-8 shadow-[0_18px_40px_-18px_rgba(37,99,235,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_45px_-18px_rgba(37,99,235,0.65)] animate-glow-pulse"
-            >
-              {siteConfig.cta.label}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="ml-2"
-              >
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </Button>
-          </Link>
-
-          <Link href="#why-skillship">
-            <Button
-              variant="secondary"
-              size="lg"
-              className="rounded-full border-primary/15 bg-white/80 px-8 text-[var(--foreground)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white"
-            >
-              Why schools switch
-            </Button>
-          </Link>
-        </Reveal>
-
-        <Reveal delay={340} className="mx-auto mt-12 max-w-5xl">
-          <div className="grid gap-4 sm:grid-cols-3">
-            {trustSignals.map((signal) => (
-              <div
-                key={signal.label}
-                className="rounded-[24px] border border-[var(--border)] bg-white/[0.85] px-6 py-5 text-center shadow-[0_18px_40px_-30px_rgba(15,23,42,0.25)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-primary/20"
-              >
-                <p className="text-2xl font-bold text-[var(--foreground)] md:text-3xl">
-                  {signal.value}
-                </p>
-                <p className="mt-2 text-sm font-medium text-[var(--muted-foreground)]">
-                  {signal.label}
-                </p>
+      <Container>
+        <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+          <div>
+            <MotionSection>
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/80 px-4 py-1.5 text-sm font-medium text-primary shadow-sm backdrop-blur-sm">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                About Skillship
               </div>
-            ))}
+            </MotionSection>
+
+            <MotionSection className="mt-6" delay={1}>
+              <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl lg:text-[56px] lg:leading-[1.05]">
+                Building the{" "}
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                  intelligence layer
+                </span>{" "}
+                for modern schools.
+              </h1>
+            </MotionSection>
+
+            <MotionSection className="mt-6 max-w-xl" delay={2}>
+              <p className="text-base leading-relaxed text-[var(--muted-foreground)] md:text-lg">
+                Skillship connects every student interaction into one live system —
+                so schools can finally see learning as it actually happens, not just
+                at the end of the term.
+              </p>
+            </MotionSection>
+
+            <MotionSection className="mt-8 flex flex-wrap gap-3" delay={3}>
+              <Link href={siteConfig.cta.href}>
+                <Button size="lg" className="rounded-full px-7 shadow-[0_16px_40px_-16px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5">
+                  {siteConfig.cta.label}
+                </Button>
+              </Link>
+              <Link href="#story">
+                <Button variant="secondary" size="lg" className="rounded-full border-primary/20 bg-white/80 px-7 backdrop-blur-sm hover:bg-white">
+                  Read our story
+                </Button>
+              </Link>
+            </MotionSection>
           </div>
-        </Reveal>
-      </div>
-    </SectionWrapper>
+
+          {/* Right: Compact stats stack */}
+          <MotionSection delay={2}>
+            <div className="relative">
+              <div className="absolute -inset-4 -z-10 rounded-[32px] bg-gradient-to-br from-primary/15 to-accent/10 blur-2xl" />
+              <div className="space-y-3 rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] backdrop-blur md:p-6">
+                {[
+                  { value: "500+", label: "schools trust Skillship", delay: 0 },
+                  { value: "1,00,000+", label: "students reached", delay: 0.15 },
+                  { value: "98%", label: "partner satisfaction", delay: 0.3 },
+                ].map((s) => (
+                  <motion.div
+                    key={s.label}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.6, delay: 0.5 + s.delay, ease: [0.22, 1, 0.36, 1] }}
+                    className="flex items-baseline gap-4 rounded-2xl bg-gradient-to-br from-[var(--muted)] to-white px-5 py-4 transition-colors hover:from-primary-50"
+                  >
+                    <span className="text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-4xl">
+                      {s.value}
+                    </span>
+                    <span className="text-sm text-[var(--muted-foreground)]">{s.label}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </MotionSection>
+        </div>
+      </Container>
+    </section>
   );
 }

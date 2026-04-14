@@ -9,10 +9,8 @@ export function Hero() {
       <Container>
         <div className="mx-auto max-w-3xl text-center">
           {/* Eyebrow */}
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary-50 px-4 py-1.5 text-sm font-medium text-primary dark:bg-primary/10">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <path d="M12 2l2.09 6.26L20.18 9.27l-5.09 3.9L16.18 19.27 12 15.77l-4.18 3.5 1.09-6.1-5.09-3.9 6.09-1.01z"/>
-            </svg>
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-50/60 px-4 py-1.5 text-sm font-medium text-primary backdrop-blur-sm dark:bg-primary/10">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
             AI-Powered School Management Platform
           </div>
 

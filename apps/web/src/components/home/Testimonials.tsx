@@ -1,86 +1,108 @@
-import { SectionWrapper } from "@/components/ui/SectionWrapper";
-import { Heading } from "@/components/ui/Heading";
-import { Card, CardContent } from "@/components/ui/Card";
-import type { TestimonialItem } from "@/types";
+"use client";
 
-const testimonials: TestimonialItem[] = [
+import { motion } from "framer-motion";
+import { Container } from "@/components/ui/Container";
+import { MotionSection } from "@/components/ui/MotionWrapper";
+
+const testimonials = [
   {
     quote:
-      "Skillship has completely transformed how our students engage with technology. The AI career pilot has helped over 200 students identify their ideal career paths. Our quiz completion rate went from 40% to 92% in just 3 months.",
+      "Our quiz completion rate went from 40% to 92% in three months. The career pilot alone has helped over 200 students find direction.",
     name: "Dr. Priya Sharma",
     role: "Principal",
     school: "Delhi Public School",
     city: "Bangalore",
+    featured: true,
+    metric: "+52% completion",
   },
   {
     quote:
-      "As a school in Tier-2 city, we struggled to provide quality AI education. Skillship made it possible with their workshop content and smart quizzes. The analytics dashboard gives me clear visibility into every student's progress.",
-    name: "Mr. Ramesh Kulkarni",
+      "As a Tier-2 school, we needed quality AI education without the infrastructure cost. Skillship made it possible in weeks, not years.",
+    name: "Ramesh Kulkarni",
     role: "Principal",
-    school: "Vidyanagar High School",
+    school: "Vidyanagar High",
     city: "Pune",
+    metric: "Launched in 2 weeks",
+  },
+  {
+    quote:
+      "The analytics dashboard gave me clear visibility into every classroom. I finally see what works.",
+    name: "Anjali Menon",
+    role: "Academic Head",
+    school: "Heritage School",
+    city: "Chennai",
+    metric: "School-wide visibility",
   },
 ];
 
-const avatarColors = ["bg-primary", "bg-red-500"];
-
-function StarRating() {
-  return (
-    <div className="flex gap-1">
-      {[...Array(5)].map((_, i) => (
-        <svg
-          key={i}
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="#F59E0B"
-          stroke="none"
-        >
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      ))}
-    </div>
-  );
-}
-
 export function Testimonials() {
   return (
-    <SectionWrapper id="testimonials">
-      <div className="mx-auto max-w-2xl text-center">
-        <Heading as="h2">What Schools Say</Heading>
-        <p className="mt-4 text-base text-[var(--muted-foreground)] md:text-lg">
-          Trusted by leading schools across India
-        </p>
-      </div>
+    <section className="py-20 md:py-28">
+      <Container>
+        <MotionSection className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              What schools say
+            </p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-4xl">
+              Real decisions. Real outcomes.
+            </h2>
+          </div>
+          <p className="text-sm text-[var(--muted-foreground)] md:text-base">
+            From 500+ partner schools across India
+          </p>
+        </MotionSection>
 
-      <div className="mt-16 grid gap-8 md:grid-cols-2">
-        {testimonials.map((t, i) => (
-          <Card key={t.name}>
-            <CardContent className="p-8">
-              <StarRating />
+        <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3">
+          {testimonials.map((t, i) => (
+            <motion.figure
+              key={t.name}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.6, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+              className={`group relative flex flex-col rounded-[24px] border p-7 transition-all hover:-translate-y-1 md:p-8 ${
+                t.featured
+                  ? "md:col-span-2 md:row-span-1 border-primary/20 bg-gradient-to-br from-primary-50 via-white to-accent/5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.3)]"
+                  : "border-[var(--border)] bg-white hover:border-primary/25 hover:shadow-[0_16px_40px_-20px_rgba(5,150,105,0.15)]"
+              }`}
+            >
+              {/* Decorative quote */}
+              <div className={`absolute right-6 top-6 text-6xl font-bold leading-none opacity-10 ${t.featured ? "text-primary" : "text-primary"}`}>
+                &ldquo;
+              </div>
 
-              <blockquote className="mt-6 text-sm leading-relaxed text-[var(--muted-foreground)]">
+              {/* Metric pill */}
+              <div className="inline-flex self-start items-center gap-1.5 rounded-full border border-primary/15 bg-white/80 px-3 py-1 text-xs font-semibold text-primary backdrop-blur-sm">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="m7 15 4-4 3 3 6-7" /><path d="M3 3v18h18" />
+                </svg>
+                {t.metric}
+              </div>
+
+              <blockquote
+                className={`mt-5 flex-1 leading-relaxed text-[var(--foreground)] ${
+                  t.featured ? "text-xl md:text-2xl font-medium" : "text-base"
+                }`}
+              >
                 &ldquo;{t.quote}&rdquo;
               </blockquote>
 
-              <div className="mt-6 flex items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white ${avatarColors[i]}`}>
-                  {t.name.charAt(0)}
+              <figcaption className="mt-6 flex items-center gap-3 border-t border-[var(--border)] pt-5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-sm font-bold text-white">
+                  {t.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">
-                    {t.name}
-                  </p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{t.name}</p>
                   <p className="text-xs text-[var(--muted-foreground)]">
                     {t.role} · {t.school}, {t.city}
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </SectionWrapper>
+              </figcaption>
+            </motion.figure>
+          ))}
+        </div>
+      </Container>
+    </section>
   );
 }

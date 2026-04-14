@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { WorkshopCategoryShowcase } from "@/components/workshops/WorkshopCategoryShowcase";
 import { WorkshopFeatured } from "@/components/workshops/WorkshopFeatured";
 import { WorkshopFilters } from "@/components/workshops/WorkshopFilters";
 import { WorkshopGrid } from "@/components/workshops/WorkshopGrid";
@@ -30,6 +31,7 @@ export default function WorkshopsPage({ searchParams = {} }: WorkshopsPageProps)
         featuredWorkshop={catalog.featuredWorkshop}
         totalCount={catalog.totalCount}
       />
+      <WorkshopCategoryShowcase />
       <WorkshopFeatured workshop={catalog.featuredWorkshop} />
 
       <section className="py-16 md:py-20">
