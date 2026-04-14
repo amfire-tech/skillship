@@ -1,7 +1,7 @@
 "use client";
 
+import React, { type ReactNode } from "react";
 import { motion, type Variants } from "framer-motion";
-import { type ReactNode } from "react";
 
 /* ── Shared easing + variants ── */
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -87,12 +87,14 @@ export function MotionItem({ children, className, index = 0 }: { children: React
 export function FloatingElement({
   children,
   className,
+  style,
   duration = 6,
   delay = 0,
   y = 12,
 }: {
   children: ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   duration?: number;
   delay?: number;
   y?: number;
@@ -100,6 +102,7 @@ export function FloatingElement({
   return (
     <motion.div
       className={className}
+      style={style}
       animate={{
         y: [-y, y, -y],
       }}

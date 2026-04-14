@@ -85,19 +85,42 @@ function AnalyticsMock() {
         </div>
       </div>
 
-      <div className="mt-6 flex h-28 items-end justify-between gap-2">
-        {bars.map((h, i) => (
-          <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
-            <motion.div
-              className="w-full rounded-t-md bg-gradient-to-t from-primary to-accent/80"
-              initial={{ height: 0 }}
-              whileInView={{ height: `${h}%` }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 + i * 0.08, duration: 0.6, ease: "easeOut" }}
-            />
-            <span className="text-[10px] font-medium text-[var(--muted-foreground)]">{days[i]}</span>
-          </div>
-        ))}
+      <div className="relative mt-6">
+        {/* Trend line overlay */}
+        <svg className="pointer-events-none absolute inset-x-0 bottom-6 h-24 w-full" viewBox="0 0 7 10" preserveAspectRatio="none">
+          <motion.polyline
+            points="0,5.8 1,3.5 2,5.2 3,2.2 4,3.8 5,1.5 6,0.8"
+            fill="none"
+            stroke="rgba(13,148,136,0.5)"
+            strokeWidth="0.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            initial={{ pathLength: 0, opacity: 0 }}
+            whileInView={{ pathLength: 1, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1.2, delay: 0.4, ease: "easeOut" }}
+          />
+        </svg>
+        <div className="flex h-24 items-end justify-between gap-1.5">
+          {bars.map((h, i) => (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+              <div className="relative flex w-full items-end" style={{ height: "100%" }}>
+                <motion.div
+                  className="w-full rounded-t-md bg-gradient-to-t from-primary/80 to-accent/50"
+                  style={{ originY: 1 }}
+                  initial={{ scaleY: 0 }}
+                  whileInView={{ scaleY: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 + i * 0.08, duration: 0.6, ease: "easeOut" }}
+                  // Use inline height so the bar fills the correct proportion
+                >
+                  <div style={{ height: `${h * 0.96}px` }} />
+                </motion.div>
+              </div>
+              <span className="text-[10px] font-medium text-[var(--muted-foreground)]">{days[i]}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2">

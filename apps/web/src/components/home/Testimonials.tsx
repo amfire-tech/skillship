@@ -46,67 +46,56 @@ const testimonials = [
 
 export function Testimonials() {
   return (
-    <section className="py-20 md:py-28">
+    <section className="py-16 md:py-20">
       <Container>
-        <MotionSection className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-              What schools say
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-4xl">
-              Real decisions. Real outcomes.
-            </h2>
-          </div>
-          <p className="text-sm text-[var(--muted-foreground)] md:text-base">
-            From 50+ partner schools across India
+        <MotionSection className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Student reviews
+          </p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-4xl">
+            What learners say
+          </h2>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+            Real feedback from Skillship students across India
           </p>
         </MotionSection>
 
-        <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3 md:grid-rows-2">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {testimonials.map((t, i) => (
             <motion.figure
               key={t.name}
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.6, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-              className={`group relative flex flex-col rounded-[24px] border p-7 transition-all hover:-translate-y-1 md:p-8 ${
-                t.featured
-                  ? "md:col-span-2 md:row-span-1 border-primary/20 bg-gradient-to-br from-primary-50 via-white to-accent/5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.3)]"
-                  : "border-[var(--border)] bg-white hover:border-primary/25 hover:shadow-[0_16px_40px_-20px_rgba(5,150,105,0.15)]"
-              }`}
+              viewport={{ once: true, margin: "-30px" }}
+              transition={{ duration: 0.5, delay: i * 0.09, ease: [0.22, 1, 0.36, 1] }}
+              className="group relative flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_12px_30px_-15px_rgba(5,150,105,0.2)]"
             >
-              {/* Decorative quote */}
-              <div className={`absolute right-6 top-6 text-6xl font-bold leading-none opacity-10 ${t.featured ? "text-primary" : "text-primary"}`}>
-                &ldquo;
+              {/* Stars */}
+              <div className="flex gap-0.5">
+                {[...Array(5)].map((_, s) => (
+                  <svg key={s} width="12" height="12" viewBox="0 0 24 24" fill="#059669" className="opacity-90">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                ))}
               </div>
 
-              {/* Metric pill */}
-              <div className="inline-flex self-start items-center gap-1.5 rounded-full border border-primary/15 bg-white/80 px-3 py-1 text-xs font-semibold text-primary backdrop-blur-sm">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="m7 15 4-4 3 3 6-7" /><path d="M3 3v18h18" />
-                </svg>
-                {t.metric}
-              </div>
-
-              <blockquote
-                className={`mt-5 flex-1 leading-relaxed text-[var(--foreground)] ${
-                  t.featured ? "text-xl md:text-2xl font-medium" : "text-base"
-                }`}
-              >
+              {/* Quote */}
+              <blockquote className="flex-1 text-sm leading-relaxed text-[var(--foreground)]">
                 &ldquo;{t.quote}&rdquo;
               </blockquote>
 
-              <figcaption className="mt-6 flex items-center gap-3 border-t border-[var(--border)] pt-5">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-sm font-bold text-white">
-                  {t.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+              {/* Author */}
+              <figcaption className="flex items-center gap-2.5 border-t border-[var(--border)] pt-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
+                  {t.name.charAt(0)}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">{t.name}</p>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    {t.role} · {t.school}, {t.city}
-                  </p>
+                  <p className="text-xs font-semibold text-[var(--foreground)]">{t.name}</p>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">{t.city}</p>
                 </div>
+                <span className="ml-auto rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  {t.metric}
+                </span>
               </figcaption>
             </motion.figure>
           ))}

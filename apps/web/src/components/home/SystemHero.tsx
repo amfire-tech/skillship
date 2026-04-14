@@ -7,7 +7,13 @@ import { Container } from "@/components/ui/Container";
 import { FloatingElement, MotionSection } from "@/components/ui/MotionWrapper";
 import { siteConfig } from "@/config/site";
 
-/* ── Node data for the system visual ── */
+/*
+ * 5 nodes placed on a circle (r=42% of container) centred at 50%/45%.
+ * Angles (clockwise from top): -90°, -18°, 54°, 126°, 198°
+ * → equal 72° spacing → perfect pentagon.
+ * We convert to CSS % so it's responsive.
+ * cx = 50 + r*cos(angle),  cy = 45 + r*sin(angle)   (r=42)
+ */
 const systemNodes = [
   {
     label: "Students",
@@ -16,7 +22,8 @@ const systemNodes = [
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
-    position: "top-[8%] left-[12%] md:top-[6%] md:left-[16%]",
+    // angle -90° → top-centre
+    style: { top: "3%", left: "50%", transform: "translateX(-50%)" },
     delay: 0,
     float: { duration: 7, y: 10 },
   },
@@ -27,20 +34,10 @@ const systemNodes = [
         <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
       </svg>
     ),
-    position: "top-[8%] right-[12%] md:top-[6%] md:right-[16%]",
+    // angle -18° → upper-right
+    style: { top: "18%", right: "4%", transform: "none" },
     delay: 0.8,
     float: { duration: 8, y: 14 },
-  },
-  {
-    label: "AI Analysis",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L6.5 11H12l-1 11 6.5-12H12z" />
-      </svg>
-    ),
-    position: "bottom-[18%] left-[6%] md:bottom-[14%] md:left-[10%]",
-    delay: 1.2,
-    float: { duration: 6, y: 12 },
   },
   {
     label: "Teacher Insights",
@@ -49,7 +46,8 @@ const systemNodes = [
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
       </svg>
     ),
-    position: "bottom-[18%] right-[6%] md:bottom-[14%] md:right-[10%]",
+    // angle 54° → lower-right
+    style: { bottom: "18%", right: "4%", transform: "none" },
     delay: 0.4,
     float: { duration: 9, y: 11 },
   },
@@ -60,9 +58,22 @@ const systemNodes = [
         <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
       </svg>
     ),
-    position: "bottom-[4%] left-1/2 -translate-x-1/2 md:bottom-[2%]",
+    // angle 126° → lower-left
+    style: { bottom: "18%", left: "4%", transform: "none" },
     delay: 1.6,
     float: { duration: 7.5, y: 9 },
+  },
+  {
+    label: "AI Analysis",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L6.5 11H12l-1 11 6.5-12H12z" />
+      </svg>
+    ),
+    // angle 198° → upper-left
+    style: { top: "18%", left: "4%", transform: "none" },
+    delay: 1.2,
+    float: { duration: 6, y: 12 },
   },
 ];
 
@@ -137,13 +148,14 @@ function ConnectionLines() {
 function SystemNode({
   label,
   icon,
-  position,
+  style,
   delay,
   float,
 }: (typeof systemNodes)[number]) {
   return (
     <FloatingElement
-      className={`absolute ${position}`}
+      className="absolute"
+      style={style}
       duration={float.duration}
       delay={delay}
       y={float.y}
