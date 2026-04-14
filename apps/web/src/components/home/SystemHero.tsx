@@ -8,12 +8,20 @@ import { FloatingElement, MotionSection } from "@/components/ui/MotionWrapper";
 import { siteConfig } from "@/config/site";
 
 /*
- * 5 nodes placed on a circle (r=42% of container) centred at 50%/45%.
- * Angles (clockwise from top): -90°, -18°, 54°, 126°, 198°
- * → equal 72° spacing → perfect pentagon.
- * We convert to CSS % so it's responsive.
- * cx = 50 + r*cos(angle),  cy = 45 + r*sin(angle)   (r=42)
+ * Square orbital container — equal % in x and y = true circle.
+ * 5 nodes at 72° intervals (pentagon) centred at 50%/50%.
+ * R = 38% of container side.
  */
+const SYSTEM_CENTER = { x: 50, y: 50 };
+const SYSTEM_RADIUS = 38;
+const NODE_ANGLES = [-90, -18, 54, 126, 198];
+
+function polarToPercent(angle: number) {
+  const radians = (angle * Math.PI) / 180;
+  const x = SYSTEM_CENTER.x + SYSTEM_RADIUS * Math.cos(radians);
+  const y = SYSTEM_CENTER.y + SYSTEM_RADIUS * Math.sin(radians);
+  return { x, y };
+}
 const systemNodes = [
   {
     label: "Students",
@@ -23,7 +31,7 @@ const systemNodes = [
       </svg>
     ),
     // angle -90° → top-centre
-    style: { top: "3%", left: "50%", transform: "translateX(-50%)" },
+    angle: -90,
     delay: 0,
     float: { duration: 7, y: 10 },
   },
@@ -35,7 +43,7 @@ const systemNodes = [
       </svg>
     ),
     // angle -18° → upper-right
-    style: { top: "18%", right: "4%", transform: "none" },
+    angle: -18,
     delay: 0.8,
     float: { duration: 8, y: 14 },
   },
@@ -47,7 +55,7 @@ const systemNodes = [
       </svg>
     ),
     // angle 54° → lower-right
-    style: { bottom: "18%", right: "4%", transform: "none" },
+    angle: 54,
     delay: 0.4,
     float: { duration: 9, y: 11 },
   },
@@ -59,7 +67,7 @@ const systemNodes = [
       </svg>
     ),
     // angle 126° → lower-left
-    style: { bottom: "18%", left: "4%", transform: "none" },
+    angle: 126,
     delay: 1.6,
     float: { duration: 7.5, y: 9 },
   },
@@ -71,7 +79,7 @@ const systemNodes = [
       </svg>
     ),
     // angle 198° → upper-left
-    style: { top: "18%", left: "4%", transform: "none" },
+    angle: 198,
     delay: 1.2,
     float: { duration: 6, y: 12 },
   },
@@ -112,8 +120,14 @@ function CenterBrain() {
 
 /* ── Connection lines (SVG) ── */
 function ConnectionLines() {
+  const endpoints = NODE_ANGLES.map((angle) => polarToPercent(angle));
   return (
-    <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
       <defs>
         <linearGradient id="line-grad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="rgba(5,150,105,0.3)" />
@@ -121,16 +135,10 @@ function ConnectionLines() {
         </linearGradient>
       </defs>
       {/* Lines from center to each node position — approximate */}
-      {[
-        "M 50% 42% L 22% 18%",
-        "M 50% 42% L 78% 18%",
-        "M 50% 42% L 16% 72%",
-        "M 50% 42% L 84% 72%",
-        "M 50% 42% L 50% 90%",
-      ].map((d, i) => (
+      {endpoints.map((point, i) => (
         <motion.path
           key={i}
-          d={d}
+          d={`M ${SYSTEM_CENTER.x} ${SYSTEM_CENTER.y} L ${point.x} ${point.y}`}
           fill="none"
           stroke="url(#line-grad)"
           strokeWidth="1.5"
@@ -148,14 +156,19 @@ function ConnectionLines() {
 function SystemNode({
   label,
   icon,
-  style,
+  angle,
   delay,
   float,
 }: (typeof systemNodes)[number]) {
+  const position = polarToPercent(angle);
   return (
     <FloatingElement
       className="absolute"
-      style={style}
+      style={{
+        left: `${position.x}%`,
+        top: `${position.y}%`,
+        transform: "translate(-50%, -50%)",
+      }}
       duration={float.duration}
       delay={delay}
       y={float.y}
@@ -247,10 +260,10 @@ export function SystemHero() {
           </Link>
         </MotionSection>
 
-        {/* ── SYSTEM VISUAL ── */}
-        <div className="relative mx-auto mt-14 h-[380px] max-w-3xl md:mt-16 md:h-[460px]">
+        {/* ── SYSTEM VISUAL — square container so % = true circle ── */}
+        <div className="relative mx-auto mt-14 w-full max-w-[520px] aspect-square md:mt-16">
           <ConnectionLines />
-          <div className="absolute left-1/2 top-[28%] -translate-x-1/2 -translate-y-1/2 md:top-[32%]">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <CenterBrain />
           </div>
           {systemNodes.map((node) => (
