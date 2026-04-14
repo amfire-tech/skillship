@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { siteConfig } from "@/config/site";
 
 export function Footer() {
@@ -38,15 +39,11 @@ export function Footer() {
         <div className="grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand Column */}
           <div>
-            <Link href="/" className="flex items-center gap-2.5" aria-label={`${siteConfig.name} home`}>
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              </div>
-              <span className="text-lg font-bold text-white">
-                {siteConfig.name}
+            <Link href="/" className="flex items-center gap-2" aria-label={`${siteConfig.name} home`}>
+              <Image src="/logo-icon.png" alt="Skillship logo" width={38} height={38} className="object-contain" />
+              <span className="text-lg font-bold tracking-tight">
+                <span style={{ color: "#F59E0B" }}>SKILL</span>
+                <span style={{ color: "#0D9488" }}>SHIP</span>
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-emerald-200/60">
