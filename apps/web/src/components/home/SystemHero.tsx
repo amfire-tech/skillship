@@ -266,7 +266,6 @@ export function SystemHero() {
 
         {/* ── SYSTEM VISUAL — square container so % = true circle ── */}
         <div className="relative mx-auto mt-14 w-full max-w-[520px] aspect-square md:mt-16">
-          <ConnectionLines />
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <CenterBrain />
           </div>
