@@ -161,32 +161,36 @@ function SystemNode({
   float,
 }: (typeof systemNodes)[number]) {
   const position = polarToPercent(angle);
+  /*
+   * Outer div: pure CSS positioning + centering.
+   * FloatingElement: only the y-float animation — no position styles here
+   * so framer-motion's transform never clobbers translate(-50%, -50%).
+   */
   return (
-    <FloatingElement
+    <div
       className="absolute"
       style={{
         left: `${position.x}%`,
         top: `${position.y}%`,
         transform: "translate(-50%, -50%)",
       }}
-      duration={float.duration}
-      delay={delay}
-      y={float.y}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.6 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.5 + delay, ease: [0.22, 1, 0.36, 1] }}
-        className="flex items-center gap-2.5 rounded-2xl border border-primary/15 bg-white/90 px-4 py-2.5 shadow-glass backdrop-blur-sm transition-shadow hover:shadow-glow"
-      >
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <span className="text-xs font-semibold text-[var(--foreground)] md:text-sm">
-          {label}
-        </span>
-      </motion.div>
-    </FloatingElement>
+      <FloatingElement duration={float.duration} delay={delay} y={float.y}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.5 + delay, ease: [0.22, 1, 0.36, 1] }}
+          className="flex items-center gap-2.5 rounded-2xl border border-primary/15 bg-white/90 px-4 py-2.5 shadow-glass backdrop-blur-sm transition-shadow hover:shadow-glow"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            {icon}
+          </div>
+          <span className="text-xs font-semibold text-[var(--foreground)] md:text-sm">
+            {label}
+          </span>
+        </motion.div>
+      </FloatingElement>
+    </div>
   );
 }
 
