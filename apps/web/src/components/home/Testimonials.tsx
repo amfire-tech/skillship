@@ -7,7 +7,7 @@ import { MotionSection } from "@/components/ui/MotionWrapper";
 const testimonials = [
   {
     quote:
-      "Mind blowing course — the instructor's explanation was brilliant and the best part is the interactive animated content that makes every concept click.",
+      "Mind blowing course, instructors explanation was nice and the best part about SkillShip is that they have interactive Animated Content.",
     name: "Jay Prakash",
     role: "Student",
     school: "Skillship Learner",
@@ -17,7 +17,7 @@ const testimonials = [
   },
   {
     quote:
-      "It was an amazing class! The quizzes after each topic really help with understanding. Looking forward to building my own projects.",
+      "It was an amazing class! Looking forward to working on my own game. Thank you so much for teaching me about python. The best part is that Skillship have Quizzes for better understanding.",
     name: "Shinaya",
     role: "Student",
     school: "Skillship Learner",
@@ -26,12 +26,21 @@ const testimonials = [
   },
   {
     quote:
-      "Really super — instant doubt resolution gave me a smooth flow throughout the course. Best learning experience I've had.",
+      "Really super, the way our instructor explained was great and the best part is that SkillShip has instant doubt resolution which gaves me a smooth flow in studies.",
     name: "Ansh",
     role: "Student",
     school: "Skillship Learner",
     city: "Mumbai",
     metric: "Instant doubt resolution",
+  },
+  {
+    quote:
+      "SkillShip is taking care of my skills with its web development course & best part is that I can easily learn using mobile phone only.",
+    name: "Rishi",
+    role: "Student",
+    school: "Skillship Learner",
+    city: "Lucknow",
+    metric: "Mobile learning",
   },
 ];
 
@@ -53,7 +62,7 @@ export function Testimonials() {
           </p>
         </MotionSection>
 
-        <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3">
+        <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3 md:grid-rows-2">
           {testimonials.map((t, i) => (
             <motion.figure
               key={t.name}
