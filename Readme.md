@@ -310,17 +310,6 @@ Runs at → http://localhost:3000
 
 ---
 
-## Default Login Credentials
-
-After running the database seed (Step 4), use these:
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@skillship.in | Admin@123 |
-| Principal | principal@demo.school.in | School@123 |
-| Teacher | teacher@demo.school.in | Teacher@123 |
-| Student | student@demo.school.in | Student@123 |
-
 ---
 
 ## Common Issues
