@@ -1,226 +1,173 @@
 # Skillship Platform
 
-AI-powered school management and career guidance SaaS for Indian schools.
-
-**Stack:** Next.js (frontend) · Node.js/Express (API) · Python/FastAPI (AI service) · PostgreSQL · Prisma · Turborepo
+AI-powered school management platform for Indian schools.
 
 ---
 
-## Prerequisites
+## Run Frontend Only (Quick Start)
 
-Install these before anything else:
+If you just want to run the website/UI, follow these steps.
 
-| Tool | Version | Download |
-|------|---------|----------|
-| Node.js | 20+ | https://nodejs.org |
-| pnpm | 9+ | `npm install -g pnpm` |
-| Python | 3.11+ | https://python.org |
-| PostgreSQL | 15+ | https://postgresql.org |
-| Git | any | https://git-scm.com |
+### Step 1 — Install Node.js
 
-> Optional: Docker + Docker Compose if you want containerized setup instead.
+Download and install Node.js (version 20 or above):
+https://nodejs.org/en/download
 
----
+Verify install:
+```bash
+node -v   # should show v20.x.x or higher
+npm -v
+```
 
-## Setup (Step by Step)
-
-### 1. Clone & Install
+### Step 2 — Clone the Repo
 
 ```bash
-git clone <repo-url>
-cd skillship-merged
-
-pnpm install
+git clone https://github.com/amfire-tech/skillship.git
+cd skillship
 ```
 
-### 2. Set Up Environment Variables
-
-Copy env files for each app:
+### Step 3 — Install Dependencies
 
 ```bash
-# Root
-cp .env.example .env
-
-# API
-cp apps/api/.env.example apps/api/.env
-
-# AI Service
-cp apps/ai-service/.env.example apps/ai-service/.env
-
-# Web
-cp apps/web/.env.example apps/web/.env.local
+cd apps/web
+npm install
 ```
 
-Edit each `.env` file. Key variables:
+### Step 4 — Set Up Environment File
 
-**`apps/api/.env`**
-```env
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/skillship
-JWT_SECRET=your-secret-key-here
-AI_SERVICE_URL=http://localhost:8001
-PORT=8000
-```
+Create a file called `.env.local` inside `apps/web/` with this content:
 
-**`apps/web/.env.local`**
 ```env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 ```
 
-**`apps/ai-service/.env`**
+### Step 5 — Run the App
+
+```bash
+npm run dev
+```
+
+Open your browser and go to: **http://localhost:3000**
+
+That's it. Frontend is running.
+
+> **Note:** API calls (login, data fetching) won't work unless the backend is also running. But all UI pages will load fine.
+
+---
+
+## Run Full Stack (Frontend + Backend + AI)
+
+Only needed if you want login, database, and AI features to work.
+
+### Requirements
+
+| Tool | Version | Download |
+|------|---------|----------|
+| Node.js | 20+ | https://nodejs.org |
+| pnpm | 9+ | Run: `npm install -g pnpm` |
+| Python | 3.11+ | https://python.org |
+| PostgreSQL | 15+ | https://postgresql.org |
+
+### Step 1 — Install pnpm and project dependencies
+
+```bash
+npm install -g pnpm
+cd skillship
+pnpm install
+```
+
+### Step 2 — Set up environment files
+
+Copy and fill in env files for each service:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/ai-service/.env.example apps/ai-service/.env
+cp apps/web/.env.example apps/web/.env.local
+```
+
+**`apps/api/.env`** — fill in:
 ```env
 DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/skillship
-OPENAI_API_KEY=sk-...
+JWT_SECRET=any-random-secret-string
+AI_SERVICE_URL=http://localhost:8001
+PORT=8000
+```
+
+**`apps/web/.env.local`** — fill in:
+```env
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+```
+
+**`apps/ai-service/.env`** — fill in:
+```env
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/skillship
+OPENAI_API_KEY=sk-your-key-here
 PORT=8001
 ```
 
-### 3. Set Up Database
+### Step 3 — Set up the database
 
-Create PostgreSQL database:
+Make sure PostgreSQL is running, then:
 
 ```bash
 psql -U postgres -c "CREATE DATABASE skillship;"
-```
 
-Run Prisma migrations:
-
-```bash
 cd packages/db
 npx prisma migrate dev
 npx prisma generate
-cd ../..
-```
-
-Seed initial data (optional):
-
-```bash
-cd packages/db
 npx prisma db seed
 cd ../..
 ```
 
-### 4. Set Up Python AI Service
+### Step 4 — Set up Python AI service
 
 ```bash
 cd apps/ai-service
 
-# Create virtual environment
 python -m venv venv
 
-# Activate it
-# Windows:
+# Activate (Windows):
 venv\Scripts\activate
-# Mac/Linux:
+
+# Activate (Mac/Linux):
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
 cd ../..
 ```
 
----
+### Step 5 — Start all 3 services (open 3 terminals)
 
-## Running Locally
-
-Run all services. Open **4 terminals** (or use tmux/screen).
-
-### Terminal 1 — API (Node.js)
-
+**Terminal 1 — API:**
 ```bash
 cd apps/api
 pnpm dev
-# Runs on http://localhost:8000
+# Running at http://localhost:8000
 ```
 
-### Terminal 2 — AI Service (Python)
-
+**Terminal 2 — AI Service:**
 ```bash
 cd apps/ai-service
-source venv/bin/activate        # Windows: venv\Scripts\activate
+venv\Scripts\activate        # or: source venv/bin/activate
 uvicorn app.main:app --reload --port 8001
-# Runs on http://localhost:8001
+# Running at http://localhost:8001
 ```
 
-### Terminal 3 — Web (Next.js)
-
+**Terminal 3 — Frontend:**
 ```bash
 cd apps/web
-pnpm dev
-# Runs on http://localhost:3000
-```
-
-### Alternative — Run All from Root (Turborepo)
-
-```bash
-# From repo root, runs all apps simultaneously
-pnpm dev
+npm run dev
+# Running at http://localhost:3000
 ```
 
 ---
 
-## Service URLs
+## Default Login Credentials
 
-| Service | URL |
-|---------|-----|
-| Web Frontend | http://localhost:3000 |
-| API | http://localhost:8000 |
-| API Docs | http://localhost:8000/api/docs |
-| AI Service | http://localhost:8001 |
-| AI Service Docs | http://localhost:8001/docs |
-
----
-
-## Docker Setup (Alternative)
-
-If you prefer Docker instead of manual setup:
-
-```bash
-# Copy root env
-cp .env.example .env
-# Fill in values in .env
-
-# Start all services
-docker compose up --build
-```
-
-Services auto-start in correct order. Web at http://localhost:3000.
-
----
-
-## Project Structure
-
-```
-skillship-merged/
-├── apps/
-│   ├── web/          # Next.js frontend (port 3000)
-│   ├── api/          # Node.js/Express backend (port 8000)
-│   └── ai-service/   # Python/FastAPI AI service (port 8001)
-├── packages/
-│   ├── db/           # Prisma schema & migrations
-│   ├── config/       # Shared config (Tailwind, ESLint, TS)
-│   └── types/        # Shared TypeScript types
-├── turbo.json
-└── package.json
-```
-
----
-
-## Common Issues
-
-**`prisma generate` fails** — run from `packages/db`, not root.
-
-**Python venv not found** — activate venv before running uvicorn.
-
-**Port already in use** — kill process: `npx kill-port 3000 8000 8001`
-
-**DB connection refused** — ensure PostgreSQL running: `pg_ctl status` or check Services (Windows).
-
-**pnpm not found** — run `npm install -g pnpm` first.
-
----
-
-## Default Login Credentials (after seed)
+After running the database seed, use these to log in:
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -228,3 +175,18 @@ skillship-merged/
 | Principal | principal@demo.school.in | School@123 |
 | Teacher | teacher@demo.school.in | Teacher@123 |
 | Student | student@demo.school.in | Student@123 |
+
+---
+
+## Common Issues
+
+**Port already in use:**
+```bash
+npx kill-port 3000 8000 8001
+```
+
+**PostgreSQL not connecting:** Make sure PostgreSQL service is running on your machine.
+
+**`pnpm` not found:** Run `npm install -g pnpm` first.
+
+**Python venv errors:** Make sure you activated the venv before running `pip install` or `uvicorn`.
