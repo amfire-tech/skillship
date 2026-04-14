@@ -1,8 +1,5 @@
-// ============================================================
-// Auth Route Group Layout
-// Minimal layout for login/register/forgot-password pages.
-// No navbar or footer — clean, focused auth experience.
-// ============================================================
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 
 export default function AuthLayout({
   children,
@@ -10,8 +7,12 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--muted)] px-4">
-      <div className="w-full max-w-md">{children}</div>
-    </div>
+    <>
+      <Navbar />
+      <main className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-[var(--muted)] px-4 py-12">
+        <div className="w-full max-w-md">{children}</div>
+      </main>
+      <Footer />
+    </>
   );
 }

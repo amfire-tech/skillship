@@ -1,10 +1,10 @@
 import type { StatItem } from "@/types";
 
 const stats: StatItem[] = [
-  { value: "500+", label: "Schools" },
-  { value: "1,00,000+", label: "Students" },
-  { value: "200+", label: "Workshops" },
-  { value: "98%", label: "Satisfaction Rate" },
+  { value: "50+", label: "Schools Connected" },
+  { value: "10,000+", label: "Students" },
+  { value: "8,000+", label: "Students Enrolled" },
+  { value: "5,000+", label: "Hours of Live Learning" },
 ];
 
 export function StatsBar() {

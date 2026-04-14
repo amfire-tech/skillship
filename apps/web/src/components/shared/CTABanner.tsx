@@ -17,7 +17,7 @@ export function CTABanner() {
           <Reveal className="mx-auto max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-sm font-medium text-white/80">
               <span className="h-2 w-2 rounded-full bg-accent" />
-              500+ schools already trust Skillship
+              50+ schools already trust Skillship
             </div>
           </Reveal>
 

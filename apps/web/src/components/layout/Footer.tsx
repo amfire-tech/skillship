@@ -24,9 +24,9 @@ export function Footer() {
     {
       title: "Contact",
       links: [
-        { label: "support@skillship.in", href: "mailto:support@skillship.in" },
-        { label: "+91 98765 43210", href: "tel:+919876543210" },
-        { label: "Bengaluru, India", href: "#" },
+        { label: "info@skillship.in", href: "mailto:info@skillship.in" },
+        { label: "+91 93684 08577", href: "tel:+919368408577" },
+        { label: "Agra, Uttar Pradesh", href: "#" },
         { label: "Privacy Policy", href: "/privacy" },
       ],
     },
@@ -80,7 +80,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="flex flex-col items-center justify-between gap-4 border-t border-emerald-800/30 py-6 md:flex-row">
           <p className="text-sm text-emerald-200/50">
-            {new Date().getFullYear()} Skillship Technologies Pvt. Ltd. All rights reserved.
+            {new Date().getFullYear()} Skillship Edutech. All rights reserved.
           </p>
           <p className="text-sm text-emerald-200/50">
             Made for Indian Education

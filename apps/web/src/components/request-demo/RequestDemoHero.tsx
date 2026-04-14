@@ -6,8 +6,8 @@ import { Container } from "@/components/ui/Container";
 import { MotionSection } from "@/components/ui/MotionWrapper";
 
 const heroStats = [
-  { value: "500+", label: "Partner schools" },
-  { value: "1L+", label: "Students onboarded" },
+  { value: "50+", label: "Partner schools" },
+  { value: "10,000+", label: "Students onboarded" },
   { value: "30 min", label: "Typical demo" },
 ];
 

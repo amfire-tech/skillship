@@ -8,18 +8,18 @@ import { QuickActions } from "@/components/admin/QuickActions";
 import { PlatformHealth } from "@/components/admin/PlatformHealth";
 
 const onboardingData = [
-  { label: "Apr", value: 305 },
-  { label: "May", value: 340 },
-  { label: "Jun", value: 365 },
-  { label: "Jul", value: 385 },
-  { label: "Aug", value: 410 },
-  { label: "Sep", value: 430 },
-  { label: "Oct", value: 450 },
-  { label: "Nov", value: 465 },
-  { label: "Dec", value: 475 },
-  { label: "Jan", value: 485 },
-  { label: "Feb", value: 495 },
-  { label: "Mar", value: 502 },
+  { label: "Apr", value: 12 },
+  { label: "May", value: 18 },
+  { label: "Jun", value: 22 },
+  { label: "Jul", value: 28 },
+  { label: "Aug", value: 31 },
+  { label: "Sep", value: 35 },
+  { label: "Oct", value: 39 },
+  { label: "Nov", value: 43 },
+  { label: "Dec", value: 44 },
+  { label: "Jan", value: 47 },
+  { label: "Feb", value: 49 },
+  { label: "Mar", value: 50 },
 ];
 
 const bookingsData = [
@@ -38,7 +38,7 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total Schools"
-          value="502"
+          value="50+"
           delta={{ value: "+8.2%" }}
           tint="primary"
           delay={0.05}
@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
         />
         <StatCard
           label="Total Students"
-          value="1,04,320"
+          value="10,000+"
           delta={{ value: "+12.4%" }}
           tint="accent"
           delay={0.1}
@@ -62,7 +62,7 @@ export default function AdminDashboardPage() {
         />
         <StatCard
           label="Active Teachers"
-          value="3,847"
+          value="8,000+"
           delta={{ value: "+5.1%" }}
           tint="violet"
           delay={0.15}
@@ -74,7 +74,7 @@ export default function AdminDashboardPage() {
         />
         <StatCard
           label="Monthly Revenue"
-          value="₹28,40,000"
+          value="₹5,499/mo"
           delta={{ value: "+18.7%" }}
           tint="amber"
           delay={0.2}

@@ -249,13 +249,13 @@ export function SystemHero() {
         {/* Trust stats */}
         <MotionSection className="mt-6 text-center" delay={2}>
           <p className="mb-5 text-sm font-medium text-[var(--muted-foreground)]">
-            Trusted by 500+ schools across India
+            Trusted by 50+ schools across India
           </p>
           <div className="mx-auto flex flex-wrap items-center justify-center gap-4">
-            <StatPill value="500+" label="Schools" />
-            <StatPill value="1L+" label="Students" />
-            <StatPill value="200+" label="Workshops" />
-            <StatPill value="98%" label="Satisfaction" />
+            <StatPill value="50+" label="Schools" />
+            <StatPill value="10,000+" label="Students" />
+            <StatPill value="8,000+" label="Enrolled" />
+            <StatPill value="5,000+" label="Live Hours" />
           </div>
         </MotionSection>
       </Container>

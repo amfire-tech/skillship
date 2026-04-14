@@ -96,7 +96,7 @@ export function WorkshopHero({ featuredWorkshop, totalCount }: WorkshopHeroProps
             <MotionSection className="mt-10 grid gap-3 sm:grid-cols-3" delay={5}>
               {[
                 { value: String(totalCount), label: "Workshop formats" },
-                { value: "500+", label: "Schools nationwide" },
+                { value: "50+", label: "Schools nationwide" },
                 { value: "1-12", label: "Class coverage" },
               ].map((s) => (
                 <div

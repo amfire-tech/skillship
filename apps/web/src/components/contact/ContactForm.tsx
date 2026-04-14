@@ -78,7 +78,7 @@ export function ContactForm() {
             id="name"
             name="name"
             label="Your name *"
-            placeholder="Dr. Priya Sharma"
+            placeholder="e.g. Nikhil Parihar"
             value={values.name}
             onChange={handleChange}
             autoComplete="name"
@@ -101,7 +101,7 @@ export function ContactForm() {
             name="phone"
             type="tel"
             label="Phone *"
-            placeholder="+91 98765 43210"
+            placeholder="+91 93684 08577"
             value={values.phone}
             onChange={handleChange}
             autoComplete="tel"

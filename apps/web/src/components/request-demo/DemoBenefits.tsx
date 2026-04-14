@@ -24,9 +24,9 @@ const benefitGroups = [
 ];
 
 const trustStats = [
-  { value: "98%", label: "Satisfaction" },
-  { value: "1L+", label: "Students" },
-  { value: "200+", label: "Workshops" },
+  { value: "50+", label: "Schools" },
+  { value: "10,000+", label: "Students" },
+  { value: "5,000+", label: "Live Hours" },
 ];
 
 export function DemoBenefits() {
@@ -83,7 +83,7 @@ export function DemoBenefits() {
       <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-primary-700 via-primary to-primary-500 p-6 text-white shadow-[0_20px_50px_-25px_rgba(5,150,105,0.5)]">
         <div className="relative z-10">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
-            500+ schools already onboard
+            50+ schools already onboard
           </p>
           <h3 className="mt-2 text-xl font-bold tracking-tight">
             Trusted across India

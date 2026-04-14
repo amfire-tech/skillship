@@ -164,14 +164,14 @@ function OrgPanel() {
     <>
       <PanelCard title="Organization details" description="Public-facing information shown to schools and partners">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Organization name"><Input defaultValue="Skillship Education Pvt. Ltd." /></Field>
+          <Field label="Organization name"><Input defaultValue="Skillship Edutech" /></Field>
           <Field label="Primary domain"><Input defaultValue="skillship.in" /></Field>
-          <Field label="Support email"><Input defaultValue="support@skillship.in" /></Field>
-          <Field label="Support phone"><Input defaultValue="+91 98765 43210" /></Field>
+          <Field label="Support email"><Input defaultValue="info@skillship.in" /></Field>
+          <Field label="Support phone"><Input defaultValue="+91 93684 08577" /></Field>
           <Field label="Registered address">
-            <Input defaultValue="HSR Layout, Bengaluru, Karnataka 560102" />
+            <Input defaultValue="Opp. Shipgram, Tajmahal Road, Tajganj, Agra, U.P. 282006" />
           </Field>
-          <Field label="GSTIN"><Input defaultValue="29ABCDE1234F1Z5" /></Field>
+          <Field label="GSTIN"><Input defaultValue="" placeholder="Enter GSTIN" /></Field>
         </div>
         <SaveBar />
       </PanelCard>

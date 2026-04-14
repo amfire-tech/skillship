@@ -31,15 +31,15 @@ export const siteConfig = {
       { label: "Terms of Service", href: "/terms" },
     ],
     socials: [
-      { label: "Twitter", href: "https://twitter.com/skillship" },
-      { label: "LinkedIn", href: "https://linkedin.com/company/skillship" },
-      { label: "Instagram", href: "https://instagram.com/skillship" },
-      { label: "YouTube", href: "https://youtube.com/@skillship" },
+      { label: "Twitter", href: "https://twitter.com/skillship_" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/company/skillship-edutech/" },
+      { label: "Instagram", href: "https://www.instagram.com/skillship.in/" },
+      { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61551827170275" },
     ],
     contact: {
-      email: "hello@skillship.in",
-      phone: "+91 98765 43210",
-      address: "Pune, Maharashtra, India",
+      email: "info@skillship.in",
+      phone: "+91 93684 08577",
+      address: "Tajganj, Agra, Uttar Pradesh 282006",
     },
   },
 } as const;

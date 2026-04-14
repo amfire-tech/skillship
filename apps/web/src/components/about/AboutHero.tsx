@@ -64,9 +64,9 @@ export function AboutHero() {
               <div className="absolute -inset-4 -z-10 rounded-[32px] bg-gradient-to-br from-primary/15 to-accent/10 blur-2xl" />
               <div className="space-y-3 rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] backdrop-blur md:p-6">
                 {[
-                  { value: "500+", label: "schools trust Skillship", delay: 0 },
-                  { value: "1,00,000+", label: "students reached", delay: 0.15 },
-                  { value: "98%", label: "partner satisfaction", delay: 0.3 },
+                  { value: "50+", label: "schools connected", delay: 0 },
+                  { value: "10,000+", label: "students on platform", delay: 0.15 },
+                  { value: "5,000+", label: "hours of live learning", delay: 0.3 },
                 ].map((s) => (
                   <motion.div
                     key={s.label}

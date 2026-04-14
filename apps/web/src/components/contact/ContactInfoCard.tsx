@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 const contactItems = [
   {
     label: "Email",
-    value: "noreply@amfire.in",
+    value: "info@skillship.in",
     note: "Partnership and onboarding queries",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -15,7 +15,7 @@ const contactItems = [
   },
   {
     label: "Phone",
-    value: "+91 98765 43210",
+    value: "+91 93684 08577",
     note: "Mon–Sat · school-hours support",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -25,8 +25,8 @@ const contactItems = [
   },
   {
     label: "Office",
-    value: "Bengaluru, Karnataka",
-    note: "Serving schools across India",
+    value: "Agra, Uttar Pradesh",
+    note: "Opp. Shipgram, Tajmahal Road, Tajganj 282006",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
@@ -99,7 +99,7 @@ export function ContactInfoCard() {
             Serving schools in
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {["Bengaluru", "Pune", "Chennai", "Hyderabad", "Mumbai", "Delhi NCR", "+40 more"].map((city) => (
+            {["Agra", "Delhi NCR", "Lucknow", "Gurugram", "Mumbai", "Noida", "+40 more"].map((city) => (
               <span
                 key={city}
                 className="rounded-full border border-primary/15 bg-white/70 px-3 py-1 text-xs font-medium text-[var(--foreground)] backdrop-blur-sm"

@@ -7,31 +7,31 @@ import { MotionSection } from "@/components/ui/MotionWrapper";
 const testimonials = [
   {
     quote:
-      "Our quiz completion rate went from 40% to 92% in three months. The career pilot alone has helped over 200 students find direction.",
-    name: "Dr. Priya Sharma",
-    role: "Principal",
-    school: "Delhi Public School",
-    city: "Bangalore",
+      "Mind blowing course — the instructor's explanation was brilliant and the best part is the interactive animated content that makes every concept click.",
+    name: "Jay Prakash",
+    role: "Student",
+    school: "Skillship Learner",
+    city: "Agra",
     featured: true,
-    metric: "+52% completion",
+    metric: "Interactive content",
   },
   {
     quote:
-      "As a Tier-2 school, we needed quality AI education without the infrastructure cost. Skillship made it possible in weeks, not years.",
-    name: "Ramesh Kulkarni",
-    role: "Principal",
-    school: "Vidyanagar High",
-    city: "Pune",
-    metric: "Launched in 2 weeks",
+      "It was an amazing class! The quizzes after each topic really help with understanding. Looking forward to building my own projects.",
+    name: "Shinaya",
+    role: "Student",
+    school: "Skillship Learner",
+    city: "Gurugram",
+    metric: "Quiz-based learning",
   },
   {
     quote:
-      "The analytics dashboard gave me clear visibility into every classroom. I finally see what works.",
-    name: "Anjali Menon",
-    role: "Academic Head",
-    school: "Heritage School",
-    city: "Chennai",
-    metric: "School-wide visibility",
+      "Really super — instant doubt resolution gave me a smooth flow throughout the course. Best learning experience I've had.",
+    name: "Ansh",
+    role: "Student",
+    school: "Skillship Learner",
+    city: "Mumbai",
+    metric: "Instant doubt resolution",
   },
 ];
 
@@ -49,7 +49,7 @@ export function Testimonials() {
             </h2>
           </div>
           <p className="text-sm text-[var(--muted-foreground)] md:text-base">
-            From 500+ partner schools across India
+            From 50+ partner schools across India
           </p>
         </MotionSection>
 
