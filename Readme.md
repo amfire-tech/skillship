@@ -10,8 +10,21 @@ If you just want to run the website/UI, follow these steps.
 
 ### Step 1 — Install Node.js
 
-Download and install Node.js (version 20 or above):
-https://nodejs.org/en/download
+**Windows:**
+```bash
+winget install OpenJS.NodeJS.LTS
+```
+
+**Mac:**
+```bash
+brew install node@20
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
 
 Verify install:
 ```bash
@@ -19,40 +32,89 @@ node -v   # should show v20.x.x or higher
 npm -v
 ```
 
-### Step 2 — Clone the Repo
+> If `winget` is not available on Windows, download installer from: https://nodejs.org/en/download
+
+---
+
+### Step 2 — Install Git
+
+**Windows:**
+```bash
+winget install Git.Git
+```
+
+**Mac:**
+```bash
+brew install git
+```
+
+**Linux:**
+```bash
+sudo apt-get install git
+```
+
+Verify:
+```bash
+git --version
+```
+
+---
+
+### Step 3 — Clone the Repo
 
 ```bash
 git clone https://github.com/amfire-tech/skillship.git
 cd skillship
 ```
 
-### Step 3 — Install Dependencies
+---
+
+### Step 4 — Install Dependencies
 
 ```bash
 cd apps/web
 npm install
 ```
 
-### Step 4 — Set Up Environment File
+---
 
-Create a file called `.env.local` inside `apps/web/` with this content:
+### Step 5 — Set Up Environment File
+
+Inside `apps/web/`, create a file named `.env.local` and paste this:
 
 ```env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 ```
 
-### Step 5 — Run the App
+**Windows (PowerShell):**
+```powershell
+New-Item apps/web/.env.local
+```
+Then open the file and paste the content above.
+
+**Mac/Linux:**
+```bash
+cat > apps/web/.env.local << 'EOF'
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+EOF
+```
+
+---
+
+### Step 6 — Run the App
 
 ```bash
+cd apps/web
 npm run dev
 ```
 
-Open your browser and go to: **http://localhost:3000**
+Open browser → **http://localhost:3000**
 
-That's it. Frontend is running.
+Done. Frontend is running.
 
-> **Note:** API calls (login, data fetching) won't work unless the backend is also running. But all UI pages will load fine.
+> **Note:** Login and data features won't work without the backend running. But all UI pages will load.
 
 ---
 
@@ -60,26 +122,81 @@ That's it. Frontend is running.
 
 Only needed if you want login, database, and AI features to work.
 
-### Requirements
+### Step 1 — Install All Tools
 
-| Tool | Version | Download |
-|------|---------|----------|
-| Node.js | 20+ | https://nodejs.org |
-| pnpm | 9+ | Run: `npm install -g pnpm` |
-| Python | 3.11+ | https://python.org |
-| PostgreSQL | 15+ | https://postgresql.org |
+#### Node.js (see above — Step 1 of Quick Start)
 
-### Step 1 — Install pnpm and project dependencies
+#### pnpm
 
 ```bash
 npm install -g pnpm
+```
+
+Verify:
+```bash
+pnpm -v
+```
+
+#### Python 3.11+
+
+**Windows:**
+```bash
+winget install Python.Python.3.11
+```
+
+**Mac:**
+```bash
+brew install python@3.11
+```
+
+**Linux:**
+```bash
+sudo apt-get install python3.11 python3.11-venv python3-pip
+```
+
+Verify:
+```bash
+python --version   # or: python3 --version
+```
+
+#### PostgreSQL
+
+**Windows:**
+```bash
+winget install PostgreSQL.PostgreSQL
+```
+
+**Mac:**
+```bash
+brew install postgresql@15
+brew services start postgresql@15
+```
+
+**Linux:**
+```bash
+sudo apt-get install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+Verify:
+```bash
+psql --version
+```
+
+---
+
+### Step 2 — Clone and Install Dependencies
+
+```bash
+git clone https://github.com/amfire-tech/skillship.git
 cd skillship
 pnpm install
 ```
 
-### Step 2 — Set up environment files
+---
 
-Copy and fill in env files for each service:
+### Step 3 — Set Up Environment Files
 
 ```bash
 cp apps/api/.env.example apps/api/.env
@@ -87,7 +204,9 @@ cp apps/ai-service/.env.example apps/ai-service/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-**`apps/api/.env`** — fill in:
+Now open each file and fill in the values:
+
+**`apps/api/.env`:**
 ```env
 DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/skillship
 JWT_SECRET=any-random-secret-string
@@ -95,26 +214,32 @@ AI_SERVICE_URL=http://localhost:8001
 PORT=8000
 ```
 
-**`apps/web/.env.local`** — fill in:
+**`apps/web/.env.local`:**
 ```env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 ```
 
-**`apps/ai-service/.env`** — fill in:
+**`apps/ai-service/.env`:**
 ```env
 DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/skillship
-OPENAI_API_KEY=sk-your-key-here
+OPENAI_API_KEY=sk-your-openai-key-here
 PORT=8001
 ```
 
-### Step 3 — Set up the database
+> Replace `yourpassword` with your PostgreSQL password set during installation.
 
-Make sure PostgreSQL is running, then:
+---
+
+### Step 4 — Create the Database
 
 ```bash
 psql -U postgres -c "CREATE DATABASE skillship;"
+```
 
+Run migrations and seed data:
+
+```bash
 cd packages/db
 npx prisma migrate dev
 npx prisma generate
@@ -122,52 +247,72 @@ npx prisma db seed
 cd ../..
 ```
 
-### Step 4 — Set up Python AI service
+---
+
+### Step 5 — Set Up Python AI Service
 
 ```bash
 cd apps/ai-service
 
 python -m venv venv
+```
 
-# Activate (Windows):
+Activate the virtual environment:
+
+**Windows:**
+```bash
 venv\Scripts\activate
+```
 
-# Activate (Mac/Linux):
+**Mac/Linux:**
+```bash
 source venv/bin/activate
+```
 
+Install Python packages:
+```bash
 pip install -r requirements.txt
 cd ../..
 ```
 
-### Step 5 — Start all 3 services (open 3 terminals)
+---
 
-**Terminal 1 — API:**
+### Step 6 — Start All 3 Services
+
+Open **3 separate terminals** and run one command in each:
+
+**Terminal 1 — API (Node.js backend):**
 ```bash
-cd apps/api
+cd skillship/apps/api
 pnpm dev
-# Running at http://localhost:8000
 ```
+Runs at → http://localhost:8000
 
-**Terminal 2 — AI Service:**
+**Terminal 2 — AI Service (Python):**
 ```bash
-cd apps/ai-service
-venv\Scripts\activate        # or: source venv/bin/activate
+cd skillship/apps/ai-service
+
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
 uvicorn app.main:app --reload --port 8001
-# Running at http://localhost:8001
 ```
+Runs at → http://localhost:8001
 
-**Terminal 3 — Frontend:**
+**Terminal 3 — Frontend (Next.js):**
 ```bash
-cd apps/web
+cd skillship/apps/web
 npm run dev
-# Running at http://localhost:3000
 ```
+Runs at → http://localhost:3000
 
 ---
 
 ## Default Login Credentials
 
-After running the database seed, use these to log in:
+After running the database seed (Step 4), use these:
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -185,8 +330,26 @@ After running the database seed, use these to log in:
 npx kill-port 3000 8000 8001
 ```
 
-**PostgreSQL not connecting:** Make sure PostgreSQL service is running on your machine.
+**`psql` command not found on Windows:**
+Add PostgreSQL to PATH. Default location: `C:\Program Files\PostgreSQL\15\bin`
 
-**`pnpm` not found:** Run `npm install -g pnpm` first.
+**PostgreSQL password error:**
+```bash
+# Reset postgres user password
+psql -U postgres
+\password postgres
+```
 
-**Python venv errors:** Make sure you activated the venv before running `pip install` or `uvicorn`.
+**`pnpm` not found:**
+```bash
+npm install -g pnpm
+```
+
+**Python venv not activating on Windows (PowerShell):**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+Then run `venv\Scripts\activate` again.
+
+**`pip install` fails:**
+Make sure venv is activated (you should see `(venv)` at the start of your terminal line).
