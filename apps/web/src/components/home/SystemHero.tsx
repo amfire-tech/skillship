@@ -96,7 +96,7 @@ function CenterBrain() {
     >
       {/* Outer glow rings */}
       <div className="absolute inset-0 rounded-full bg-primary/5 animate-[ping_3s_ease-in-out_infinite]" />
-      <div className="absolute inset-3 rounded-full bg-primary/8 animate-[ping_3s_ease-in-out_infinite_0.5s]" />
+      <div className="absolute inset-3 rounded-full bg-primary/10 animate-[ping_3s_ease-in-out_infinite_0.5s]" />
 
       {/* Main circle */}
       <div className="relative z-10 flex h-36 w-36 flex-col items-center justify-center rounded-full border-2 border-primary/20 bg-white shadow-[0_0_60px_-15px_rgba(5,150,105,0.3)] md:h-48 md:w-48">
@@ -125,7 +125,7 @@ function ConnectionLines() {
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
       viewBox="0 0 100 100"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
     >
       <defs>
@@ -266,6 +266,7 @@ export function SystemHero() {
 
         {/* ── SYSTEM VISUAL — square container so % = true circle ── */}
         <div className="relative mx-auto mt-14 w-full max-w-[520px] aspect-square md:mt-16">
+          <ConnectionLines />
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <CenterBrain />
           </div>

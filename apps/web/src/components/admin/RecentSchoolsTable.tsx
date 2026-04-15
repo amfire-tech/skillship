@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
 interface SchoolRow {
@@ -32,6 +33,7 @@ const statusClass: Record<SchoolRow["status"], string> = {
 };
 
 export function RecentSchoolsTable() {
+  const router = useRouter();
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -91,8 +93,8 @@ export function RecentSchoolsTable() {
                 </td>
                 <td className="py-3">
                   <div className="flex items-center gap-3 text-xs">
-                    <button className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                    <button className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                    <button onClick={() => router.push("/admin/schools")} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                    <button onClick={() => router.push("/admin/schools")} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
                   </div>
                 </td>
               </motion.tr>

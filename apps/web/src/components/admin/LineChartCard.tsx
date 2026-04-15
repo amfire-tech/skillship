@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 
 interface LineChartCardProps {
@@ -33,6 +34,8 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
 
   const ticks = yTicks ?? [min, min + range / 3, min + (2 * range) / 3, max];
 
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: number } | null>(null);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -45,8 +48,14 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
         <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{subtitle}</p>
       </div>
 
-      <div className="mt-4 overflow-hidden">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-[240px] w-full">
+      <div className="relative mt-4 overflow-hidden">
+        <svg
+          role="img"
+          aria-label={`${title}: ${data.map((d) => `${d.label} ${d.value}`).join(", ")}`}
+          viewBox={`0 0 ${W} ${H}`}
+          className="h-[240px] w-full"
+          onMouseLeave={() => setTooltip(null)}
+        >
           <defs>
             <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor="rgb(5,150,105)" stopOpacity="0.22" />
@@ -93,21 +102,67 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
             strokeLinejoin="round"
           />
 
-          {/* Dots */}
+          {/* Dots + hover targets */}
           {data.map((d, i) => (
-            <motion.circle
-              key={d.label}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.8 + i * 0.03 }}
-              cx={xFor(i)}
-              cy={yFor(d.value)}
-              r="3.5"
-              fill="white"
-              stroke="rgb(5,150,105)"
-              strokeWidth="2"
-            />
+            <g key={d.label}>
+              <motion.circle
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.8 + i * 0.03 }}
+                cx={xFor(i)}
+                cy={yFor(d.value)}
+                r="3.5"
+                fill="white"
+                stroke="rgb(5,150,105)"
+                strokeWidth="2"
+              />
+              {/* Invisible larger hit area */}
+              <circle
+                cx={xFor(i)}
+                cy={yFor(d.value)}
+                r="10"
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() =>
+                  setTooltip({ x: xFor(i), y: yFor(d.value), label: d.label, value: d.value })
+                }
+              />
+            </g>
           ))}
+
+          {/* Tooltip */}
+          {tooltip && (
+            <g>
+              <line
+                x1={tooltip.x}
+                x2={tooltip.x}
+                y1={padT}
+                y2={H - padB}
+                stroke="rgb(5,150,105)"
+                strokeWidth="1"
+                strokeDasharray="3 3"
+                opacity="0.5"
+              />
+              <rect
+                x={tooltip.x > W / 2 ? tooltip.x - 72 : tooltip.x + 10}
+                y={tooltip.y - 28}
+                width="62"
+                height="22"
+                rx="6"
+                fill="rgb(5,150,105)"
+              />
+              <text
+                x={tooltip.x > W / 2 ? tooltip.x - 41 : tooltip.x + 41}
+                y={tooltip.y - 13}
+                fontSize="11"
+                textAnchor="middle"
+                fill="white"
+                fontWeight="600"
+              >
+                {tooltip.label}: {tooltip.value}
+              </text>
+            </g>
+          )}
 
           {/* X labels */}
           {data.map((d, i) => (

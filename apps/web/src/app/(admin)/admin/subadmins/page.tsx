@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 interface SubAdminRow {
   name: string;
@@ -22,6 +23,7 @@ const subadmins: SubAdminRow[] = [
 ];
 
 export default function SubAdminManagementPage() {
+  const toast = useToast();
   return (
     <div className="space-y-6">
       <PageHeader
@@ -29,7 +31,7 @@ export default function SubAdminManagementPage() {
         subtitle={`${subadmins.length} sub-admins managing schools across regions`}
         action={
           <Link
-            href="/admin/users/new"
+            href="/admin/users/new/subadmin"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -43,8 +45,8 @@ export default function SubAdminManagementPage() {
       {/* Stat strip */}
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "Total SubAdmins", value: "12", tone: "text-primary" },
-          { label: "Active Now", value: "8", tone: "text-teal-600" },
+          { label: "Total SubAdmins", value: subadmins.length.toString(), tone: "text-primary" },
+          { label: "Active Now", value: subadmins.filter((s) => s.status === "Active").length.toString(), tone: "text-teal-600" },
           { label: "Schools Under Mgmt.", value: "502", tone: "text-violet-600" },
           { label: "Pending Approvals", value: "14", tone: "text-amber-600" },
         ].map((s, i) => (
@@ -81,6 +83,13 @@ export default function SubAdminManagementPage() {
               </tr>
             </thead>
             <tbody>
+              {subadmins.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
+                    No sub-admins yet. Create one to get started.
+                  </td>
+                </tr>
+              )}
               {subadmins.map((s, i) => (
                 <motion.tr
                   key={s.email}
@@ -119,8 +128,8 @@ export default function SubAdminManagementPage() {
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-3 text-xs">
-                      <button className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                      <button className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                      <button onClick={() => toast(`Viewing ${s.name}`, "info")} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                      <button onClick={() => toast(`Editing ${s.name}`, "info")} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
                     </div>
                   </td>
                 </motion.tr>

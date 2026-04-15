@@ -1,7 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 interface QuizCard {
   title: string;
@@ -38,14 +41,37 @@ const subjectTint: Record<string, string> = {
   English: "from-sky-500 to-cyan-400",
 };
 
+const subjects = ["All Subjects", "Mathematics", "Biology", "History", "Physics", "Chemistry", "English"];
+const grades = ["All Grades", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
+const statuses = ["All Status", "Published", "Review", "Draft"];
+
 export default function GlobalQuizPage() {
+  const toast = useToast();
+  const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [subject, setSubject] = useState("All Subjects");
+  const [grade, setGrade] = useState("All Grades");
+  const [status, setStatus] = useState("All Status");
+
+  const filtered = quizzes.filter((q) => {
+    const q2 = search.toLowerCase();
+    const matchSearch = !q2 || q.title.toLowerCase().includes(q2) || q.subject.toLowerCase().includes(q2);
+    const matchSubject = subject === "All Subjects" || q.subject === subject;
+    const matchGrade = grade === "All Grades" || q.grade === grade;
+    const matchStatus = status === "All Status" || q.status === status;
+    return matchSearch && matchSubject && matchGrade && matchStatus;
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Global Quiz Management"
         subtitle="All quizzes across subjects, grades and schools"
         action={
-          <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5">
+          <button
+            onClick={() => router.push("/admin/quizzes/new")}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14" /><path d="M5 12h14" />
             </svg>
@@ -65,64 +91,75 @@ export default function GlobalQuizPage() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
           </svg>
-          <input type="search" placeholder="Search quizzes by title or subject…" className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--muted)]/40 pl-9 pr-3 text-sm outline-none placeholder:text-[var(--muted-foreground)] focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search quizzes by title or subject…"
+            className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--muted)]/40 pl-9 pr-3 text-sm outline-none placeholder:text-[var(--muted-foreground)] focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          />
         </div>
-        <select className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
-          <option>All Subjects</option><option>Mathematics</option><option>Biology</option><option>History</option>
+        <select value={subject} onChange={(e) => setSubject(e.target.value)} className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+          {subjects.map((s) => <option key={s}>{s}</option>)}
         </select>
-        <select className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
-          <option>All Grades</option><option>Class 6</option><option>Class 9</option><option>Class 10</option>
+        <select value={grade} onChange={(e) => setGrade(e.target.value)} className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+          {grades.map((g) => <option key={g}>{g}</option>)}
         </select>
-        <select className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
-          <option>All Status</option><option>Published</option><option>Review</option><option>Draft</option>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+          {statuses.map((s) => <option key={s}>{s}</option>)}
         </select>
       </motion.div>
 
       {/* Quiz grid */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {quizzes.map((q, i) => (
-          <motion.div
-            key={q.title}
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15 + i * 0.06 }}
-            className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_20px_40px_-20px_rgba(5,150,105,0.25)]"
-          >
-            {/* Subject stripe */}
-            <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${subjectTint[q.subject] ?? "from-primary to-accent"}`} />
+      {filtered.length === 0 ? (
+        <p className="py-12 text-center text-sm text-[var(--muted-foreground)]">No quizzes match your filters.</p>
+      ) : (
+        <AnimatePresence mode="popLayout">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((q, i) => (
+            <motion.div
+              key={q.title}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 + i * 0.06 }}
+              className="group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_20px_40px_-20px_rgba(5,150,105,0.25)]"
+            >
+              <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${subjectTint[q.subject] ?? "from-primary to-accent"}`} />
 
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">{q.subject}</p>
-                <h3 className="mt-1 text-base font-bold leading-snug text-[var(--foreground)]">{q.title}</h3>
-                <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{q.grade} · {q.questions} questions</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">{q.subject}</p>
+                  <h3 className="mt-1 text-base font-bold leading-snug text-[var(--foreground)]">{q.title}</h3>
+                  <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{q.grade} · {q.questions} questions</p>
+                </div>
+                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor[q.status]}`}>
+                  {q.status}
+                </span>
               </div>
-              <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor[q.status]}`}>
-                {q.status}
-              </span>
-            </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Attempts</p>
-                <p className="mt-0.5 text-sm font-bold text-[var(--foreground)]">{q.attempts}</p>
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-4">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Attempts</p>
+                  <p className="mt-0.5 text-sm font-bold text-[var(--foreground)]">{q.attempts}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Avg score</p>
+                  <p className="mt-0.5 text-sm font-bold text-primary">{q.avgScore}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Avg score</p>
-                <p className="mt-0.5 text-sm font-bold text-primary">{q.avgScore}</p>
-              </div>
-            </div>
 
-            <div className="mt-4 flex items-center justify-between text-xs">
-              <span className="text-[var(--muted-foreground)]">Updated {q.updated}</span>
-              <div className="flex items-center gap-3">
-                <button className="font-semibold text-primary transition-colors hover:text-primary-700">Open</button>
-                <button className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <span className="text-[var(--muted-foreground)]">Updated {q.updated}</span>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => toast(`Opening "${q.title}"`, "info")} className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-primary transition-colors hover:bg-primary/5">Open</button>
+                  <button onClick={() => toast(`Editing "${q.title}"`, "info")} className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary">Edit</button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </motion.div>
+          ))}
+        </div>
+        </AnimatePresence>
+      )}
     </div>
   );
 }

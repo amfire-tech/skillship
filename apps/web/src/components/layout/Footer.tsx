@@ -10,16 +10,15 @@ export function Footer() {
         { label: "Features", href: "/#features" },
         { label: "Workshops", href: "/workshops" },
         { label: "Marketplace", href: "/marketplace" },
-        { label: "Pricing", href: "/pricing" },
+        { label: "Terms of Service", href: "/terms" },
       ],
     },
     {
       title: "Company",
       links: [
         { label: "About Us", href: "/about" },
-        { label: "Careers", href: "/careers" },
-        { label: "Blog", href: "/blog" },
-        { label: "Press", href: "/press" },
+        { label: "Privacy Policy", href: "/privacy" },
+        { label: "Contact Us", href: "mailto:info@skillship.in" },
       ],
     },
     {
@@ -27,8 +26,7 @@ export function Footer() {
       links: [
         { label: "info@skillship.in", href: "mailto:info@skillship.in" },
         { label: "+91 93684 08577", href: "tel:+919368408577" },
-        { label: "Agra, Uttar Pradesh", href: "#" },
-        { label: "Privacy Policy", href: "/privacy" },
+        { label: "Agra, Uttar Pradesh", href: "https://maps.google.com/?q=Tajganj,Agra,Uttar+Pradesh" },
       ],
     },
   ];
@@ -42,8 +40,8 @@ export function Footer() {
             <Link href="/" className="flex items-center gap-2" aria-label={`${siteConfig.name} home`}>
               <Image src="/logo-icon.png" alt="Skillship logo" width={38} height={38} className="object-contain" />
               <span className="text-lg font-bold tracking-tight">
-                <span style={{ color: "#F59E0B" }}>SKILL</span>
-                <span style={{ color: "#0D9488" }}>SHIP</span>
+                <span className="text-amber-500">SKILL</span>
+                <span className="text-teal-600">SHIP</span>
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-emerald-200/60">

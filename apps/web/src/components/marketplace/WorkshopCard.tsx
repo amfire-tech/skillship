@@ -1,7 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { useToast } from "@/components/ui/Toast";
 import type { MarketplaceWorkshopItem } from "@/types";
 
 const categoryLabels = {
@@ -25,6 +28,7 @@ interface WorkshopCardProps {
 }
 
 export function WorkshopCard({ workshop }: WorkshopCardProps) {
+  const toast = useToast();
   return (
     <Card
       hoverable
@@ -93,7 +97,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
               Subscribed
             </div>
           ) : (
-            <Button className="w-full rounded-full">Book Now</Button>
+            <Button onClick={() => toast(`Booking "${workshop.title}"…`, "success")} className="w-full rounded-full">Book Now</Button>
           )}
         </div>
       </CardContent>

@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import { useAuthStore } from "@/store/authStore";
 
 const crumbMap: Record<string, string> = {
@@ -15,7 +16,15 @@ const crumbMap: Record<string, string> = {
   reports: "Reports",
   settings: "Settings",
   users: "Users",
-  new: "Create New User",
+  new: "New",
+};
+
+// Context-aware label for "new" segment based on parent route
+const newLabelByParent: Record<string, string> = {
+  schools: "Add New School",
+  quizzes: "New Quiz",
+  marketplace: "Add Workshop",
+  users: "Create User",
 };
 
 function buildCrumbs(pathname: string) {
@@ -27,10 +36,15 @@ function buildCrumbs(pathname: string) {
   let acc = "/admin";
   for (let i = 1; i < parts.length; i += 1) {
     acc += `/${parts[i]}`;
-    crumbs.push({
-      label: crumbMap[parts[i]] ?? parts[i].charAt(0).toUpperCase() + parts[i].slice(1),
-      href: acc,
-    });
+    let label: string;
+    if (parts[i] === "new") {
+      // Use context from parent segment for a meaningful label
+      const parent = parts[i - 1];
+      label = newLabelByParent[parent] ?? "New";
+    } else {
+      label = crumbMap[parts[i]] ?? parts[i].charAt(0).toUpperCase() + parts[i].slice(1);
+    }
+    crumbs.push({ label, href: acc });
   }
   // If we're at /admin, second crumb is "Dashboard"
   if (parts.length === 1) {
@@ -43,6 +57,7 @@ export function AdminTopbar() {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const crumbs = buildCrumbs(pathname);
+  const { theme, setTheme } = useTheme();
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-[var(--border)] bg-white/80 px-6 backdrop-blur-lg">
@@ -80,15 +95,22 @@ export function AdminTopbar() {
         />
       </div>
 
-      {/* Theme stub */}
+      {/* Theme toggle */}
       <button
         type="button"
         aria-label="Toggle theme"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
+        {theme === "dark" ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="5" /><line x1="12" x2="12" y1="1" y2="3" /><line x1="12" x2="12" y1="21" y2="23" /><line x1="4.22" x2="5.64" y1="4.22" y2="5.64" /><line x1="18.36" x2="19.78" y1="18.36" y2="19.78" /><line x1="1" x2="3" y1="12" y2="12" /><line x1="21" x2="23" y1="12" y2="12" /><line x1="4.22" x2="5.64" y1="19.78" y2="18.36" /><line x1="18.36" x2="19.78" y1="5.64" y2="4.22" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        )}
       </button>
 
       {/* Notifications */}
@@ -100,9 +122,6 @@ export function AdminTopbar() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-          7
-        </span>
       </button>
 
       {/* Profile */}
@@ -111,7 +130,7 @@ export function AdminTopbar() {
           {(user?.name ?? "A").charAt(0).toUpperCase()}
         </div>
         <span className="text-xs font-semibold text-[var(--foreground)]">
-          {user?.name ?? "Aryan Gupta"}
+          {user?.name ?? "Admin"}
         </span>
       </div>
     </header>

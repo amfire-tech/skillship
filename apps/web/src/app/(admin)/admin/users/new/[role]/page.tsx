@@ -30,15 +30,36 @@ const roleMeta: Record<string, { label: string; color: string; fields: string[] 
 };
 
 const fieldMeta: Record<string, { label: string; type: string; placeholder: string }> = {
-  full_name:   { label: "Full Name",       type: "text",     placeholder: "e.g. Rahul Iyer" },
-  email:       { label: "Email Address",   type: "email",    placeholder: "e.g. rahul@school.edu.in" },
-  phone:       { label: "Phone Number",    type: "tel",      placeholder: "+91 98765 43210" },
-  region:      { label: "Region",          type: "text",     placeholder: "e.g. North India" },
-  school:      { label: "School Name",     type: "text",     placeholder: "e.g. Delhi Public School, Noida" },
-  subject:     { label: "Primary Subject", type: "text",     placeholder: "e.g. Mathematics" },
-  class_grade: { label: "Class / Grade",   type: "text",     placeholder: "e.g. Class 9-A" },
-  password:    { label: "Temporary Password", type: "password", placeholder: "Min. 8 characters" },
+  full_name:   { label: "Full Name",           type: "text",     placeholder: "e.g. Rahul Iyer" },
+  email:       { label: "Email Address",        type: "email",    placeholder: "e.g. rahul@school.edu.in" },
+  phone:       { label: "Phone Number",         type: "tel",      placeholder: "+91 98765 43210" },
+  region:      { label: "Region",               type: "text",     placeholder: "e.g. North India" },
+  school:      { label: "School Name",          type: "text",     placeholder: "e.g. Delhi Public School, Noida" },
+  subject:     { label: "Primary Subject",      type: "text",     placeholder: "e.g. Mathematics" },
+  class_grade: { label: "Class / Grade",        type: "text",     placeholder: "e.g. Class 9-A" },
+  password:    { label: "Temporary Password",   type: "password", placeholder: "Min. 8 characters" },
 };
+
+function validateFields(fields: string[], values: Record<string, string>): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const key of fields) {
+    const val = (values[key] ?? "").trim();
+    if (!val) {
+      errors[key] = `${fieldMeta[key]?.label ?? key} is required`;
+      continue;
+    }
+    if (key === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      errors[key] = "Enter a valid email address";
+    }
+    if (key === "phone" && !/^[+]?[\d\s\-()]{8,15}$/.test(val)) {
+      errors[key] = "Enter a valid phone number";
+    }
+    if (key === "password" && val.length < 8) {
+      errors[key] = "Password must be at least 8 characters";
+    }
+  }
+  return errors;
+}
 
 export default function CreateUserRolePage() {
   const params = useParams();
@@ -47,6 +68,8 @@ export default function CreateUserRolePage() {
   const meta = roleMeta[role];
 
   const [values, setValues] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   if (!meta) {
@@ -62,12 +85,19 @@ export default function CreateUserRolePage() {
 
   function handleChange(key: string, val: string) {
     setValues((prev) => ({ ...prev, [key]: val }));
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Backend team: replace with POST /api/users/ with { role, ...values }
-    setSubmitted(true);
+    const errs = validateFields(meta.fields, values);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+    // Backend team: replace with POST /api/users with { role, ...values }
+    setIsLoading(true);
+    setTimeout(() => { setIsLoading(false); setSubmitted(true); }, 600);
   }
 
   if (submitted) {
@@ -87,11 +117,11 @@ export default function CreateUserRolePage() {
           <h2 className="mt-5 text-xl font-bold text-[var(--foreground)]">User Created!</h2>
           <p className="mt-2 text-sm text-[var(--muted-foreground)]">
             <span className="font-semibold text-[var(--foreground)]">{values.full_name || "The new user"}</span> has been added as a{" "}
-            <span className="font-semibold text-primary">{meta.label}</span>. They will receive login credentials by email.
+            <span className="font-semibold text-primary">{meta.label}</span>. Connect the backend to enable login and email delivery.
           </p>
           <div className="mt-7 flex gap-3">
             <button
-              onClick={() => { setSubmitted(false); setValues({}); }}
+              onClick={() => { setSubmitted(false); setValues({}); setErrors({}); }}
               className="h-10 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary"
             >
               Add Another
@@ -156,6 +186,8 @@ export default function CreateUserRolePage() {
               {meta.fields.map((key, i) => {
                 const f = fieldMeta[key];
                 const isFullWidth = key === "school" || key === "password";
+                const fieldId = `field-${key}`;
+                const errorId = `error-${key}`;
                 return (
                   <motion.div
                     key={key}
@@ -164,17 +196,28 @@ export default function CreateUserRolePage() {
                     transition={{ duration: 0.3, delay: 0.1 + i * 0.04 }}
                     className={`grid gap-1.5 ${isFullWidth ? "md:col-span-2" : ""}`}
                   >
-                    <label className="text-xs font-semibold text-[var(--muted-foreground)]">
+                    <label htmlFor={fieldId} className="text-xs font-semibold text-[var(--muted-foreground)]">
                       {f.label}
                     </label>
                     <input
+                      id={fieldId}
                       type={f.type}
                       placeholder={f.placeholder}
                       value={values[key] ?? ""}
                       onChange={(e) => handleChange(key, e.target.value)}
-                      required
-                      className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10"
+                      aria-describedby={errors[key] ? errorId : undefined}
+                      aria-invalid={!!errors[key]}
+                      className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${
+                        errors[key]
+                          ? "border-red-400 focus:border-red-400 focus:ring-red-100"
+                          : "border-[var(--border)] focus:border-primary focus:ring-primary/10"
+                      }`}
                     />
+                    {errors[key] && (
+                      <p id={errorId} role="alert" className="text-[11px] font-medium text-red-500">
+                        {errors[key]}
+                      </p>
+                    )}
                   </motion.div>
                 );
               })}
@@ -186,7 +229,7 @@ export default function CreateUserRolePage() {
                 <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
               </svg>
               <p className="text-xs text-[var(--muted-foreground)]">
-                The user will receive an email with their login credentials and a prompt to change their password.
+                Backend: connect <code className="rounded bg-[var(--muted)] px-1 text-[10px]">POST /api/users</code> with <code className="rounded bg-[var(--muted)] px-1 text-[10px]">{"{ role, ...fields }"}</code>. In production, login credentials are emailed automatically.
               </p>
             </div>
           </div>
@@ -201,13 +244,20 @@ export default function CreateUserRolePage() {
             </Link>
             <button
               type="submit"
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-6 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
+              disabled={isLoading}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-6 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                <path d="M16 11h6" /><path d="M19 8v6" />
-              </svg>
-              Create {meta.label}
+              {isLoading ? (
+                <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                  <path d="M16 11h6" /><path d="M19 8v6" />
+                </svg>
+              )}
+              {isLoading ? "Saving…" : `Create ${meta.label}`}
             </button>
           </div>
         </div>

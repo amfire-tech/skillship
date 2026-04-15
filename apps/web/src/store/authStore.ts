@@ -54,17 +54,19 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       refreshAuth: async () => {
         // Django sets refresh token as HttpOnly cookie.
         // This call sends the cookie automatically via withCredentials.
-        // Stub until Django endpoint is ready.
-        try {
-          // const res = await apiClient.post<{access: string}>("/auth/token/refresh/");
-          // set({ accessToken: res.data.access });
-          // return true;
-          get().clearAuth();
-          return false;
-        } catch {
-          get().clearAuth();
-          return false;
-        }
+        // TODO (backend): uncomment when Django /auth/token/refresh/ is ready:
+        // try {
+        //   const res = await apiClient.post<{access: string}>("/auth/token/refresh/");
+        //   set({ accessToken: res.data.access });
+        //   return true;
+        // } catch {
+        //   get().clearAuth();
+        //   return false;
+        // }
+        //
+        // Stub: return false without destroying the session.
+        // Calling clearAuth() here would log the user out on every token expiry.
+        return false;
       },
     }),
     {

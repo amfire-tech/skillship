@@ -1,22 +1,61 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { StatCard } from "@/components/admin/StatCard";
 import { LineChartCard } from "@/components/admin/LineChartCard";
 import { BarChartCard } from "@/components/admin/BarChartCard";
 
-const engagementData = [
-  { label: "W1", value: 64 },
-  { label: "W2", value: 68 },
-  { label: "W3", value: 72 },
-  { label: "W4", value: 74 },
-  { label: "W5", value: 78 },
-  { label: "W6", value: 81 },
-  { label: "W7", value: 83 },
-  { label: "W8", value: 87 },
-];
+const timeRanges = ["7D", "30D", "90D", "1Y"] as const;
+type TimeRange = typeof timeRanges[number];
 
+// Engagement data keyed by time range
+const engagementByRange: Record<TimeRange, { label: string; value: number }[]> = {
+  "7D": [
+    { label: "Mon", value: 81 },
+    { label: "Tue", value: 84 },
+    { label: "Wed", value: 79 },
+    { label: "Thu", value: 86 },
+    { label: "Fri", value: 88 },
+    { label: "Sat", value: 72 },
+    { label: "Sun", value: 68 },
+  ],
+  "30D": [
+    { label: "W1", value: 64 },
+    { label: "W2", value: 68 },
+    { label: "W3", value: 72 },
+    { label: "W4", value: 74 },
+    { label: "W5", value: 78 },
+    { label: "W6", value: 81 },
+    { label: "W7", value: 83 },
+    { label: "W8", value: 87 },
+  ],
+  "90D": [
+    { label: "Jan", value: 58 },
+    { label: "Feb", value: 63 },
+    { label: "Mar", value: 71 },
+    { label: "Apr", value: 75 },
+    { label: "May", value: 80 },
+    { label: "Jun", value: 87 },
+  ],
+  "1Y": [
+    { label: "Jan", value: 48 },
+    { label: "Feb", value: 52 },
+    { label: "Mar", value: 55 },
+    { label: "Apr", value: 61 },
+    { label: "May", value: 65 },
+    { label: "Jun", value: 70 },
+    { label: "Jul", value: 74 },
+    { label: "Aug", value: 78 },
+    { label: "Sep", value: 81 },
+    { label: "Oct", value: 84 },
+    { label: "Nov", value: 86 },
+    { label: "Dec", value: 87 },
+  ],
+};
+
+// Subject performance (same across ranges — backend will vary)
 const subjectPerf = [
   { label: "Math", value: 72 },
   { label: "Sci", value: 81 },
@@ -25,6 +64,14 @@ const subjectPerf = [
   { label: "Geo", value: 70 },
   { label: "Comp", value: 88 },
 ];
+
+// KPI values keyed by time range
+const kpiByRange: Record<TimeRange, { dau: string; quizzes: string; session: string; score: string }> = {
+  "7D":  { dau: "39,420", quizzes: "4,280", session: "22m", score: "74%" },
+  "30D": { dau: "42,180", quizzes: "18,940", session: "24m", score: "76%" },
+  "90D": { dau: "44,600", quizzes: "58,100", session: "25m", score: "77%" },
+  "1Y":  { dau: "46,200", quizzes: "2,14,000", session: "26m", score: "78%" },
+};
 
 const regionRows = [
   { region: "North India", schools: 158, students: "34,210", active: "82%" },
@@ -35,6 +82,10 @@ const regionRows = [
 ];
 
 export default function GlobalAnalyticsPage() {
+  const [activeRange, setActiveRange] = useState<TimeRange>("30D");
+  const kpi = kpiByRange[activeRange];
+  const engagementData = engagementByRange[activeRange];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -42,11 +93,12 @@ export default function GlobalAnalyticsPage() {
         subtitle="Platform-wide engagement, performance and regional distribution"
         action={
           <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-white p-1">
-            {["7D", "30D", "90D", "1Y"].map((r, i) => (
+            {timeRanges.map((r) => (
               <button
                 key={r}
+                onClick={() => setActiveRange(r)}
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  i === 1
+                  activeRange === r
                     ? "bg-gradient-to-r from-primary to-accent text-white"
                     : "text-[var(--muted-foreground)] hover:text-primary"
                 }`}
@@ -62,7 +114,7 @@ export default function GlobalAnalyticsPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Daily Active Users"
-          value="42,180"
+          value={kpi.dau}
           delta={{ value: "+9.4%" }}
           tint="primary"
           delay={0.05}
@@ -70,7 +122,7 @@ export default function GlobalAnalyticsPage() {
         />
         <StatCard
           label="Quizzes Attempted"
-          value="18,940"
+          value={kpi.quizzes}
           delta={{ value: "+12.1%" }}
           tint="accent"
           delay={0.1}
@@ -78,7 +130,7 @@ export default function GlobalAnalyticsPage() {
         />
         <StatCard
           label="Avg. Session Time"
-          value="24m"
+          value={kpi.session}
           delta={{ value: "+3m" }}
           tint="violet"
           delay={0.15}
@@ -86,7 +138,7 @@ export default function GlobalAnalyticsPage() {
         />
         <StatCard
           label="Avg. Quiz Score"
-          value="76%"
+          value={kpi.score}
           delta={{ value: "+1.8pp" }}
           tint="amber"
           delay={0.2}
@@ -97,13 +149,14 @@ export default function GlobalAnalyticsPage() {
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <LineChartCard
-          title="Student Engagement — Last 8 Weeks"
-          subtitle="Weekly active rate across all schools"
+          key={`engagement-${activeRange}`}
+          title={`Student Engagement — ${activeRange}`}
+          subtitle="Active rate across all schools"
           data={engagementData}
         />
         <BarChartCard
           title="Average Score by Subject"
-          subtitle="Across all students, last 30 days"
+          subtitle="Across all students, selected period"
           data={subjectPerf}
         />
       </div>
@@ -130,9 +183,11 @@ export default function GlobalAnalyticsPage() {
                 <th className="px-5 py-3">Trend</th>
               </tr>
             </thead>
+            <AnimatePresence mode="popLayout">
             <tbody>
               {regionRows.map((r, i) => (
                 <motion.tr
+                  layout
                   key={r.region}
                   initial={{ opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -158,6 +213,7 @@ export default function GlobalAnalyticsPage() {
                 </motion.tr>
               ))}
             </tbody>
+            </AnimatePresence>
           </table>
         </div>
       </motion.div>

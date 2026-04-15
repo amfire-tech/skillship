@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { MarketplaceBenefits } from "@/components/marketplace/MarketplaceBenefits";
 import { MarketplaceCTA } from "@/components/marketplace/MarketplaceCTA";
 import { MarketplaceFeaturedStrip } from "@/components/marketplace/MarketplaceFeaturedStrip";
@@ -35,12 +36,14 @@ export default function MarketplacePage({
 
       <section className="pb-10 pt-2">
         <PageContainer className="px-6 lg:px-8">
-          <MarketplaceFilters
-            filters={catalog.filters}
-            filterOptions={catalog.filterOptions}
-            filteredCount={catalog.filteredCount}
-            totalCount={catalog.totalCount}
-          />
+          <Suspense fallback={<div className="h-48 rounded-[28px] border border-[var(--border)] bg-white animate-pulse" />}>
+            <MarketplaceFilters
+              filters={catalog.filters}
+              filterOptions={catalog.filterOptions}
+              filteredCount={catalog.filteredCount}
+              totalCount={catalog.totalCount}
+            />
+          </Suspense>
         </PageContainer>
       </section>
 

@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 interface Workshop {
   title: string;
@@ -15,7 +18,7 @@ interface Workshop {
   published: boolean;
 }
 
-const workshops: Workshop[] = [
+const initialWorkshops: Workshop[] = [
   { title: "AI Vision Lab", category: "AI & ML", duration: "Half day", grade: "Class 9–12", price: 2499, enrolled: 1840, rating: 4.8, featured: true, published: true },
   { title: "Robotics Sensor Studio", category: "Robotics", duration: "2 days", grade: "Class 6–8", price: 3999, enrolled: 1240, rating: 4.6, featured: true, published: true },
   { title: "Creative Coding Lab", category: "Coding", duration: "Under 2 hours", grade: "Class 3–5", price: 999, enrolled: 2960, rating: 4.9, featured: false, published: true },
@@ -32,14 +35,55 @@ const categoryTint: Record<Workshop["category"], string> = {
   IoT: "from-teal-500 to-emerald-500",
 };
 
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${on ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-200"}`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-0.5"}`} />
+    </button>
+  );
+}
+
 export default function MarketplaceManagementPage() {
+  const toast = useToast();
+  const router = useRouter();
+  const [workshops, setWorkshops] = useState(initialWorkshops);
+
+  function toggleFeatured(index: number) {
+    setWorkshops((prev) =>
+      prev.map((w, i) => {
+        if (i !== index) return w;
+        const next = !w.featured;
+        toast(`"${w.title}" ${next ? "featured" : "unfeatured"}`, "success");
+        return { ...w, featured: next };
+      })
+    );
+  }
+
+  function togglePublished(index: number) {
+    setWorkshops((prev) =>
+      prev.map((w, i) => {
+        if (i !== index) return w;
+        const next = !w.published;
+        toast(`"${w.title}" ${next ? "published" : "unpublished"}`, next ? "success" : "info");
+        return { ...w, published: next };
+      })
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Marketplace Management"
         subtitle="Workshops, pricing, visibility and featured selection across the catalog"
         action={
-          <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5">
+          <button
+            onClick={() => router.push("/admin/marketplace/new")}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14" /><path d="M5 12h14" />
             </svg>
@@ -91,6 +135,13 @@ export default function MarketplaceManagementPage() {
               </tr>
             </thead>
             <tbody>
+              {workshops.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
+                    No workshops yet. Add one to get started.
+                  </td>
+                </tr>
+              )}
               {workshops.map((w, i) => (
                 <motion.tr
                   key={w.title}
@@ -121,10 +172,10 @@ export default function MarketplaceManagementPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <Toggle on={w.featured} />
+                    <Toggle on={w.featured} onToggle={() => toggleFeatured(i)} />
                   </td>
                   <td className="px-5 py-3.5">
-                    <Toggle on={w.published} />
+                    <Toggle on={w.published} onToggle={() => togglePublished(i)} />
                   </td>
                 </motion.tr>
               ))}
@@ -132,14 +183,6 @@ export default function MarketplaceManagementPage() {
           </table>
         </div>
       </motion.div>
-    </div>
-  );
-}
-
-function Toggle({ on }: { on: boolean }) {
-  return (
-    <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${on ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-200"}`}>
-      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-0.5"}`} />
     </div>
   );
 }

@@ -105,9 +105,18 @@ const navItems: NavItem[] = [
   },
 ];
 
+const roleLabel: Record<string, string> = {
+  admin: "Super Admin",
+  subadmin: "Sub Admin",
+  principal: "Principal",
+  teacher: "Teacher",
+  student: "Student",
+};
+
 export function AdminSidebar() {
   const pathname = usePathname();
   const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
   const router = useRouter();
 
   function handleLogout() {
@@ -126,7 +135,7 @@ export function AdminSidebar() {
         </div>
         <div className="leading-tight">
           <p className="text-base font-bold text-primary">Skillship</p>
-          <p className="text-[11px] font-medium text-[var(--muted-foreground)]">Super Admin</p>
+          <p className="text-[11px] font-medium text-[var(--muted-foreground)]">{roleLabel[user?.role ?? ""] ?? "Admin"}</p>
         </div>
       </div>
 

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import { getDefaultRouteForRole } from "@/lib/role-guard";
-import { verifySeedCredential } from "@/lib/seed-credentials";
+import { seedCredentials, verifySeedCredential } from "@/lib/seed-credentials";
 import type { UserRole } from "@/types";
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -27,6 +27,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const roleRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showRoleMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (roleRef.current && !roleRef.current.contains(e.target as Node)) {
+        setShowRoleMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showRoleMenu]);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,7 +50,7 @@ export default function LoginPage() {
     // --- Seed-credential check (replace with real API call later) ---
     const match = verifySeedCredential(role as UserRole, userId, password);
     if (!match) {
-      setError("Invalid credentials. Check the demo logins.");
+      setError("Invalid credentials. Please try again.");
       return;
     }
     login(
@@ -96,7 +108,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-3.5" noValidate>
             {/* Role select */}
-            <div className="relative">
+            <div className="relative" ref={roleRef}>
               <button
                 type="button"
                 onClick={() => setShowRoleMenu((v) => !v)}
@@ -218,22 +230,6 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Demo credentials helper (remove once backend auth is live) */}
-          <details className="mt-6 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-xs">
-            <summary className="cursor-pointer font-semibold text-primary">
-              Preview credentials (demo only)
-            </summary>
-            <div className="mt-3 grid grid-cols-[auto_1fr_1fr] gap-x-4 gap-y-1 text-[11px] text-[var(--foreground)]">
-              <span className="font-semibold">Role</span>
-              <span className="font-semibold">User ID</span>
-              <span className="font-semibold">Password</span>
-              <span>Super Admin</span><span>admin</span><span>admin123</span>
-              <span>Sub Admin</span><span>subadmin</span><span>subadmin123</span>
-              <span>Principal</span><span>principal</span><span>principal123</span>
-              <span>Teacher</span><span>teacher</span><span>teacher123</span>
-              <span>Student</span><span>student</span><span>student123</span>
-            </div>
-          </details>
         </div>
 
         <p className="mt-6 text-center text-xs text-[var(--muted-foreground)]">
@@ -242,6 +238,36 @@ export default function LoginPage() {
           {" "}and{" "}
           <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
         </p>
+
+        {/* ── DEMO CREDENTIALS (remove when backend auth is live) ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+          className="mt-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
+        >
+          <div className="flex items-center gap-2 border-b border-amber-200 px-4 py-2.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-amber-600">
+              <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <p className="text-[11px] font-semibold text-amber-700">Demo credentials — click any row to fill</p>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {seedCredentials.map((c) => (
+              <button
+                key={c.role}
+                type="button"
+                onClick={() => { setRole(c.role); setUserId(c.userId); setPassword(c.password); }}
+                className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-amber-100"
+              >
+                <span className="text-[11px] font-semibold capitalize text-amber-800">{c.role === "subadmin" ? "Sub Admin" : c.role === "admin" ? "Super Admin" : c.role.charAt(0).toUpperCase() + c.role.slice(1)}</span>
+                <span className="font-mono text-[10px] text-amber-700">{c.userId} / {c.password}</span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+        {/* ── END DEMO CREDENTIALS ── */}
+
       </motion.div>
     </main>
   );

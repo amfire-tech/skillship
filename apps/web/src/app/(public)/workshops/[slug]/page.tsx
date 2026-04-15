@@ -9,16 +9,20 @@ import { CTABanner } from "@/components/shared/CTABanner";
 import { getWorkshopBySlug, getWorkshopSlugs } from "@/services/workshops";
 import type { WorkshopCategory } from "@/types";
 
-const categoryVariants: Record<WorkshopCategory, "info" | "purple" | "cyan"> = {
+const categoryVariants: Record<string, "info" | "purple" | "cyan" | "default"> = {
   ai: "info",
   robotics: "purple",
   coding: "cyan",
+  electronics: "default",
+  iot: "info",
 };
 
-const categoryLabels: Record<WorkshopCategory, string> = {
-  ai: "AI",
+const categoryLabels: Record<string, string> = {
+  ai: "AI & ML",
   robotics: "Robotics",
   coding: "Coding",
+  electronics: "Electronics",
+  iot: "IoT",
 };
 
 interface WorkshopDetailPageProps {
@@ -66,8 +70,8 @@ export default function WorkshopDetailPage({
         <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-45" />
         <div className="relative grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
-            <Badge variant={categoryVariants[workshop.category]}>
-              {categoryLabels[workshop.category]}
+            <Badge variant={categoryVariants[workshop.category] ?? "default"}>
+              {categoryLabels[workshop.category] ?? workshop.category}
             </Badge>
             <h1 className="mt-6 text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl lg:text-[56px] lg:leading-[1.08]">
               {workshop.title}

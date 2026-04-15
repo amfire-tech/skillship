@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 type TabKey = "organization" | "branding" | "security" | "integrations" | "notifications";
 
@@ -132,102 +133,204 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-function Toggle({ on, label, description }: { on: boolean; label: string; description: string }) {
+function Toggle({ on, onToggle, label, description }: { on: boolean; onToggle: () => void; label: string; description: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-start justify-between gap-4 rounded-xl border border-[var(--border)] p-4 text-left transition-colors hover:border-primary/20"
+    >
       <div>
         <p className="text-sm font-semibold text-[var(--foreground)]">{label}</p>
         <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{description}</p>
       </div>
-      <div className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full ${on ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-200"}`}>
+      <div className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${on ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-200"}`}>
         <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-0.5"}`} />
       </div>
-    </div>
+    </button>
   );
 }
 
-function SaveBar() {
+function SaveBar({ onSave, onCancel }: { onSave: () => void; onCancel?: () => void }) {
   return (
     <div className="flex items-center justify-end gap-3 pt-2">
-      <button className="h-10 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="h-10 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary"
+      >
         Cancel
       </button>
-      <button className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5">
+      <button
+        onClick={onSave}
+        className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
+      >
         Save changes
       </button>
     </div>
   );
 }
 
+const orgDefaults = {
+  name: "Skillship Edutech",
+  domain: "skillship.in",
+  email: "info@skillship.in",
+  phone: "+91 93684 08577",
+  address: "Opp. Shipgram, Tajmahal Road, Tajganj, Agra, U.P. 282006",
+  gstin: "",
+};
+
+type OrgErrors = Partial<Record<keyof typeof orgDefaults, string>>;
+
+function validateOrg(form: typeof orgDefaults): OrgErrors {
+  const err: OrgErrors = {};
+  if (!form.name.trim()) err.name = "Organization name is required";
+  if (!form.email.trim()) err.email = "Support email is required";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) err.email = "Enter a valid email address";
+  if (!form.phone.trim()) err.phone = "Contact number is required";
+  else if (!/^[+]?[\d\s\-()]{8,15}$/.test(form.phone)) err.phone = "Enter a valid phone number";
+  return err;
+}
+
 function OrgPanel() {
+  const toast = useToast();
+  const [form, setForm] = useState(orgDefaults);
+  const [errors, setErrors] = useState<OrgErrors>({});
+
+  function set(k: keyof typeof orgDefaults) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((p) => ({ ...p, [k]: e.target.value }));
+      if (errors[k]) setErrors((prev) => ({ ...prev, [k]: undefined }));
+    };
+  }
+
+  function handleSave() {
+    const errs = validateOrg(form);
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    toast("Organization settings saved", "success");
+  }
+
   return (
     <>
       <PanelCard title="Organization details" description="Public-facing information shown to schools and partners">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Organization name"><Input defaultValue="Skillship Edutech" /></Field>
-          <Field label="Primary domain"><Input defaultValue="skillship.in" /></Field>
-          <Field label="Support email"><Input defaultValue="info@skillship.in" /></Field>
-          <Field label="Support phone"><Input defaultValue="+91 93684 08577" /></Field>
-          <Field label="Registered address">
-            <Input defaultValue="Opp. Shipgram, Tajmahal Road, Tajganj, Agra, U.P. 282006" />
+          <Field label="Organization name">
+            <input
+              value={form.name}
+              onChange={set("name")}
+              aria-describedby={errors.name ? "org-name-err" : undefined}
+              className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.name ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
+            />
+            {errors.name && <p id="org-name-err" className="text-[11px] font-medium text-red-500">{errors.name}</p>}
           </Field>
-          <Field label="GSTIN"><Input defaultValue="" placeholder="Enter GSTIN" /></Field>
+          <Field label="Primary domain"><Input value={form.domain} onChange={set("domain")} /></Field>
+          <Field label="Support email">
+            <input
+              type="email"
+              value={form.email}
+              onChange={set("email")}
+              aria-describedby={errors.email ? "org-email-err" : undefined}
+              className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.email ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
+            />
+            {errors.email && <p id="org-email-err" className="text-[11px] font-medium text-red-500">{errors.email}</p>}
+          </Field>
+          <Field label="Support phone">
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={set("phone")}
+              aria-describedby={errors.phone ? "org-phone-err" : undefined}
+              className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.phone ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
+            />
+            {errors.phone && <p id="org-phone-err" className="text-[11px] font-medium text-red-500">{errors.phone}</p>}
+          </Field>
+          <Field label="Registered address">
+            <Input value={form.address} onChange={set("address")} />
+          </Field>
+          <Field label="GSTIN"><Input value={form.gstin} onChange={set("gstin")} placeholder="Enter GSTIN" /></Field>
         </div>
-        <SaveBar />
+        <SaveBar
+          onSave={handleSave}
+          onCancel={() => { setForm(orgDefaults); setErrors({}); toast("Changes discarded", "info"); }}
+        />
       </PanelCard>
     </>
   );
 }
 
 function BrandingPanel() {
+  const toast = useToast();
   return (
     <>
       <PanelCard title="Logo and identity" description="Assets used across dashboards and public pages">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Logo (PNG, SVG)">
-            <div className="flex h-24 items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)]">
+            <label className="flex h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)] transition-colors hover:border-primary/30 hover:text-primary">
+              <input type="file" accept="image/*" className="sr-only" onChange={() => toast("Logo selected", "success")} />
               Drag and drop or click to upload
-            </div>
+            </label>
           </Field>
           <Field label="Favicon (32x32)">
-            <div className="flex h-24 items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)]">
+            <label className="flex h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)] transition-colors hover:border-primary/30 hover:text-primary">
+              <input type="file" accept="image/*" className="sr-only" onChange={() => toast("Favicon selected", "success")} />
               Drag and drop
-            </div>
+            </label>
           </Field>
         </div>
         <Field label="Primary color">
           <div className="flex items-center gap-2">
-            <span className="h-8 w-8 rounded-lg bg-primary" />
+            <input type="color" defaultValue="#059669" className="h-8 w-8 cursor-pointer rounded-lg border border-[var(--border)] bg-transparent p-0.5" />
             <Input defaultValue="#059669" className="max-w-[180px]" />
           </div>
         </Field>
-        <SaveBar />
+        <SaveBar
+          onSave={() => toast("Branding settings saved", "success")}
+          onCancel={() => toast("Changes discarded", "info")}
+        />
       </PanelCard>
     </>
   );
 }
 
+const securityDefaults = { enforce2FA: true, sso: false, sessionTimeout: true, auditLogs: true };
+
 function SecurityPanel() {
+  const toast = useToast();
+  const [enforce2FA, setEnforce2FA] = useState(securityDefaults.enforce2FA);
+  const [sso, setSSO] = useState(securityDefaults.sso);
+  const [sessionTimeout, setSessionTimeout] = useState(securityDefaults.sessionTimeout);
+  const [auditLogs, setAuditLogs] = useState(securityDefaults.auditLogs);
+
   return (
     <>
       <PanelCard title="Authentication" description="Control how admins and users sign in">
-        <Toggle on={true} label="Enforce 2FA for admins" description="Super admins and sub-admins must verify with an authenticator app." />
-        <Toggle on={false} label="Allow SSO (Google Workspace)" description="Schools with Google domains can sign in with their school account." />
-        <Toggle on={true} label="Session timeout after 30 min idle" description="Users are logged out automatically after inactivity." />
+        <Toggle on={enforce2FA} onToggle={() => setEnforce2FA((v) => !v)} label="Enforce 2FA for admins" description="Super admins and sub-admins must verify with an authenticator app." />
+        <Toggle on={sso} onToggle={() => setSSO((v) => !v)} label="Allow SSO (Google Workspace)" description="Schools with Google domains can sign in with their school account." />
+        <Toggle on={sessionTimeout} onToggle={() => setSessionTimeout((v) => !v)} label="Session timeout after 30 min idle" description="Users are logged out automatically after inactivity." />
       </PanelCard>
 
       <PanelCard title="Access control" description="IP restrictions and audit logs">
         <Field label="Allowed admin IP ranges (CIDR)">
           <Input placeholder="e.g., 10.0.0.0/24, 192.168.1.0/24" />
         </Field>
-        <Toggle on={true} label="Retain audit logs for 1 year" description="Meets DPDP compliance for Indian educational data." />
-        <SaveBar />
+        <Toggle on={auditLogs} onToggle={() => setAuditLogs((v) => !v)} label="Retain audit logs for 1 year" description="Meets DPDP compliance for Indian educational data." />
+        <SaveBar
+          onSave={() => toast("Security settings saved", "success")}
+          onCancel={() => {
+            setEnforce2FA(securityDefaults.enforce2FA);
+            setSSO(securityDefaults.sso);
+            setSessionTimeout(securityDefaults.sessionTimeout);
+            setAuditLogs(securityDefaults.auditLogs);
+            toast("Changes discarded", "info");
+          }}
+        />
       </PanelCard>
     </>
   );
 }
 
 function IntegrationsPanel() {
+  const toast = useToast();
   const items = [
     { name: "Razorpay", description: "Payment gateway for workshop bookings", connected: true },
     { name: "Google Classroom", description: "Sync rosters and grade passback", connected: true },
@@ -235,10 +338,33 @@ function IntegrationsPanel() {
     { name: "Zoho CRM", description: "Lead and partnership sync", connected: false },
     { name: "Zoom", description: "Live workshop delivery and recording", connected: true },
   ];
+  const [connected, setConnected] = useState(items.map((it) => it.connected));
+  const [confirmDisconnect, setConfirmDisconnect] = useState<string | null>(null);
+
+  function handleToggle(i: number) {
+    if (connected[i]) {
+      // Disconnecting is destructive — confirm first
+      setConfirmDisconnect(items[i].name);
+    } else {
+      setConnected((prev) => prev.map((c, idx) => (idx === i ? true : c)));
+      toast(`${items[i].name} connected`, "success");
+    }
+  }
+
+  function confirmDoDisconnect() {
+    const i = items.findIndex((it) => it.name === confirmDisconnect);
+    if (i >= 0) {
+      setConnected((prev) => prev.map((c, idx) => (idx === i ? false : c)));
+      toast(`${confirmDisconnect} disconnected`, "info");
+    }
+    setConfirmDisconnect(null);
+  }
+
   return (
+    <>
     <PanelCard title="Connected services" description="Manage third-party integrations used by Skillship">
       <div className="space-y-3">
-        {items.map((it) => (
+        {items.map((it, i) => (
           <div key={it.name} className="flex items-center justify-between rounded-xl border border-[var(--border)] p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold">
@@ -249,28 +375,97 @@ function IntegrationsPanel() {
                 <p className="text-xs text-[var(--muted-foreground)]">{it.description}</p>
               </div>
             </div>
-            <button className={`h-9 rounded-full px-4 text-xs font-semibold transition-colors ${
-              it.connected
-                ? "border border-[var(--border)] bg-white text-[var(--muted-foreground)] hover:border-red-200 hover:text-red-500"
-                : "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)] hover:-translate-y-0.5"
-            }`}>
-              {it.connected ? "Disconnect" : "Connect"}
+            <button
+              onClick={() => handleToggle(i)}
+              className={`h-9 rounded-full px-4 text-xs font-semibold transition-all ${
+                connected[i]
+                  ? "border border-[var(--border)] bg-white text-[var(--muted-foreground)] hover:border-red-200 hover:text-red-500"
+                  : "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)] hover:-translate-y-0.5"
+              }`}
+            >
+              {connected[i] ? "Disconnect" : "Connect"}
             </button>
           </div>
         ))}
       </div>
     </PanelCard>
+
+    {/* Disconnect confirmation dialog */}
+    <AnimatePresence>
+      {confirmDisconnect && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="disconnect-dialog-title"
+            aria-describedby="disconnect-dialog-desc"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-6 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)]"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500">
+                <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 3v4M8 3v4" />
+              </svg>
+            </div>
+            <h3 id="disconnect-dialog-title" className="mt-4 text-base font-bold text-[var(--foreground)]">Disconnect {confirmDisconnect}?</h3>
+            <p id="disconnect-dialog-desc" className="mt-1.5 text-sm text-[var(--muted-foreground)]">
+              Disconnecting <span className="font-semibold text-[var(--foreground)]">{confirmDisconnect}</span> will stop all syncs and data flow immediately. You can reconnect later.
+            </p>
+            <div className="mt-5 flex items-center gap-3">
+              <button
+                onClick={() => setConfirmDisconnect(null)}
+                className="flex-1 h-10 rounded-full border border-[var(--border)] bg-white text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDoDisconnect}
+                className="flex-1 h-10 rounded-full bg-red-500 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-600"
+              >
+                Disconnect
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
 
+const notifDefaults = { onboarding: true, quizDigest: true, weeklyReport: false, securityAlerts: true };
+
 function NotificationsPanel() {
+  const toast = useToast();
+  const [onboarding, setOnboarding] = useState(notifDefaults.onboarding);
+  const [quizDigest, setQuizDigest] = useState(notifDefaults.quizDigest);
+  const [weeklyReport, setWeeklyReport] = useState(notifDefaults.weeklyReport);
+  const [securityAlerts, setSecurityAlerts] = useState(notifDefaults.securityAlerts);
+
   return (
     <PanelCard title="Notifications" description="Control the channels and frequency of system alerts">
-      <Toggle on={true} label="New school onboarding" description="Email when a new school completes onboarding." />
-      <Toggle on={true} label="Pending quiz approvals" description="Daily digest of quizzes awaiting review." />
-      <Toggle on={false} label="Weekly performance report" description="Aggregated performance sent every Monday at 9 AM IST." />
-      <Toggle on={true} label="Security alerts" description="Unusual login attempts, failed 2FA and token misuse." />
-      <SaveBar />
+      <Toggle on={onboarding} onToggle={() => setOnboarding((v) => !v)} label="New school onboarding" description="Email when a new school completes onboarding." />
+      <Toggle on={quizDigest} onToggle={() => setQuizDigest((v) => !v)} label="Pending quiz approvals" description="Daily digest of quizzes awaiting review." />
+      <Toggle on={weeklyReport} onToggle={() => setWeeklyReport((v) => !v)} label="Weekly performance report" description="Aggregated performance sent every Monday at 9 AM IST." />
+      <Toggle on={securityAlerts} onToggle={() => setSecurityAlerts((v) => !v)} label="Security alerts" description="Unusual login attempts, failed 2FA and token misuse." />
+      <SaveBar
+        onSave={() => toast("Notification preferences saved", "success")}
+        onCancel={() => {
+          setOnboarding(notifDefaults.onboarding);
+          setQuizDigest(notifDefaults.quizDigest);
+          setWeeklyReport(notifDefaults.weeklyReport);
+          setSecurityAlerts(notifDefaults.securityAlerts);
+          toast("Changes discarded", "info");
+        }}
+      />
     </PanelCard>
   );
 }

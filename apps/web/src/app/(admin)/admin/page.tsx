@@ -73,7 +73,7 @@ export default function AdminDashboardPage() {
           }
         />
         <StatCard
-          label="Monthly Revenue"
+          label="Avg. Revenue / School"
           value="₹5,499/mo"
           delta={{ value: "+18.7%" }}
           tint="amber"

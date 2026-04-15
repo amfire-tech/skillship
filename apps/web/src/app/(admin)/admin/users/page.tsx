@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 type Role = "all" | "admin" | "subadmin" | "principal" | "teacher" | "student";
 
@@ -40,19 +41,30 @@ const statusColor: Record<UserRow["status"], string> = {
   Invited: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-const tabs: { label: string; value: Role; count: number }[] = [
-  { label: "All", value: "all", count: 1_04_320 + 3847 + 502 + 12 + 1 },
-  { label: "Super Admin", value: "admin", count: 1 },
-  { label: "Sub Admins", value: "subadmin", count: 12 },
-  { label: "Principals", value: "principal", count: 502 },
-  { label: "Teachers", value: "teacher", count: 3847 },
-  { label: "Students", value: "student", count: 104320 },
+const roleTabDefs: { label: string; value: Role }[] = [
+  { label: "All", value: "all" },
+  { label: "Super Admin", value: "admin" },
+  { label: "Sub Admins", value: "subadmin" },
+  { label: "Principals", value: "principal" },
+  { label: "Teachers", value: "teacher" },
+  { label: "Students", value: "student" },
 ];
 
 export default function UserManagementPage() {
+  const toast = useToast();
   const [activeRole, setActiveRole] = useState<Role>("all");
+  const [search, setSearch] = useState("");
+  const [confirmSuspend, setConfirmSuspend] = useState<UserRow | null>(null);
 
-  const filtered = activeRole === "all" ? users : users.filter((u) => u.role === activeRole);
+  const tabs = roleTabDefs.map((t) => ({
+    ...t,
+    count: t.value === "all" ? users.length : users.filter((u) => u.role === t.value).length,
+  }));
+
+  const filtered = (activeRole === "all" ? users : users.filter((u) => u.role === activeRole)).filter((u) => {
+    const q = search.toLowerCase();
+    return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.school.toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-6">
@@ -84,7 +96,7 @@ export default function UserManagementPage() {
           return (
             <button
               key={t.value}
-              onClick={() => setActiveRole(t.value)}
+              onClick={() => { setActiveRole(t.value); setSearch(""); }}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
                 active
                   ? "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)]"
@@ -93,7 +105,7 @@ export default function UserManagementPage() {
             >
               {t.label}
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-white/25" : "bg-[var(--muted)]"}`}>
-                {t.count.toLocaleString("en-IN")}
+                {t.count}
               </span>
             </button>
           );
@@ -112,6 +124,8 @@ export default function UserManagementPage() {
         </svg>
         <input
           type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name, email, school…"
           className="h-11 w-full rounded-xl border border-[var(--border)] bg-white pl-11 pr-4 text-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10"
         />
@@ -137,50 +151,108 @@ export default function UserManagementPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u, i) => (
-                <motion.tr
-                  key={u.email}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.25 + i * 0.04 }}
-                  className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
-                >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
-                        {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
+                    No users match your search.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((u, i) => (
+                  <motion.tr
+                    key={u.email}
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: 0.25 + i * 0.04 }}
+                    className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
+                          {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-[var(--foreground)]">{u.name}</p>
+                          <p className="text-[11px] text-[var(--muted-foreground)]">{u.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-[var(--foreground)]">{u.name}</p>
-                        <p className="text-[11px] text-[var(--muted-foreground)]">{u.email}</p>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${roleColor[u.role]}`}>
+                        {u.role === "subadmin" ? "Sub Admin" : u.role === "admin" ? "Super Admin" : u.role}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.school}</td>
+                    <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.joined}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor[u.status]}`}>
+                        {u.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-3 text-xs">
+                        <button onClick={() => toast(`Viewing ${u.name}`, "info")} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                        <button onClick={() => toast(`Editing ${u.name}`, "info")} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                        <button onClick={() => setConfirmSuspend(u)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Suspend</button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${roleColor[u.role]}`}>
-                      {u.role === "subadmin" ? "Sub Admin" : u.role === "admin" ? "Super Admin" : u.role}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.school}</td>
-                  <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.joined}</td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor[u.status]}`}>
-                      {u.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-3 text-xs">
-                      <button className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                      <button className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
-                      <button className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Suspend</button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
+                    </td>
+                  </motion.tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </motion.div>
+      {/* Suspend confirmation dialog */}
+      <AnimatePresence>
+        {confirmSuspend && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="suspend-dialog-title"
+              aria-describedby="suspend-dialog-desc"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-6 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)]"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <h3 id="suspend-dialog-title" className="mt-4 text-base font-bold text-[var(--foreground)]">Suspend user?</h3>
+              <p id="suspend-dialog-desc" className="mt-1.5 text-sm text-[var(--muted-foreground)]">
+                <span className="font-semibold text-[var(--foreground)]">{confirmSuspend.name}</span> will lose access to the platform immediately. You can reinstate them later.
+              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <button
+                  onClick={() => setConfirmSuspend(null)}
+                  className="flex-1 h-10 rounded-full border border-[var(--border)] bg-white text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    toast(`${confirmSuspend.name} suspended`, "error");
+                    setConfirmSuspend(null);
+                  }}
+                  className="flex-1 h-10 rounded-full bg-amber-500 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-amber-600"
+                >
+                  Suspend
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
