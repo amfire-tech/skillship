@@ -1,10 +1,78 @@
-/*
-  File:    frontend/src/app/globals.css
-  Purpose: Global Tailwind directives + a few CSS custom properties.
-  Owner:   Pranav
-  TODO:
-    @tailwind base;
-    @tailwind components;
-    @tailwind utilities;
-    :root { --brand: #2563eb; }  // can be overridden per-school from API
-*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+@layer base {
+  :root {
+    --background: #FAFFFE;
+    --foreground: #0C1220;
+    --card: #FFFFFF;
+    --card-foreground: #1A2332;
+    --border: #E2EDE8;
+    --muted: #F0FAF5;
+    --muted-foreground: #5A7068;
+    /* Brand color override point — can be set per-school from settings API */
+    --brand: #059669;
+    --nav: #059669;
+  }
+
+  .dark {
+    --background: #0C1220;
+    --foreground: #F0FDF4;
+    --card: #162032;
+    --card-foreground: #F0FDF4;
+    --border: #1E3A3A;
+    --muted: #162032;
+    --muted-foreground: #86AEAA;
+  }
+
+  * {
+    @apply border-[var(--border)];
+  }
+
+  body {
+    @apply bg-[var(--background)] text-[var(--foreground)] font-sans antialiased;
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes tilt-soft {
+  0%, 100% { transform: rotate(0deg); }
+  50%       { transform: rotate(4deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.16); }
+  50%       { box-shadow: 0 0 0 14px rgba(5, 150, 105, 0); }
+}
+
+@layer components {
+  .section-padding   { @apply py-20 md:py-24; }
+  .container-main    { @apply mx-auto max-w-container px-6 lg:px-8; }
+
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+    background-position: center;
+    background-size: 36px 36px;
+  }
+
+  .animate-float-slow  { animation: float-slow 8s ease-in-out infinite; }
+  .animate-float-delay { animation: float-slow 10s ease-in-out infinite 1.2s; }
+  .animate-tilt-soft   { animation: tilt-soft 6s ease-in-out infinite; }
+  .animate-glow-pulse  { animation: glow-pulse 2.8s ease-in-out infinite; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-delay,
+  .animate-tilt-soft,
+  .animate-glow-pulse { animation: none; }
+}

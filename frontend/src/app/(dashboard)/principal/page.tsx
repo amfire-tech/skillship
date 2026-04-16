@@ -1,7 +1,10 @@
-// File:    frontend/src/app/(dashboard)/principal/page.tsx
-// Purpose: Principal dashboard — school-wide KPIs, at-risk list, weekly AI report.
-// Owner:   Pranav
-// TODO:
-//   - GET /dashboards/principal -> KPIs cards, top risk students, class heatmap
-//   - "Generate Weekly Report" button -> POST /ai/reports/weekly/
-//   - Risk signals panel with acknowledge action.
+// Placeholder — principal dashboard.
+// TODO (Sprint 2): Add stats cards, quiz activity feed, enrollment summary.
+export default function PrincipalPage() {
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-semibold">Principal Dashboard</h1>
+      <p className="mt-2 text-sm opacity-70">Placeholder — pending Sprint 2 implementation.</p>
+    </main>
+  );
+}

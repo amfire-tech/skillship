@@ -1,12 +1,39 @@
 {
-  "_comment_file": "frontend/package.json",
-  "_comment_purpose": "NPM manifest — declares every JS dep the frontend needs.",
-  "_comment_why": "Locked versions so every teammate and CI install the same code.",
-  "_comment_owner": "Pranav",
-  "_todo": [
-    "Replace with real package.json after running `npx create-next-app@14 frontend --typescript --tailwind --app`",
-    "Add deps: @tanstack/react-query, axios, zustand, zod, react-hook-form",
-    "Add devDeps: openapi-typescript (auto-generate TS types from Django's drf-spectacular schema)",
-    "Add script: `gen:types` -> openapi-typescript http://localhost:8000/api/schema/ -o src/types/generated/api.ts"
-  ]
+  "name": "skillship-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "gen:types": "openapi-typescript http://localhost:8000/api/schema/ -o src/types/generated/api.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@tanstack/react-query": "^5.97.0",
+    "axios": "^1.15.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.8.0",
+    "next": "14.2.29",
+    "next-themes": "^0.4.6",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-hook-form": "^7.72.1",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.29",
+    "openapi-typescript": "^7.0.0",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
 }

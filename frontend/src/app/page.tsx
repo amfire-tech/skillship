@@ -1,4 +1,23 @@
 // File:    frontend/src/app/page.tsx
-// Purpose: Root "/" page — redirects to (public) landing.
+// Purpose: Root "/" — renders the public landing page directly.
 // Owner:   Pranav
-// TODO:    redirect('/home') or render the public landing directly.
+
+import { SystemHero } from "@/components/home/SystemHero";
+import { SystemFlow } from "@/components/home/SystemFlow";
+import { ProductShowcase } from "@/components/home/ProductShowcase";
+import { TransformSection } from "@/components/home/TransformSection";
+import { Testimonials } from "@/components/home/Testimonials";
+import { CTABanner } from "@/components/shared/CTABanner";
+
+export default function HomePage() {
+  return (
+    <>
+      <SystemHero />
+      <SystemFlow />
+      <ProductShowcase />
+      <TransformSection />
+      <Testimonials />
+      <CTABanner />
+    </>
+  );
+}

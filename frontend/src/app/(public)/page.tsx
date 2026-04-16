@@ -1,4 +1,19 @@
-// File:    frontend/src/app/(public)/page.tsx
-// Purpose: Public landing page — hero, features, pricing, "Login" CTA.
-// Owner:   Pranav
-// TODO:    Hero + Features + Pricing + Testimonials + Footer. No auth needed.
+import { SystemHero } from "@/components/home/SystemHero";
+import { SystemFlow } from "@/components/home/SystemFlow";
+import { ProductShowcase } from "@/components/home/ProductShowcase";
+import { TransformSection } from "@/components/home/TransformSection";
+import { Testimonials } from "@/components/home/Testimonials";
+import { CTABanner } from "@/components/shared/CTABanner";
+
+export default function HomePage() {
+  return (
+    <>
+      <SystemHero />
+      <SystemFlow />
+      <ProductShowcase />
+      <TransformSection />
+      <Testimonials />
+      <CTABanner />
+    </>
+  );
+}

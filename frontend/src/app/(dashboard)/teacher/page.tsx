@@ -1,7 +1,10 @@
-// File:    frontend/src/app/(dashboard)/teacher/page.tsx
-// Purpose: Teacher dashboard — my classes, quizzes I created, student progress, content uploads.
-// Owner:   Pranav
-// TODO:
-//   - Tabs: Classes | Quizzes | Content | Students
-//   - Quiz builder uses AI: "Generate 10 MCQs on photosynthesis grade 7"
-//     -> POST /ai/quiz/generate/ -> review/edit -> publish.
+// Placeholder — teacher dashboard.
+// TODO (Sprint 2): Add my classes list, recent quiz activity feed, quiz builder entry.
+export default function TeacherPage() {
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-semibold">Teacher Dashboard</h1>
+      <p className="mt-2 text-sm opacity-70">Placeholder — pending Sprint 2 implementation.</p>
+    </main>
+  );
+}

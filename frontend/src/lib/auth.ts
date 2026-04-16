@@ -1,4 +1,23 @@
 // File:    frontend/src/lib/auth.ts
-// Purpose: Helpers to log in, log out, read current user, decode role from JWT.
+// Purpose: Thin helpers that wrap authStore — for use outside React components.
 // Owner:   Pranav
-// TODO:    login(email, pw), logout(), getCurrentUser(), getRole(), isAuthenticated().
+// Note:    Inside components use useAuth() hook instead.
+
+import { useAuthStore } from "@/store/authStore";
+
+export function isAuthenticated(): boolean {
+  return useAuthStore.getState().isAuthenticated;
+}
+
+export function getCurrentUser() {
+  return useAuthStore.getState().user;
+}
+
+export function getRole() {
+  return useAuthStore.getState().user?.role ?? null;
+}
+
+export function logout() {
+  useAuthStore.getState().clearAuth();
+  if (typeof window !== "undefined") window.location.href = "/login";
+}

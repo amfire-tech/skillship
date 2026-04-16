@@ -1,8 +1,10 @@
-// File:    frontend/src/app/(dashboard)/student/page.tsx
-// Purpose: Student dashboard — my courses, next quiz, tutor chat, career pilot, progress.
-// Owner:   Pranav
-// TODO:
-//   - "Take Next Quiz" -> adaptive flow (calls /ai/quiz/adaptive-next/ between answers)
-//   - "Ask Tutor" chat drawer -> POST /ai/tutor/ask/
-//   - "Career Pilot" standalone page
-//   - Progress charts by course.
+// Placeholder — student dashboard.
+// TODO (Sprint 2): Add upcoming quizzes, progress ring, AI tools entry points.
+export default function StudentPage() {
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-semibold">Student Dashboard</h1>
+      <p className="mt-2 text-sm opacity-70">Placeholder — pending Sprint 2 implementation.</p>
+    </main>
+  );
+}
