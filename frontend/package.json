@@ -1,0 +1,12 @@
+{
+  "_comment_file": "frontend/package.json",
+  "_comment_purpose": "NPM manifest — declares every JS dep the frontend needs.",
+  "_comment_why": "Locked versions so every teammate and CI install the same code.",
+  "_comment_owner": "Pranav",
+  "_todo": [
+    "Replace with real package.json after running `npx create-next-app@14 frontend --typescript --tailwind --app`",
+    "Add deps: @tanstack/react-query, axios, zustand, zod, react-hook-form",
+    "Add devDeps: openapi-typescript (auto-generate TS types from Django's drf-spectacular schema)",
+    "Add script: `gen:types` -> openapi-typescript http://localhost:8000/api/schema/ -o src/types/generated/api.ts"
+  ]
+}

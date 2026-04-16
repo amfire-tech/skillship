@@ -1,0 +1,16 @@
+# File:    .github/workflows/backend-ci.yml
+# Purpose: Run lint (ruff) + type check (mypy) + tests (pytest) on every PR that touches backend/.
+# Why:     Catch bugs before merge — cheaper than fixing in prod.
+# Owner:   Navanish
+# TODO:
+#   on: pull_request  paths: ['backend/**']
+#   jobs:
+#     test:
+#       services: [postgres:16, redis:7]
+#       steps:
+#         - checkout
+#         - setup-python@v5 with python-version: 3.12
+#         - pip install -r backend/requirements-dev.txt
+#         - ruff check backend
+#         - mypy backend
+#         - pytest backend --cov --cov-fail-under=70

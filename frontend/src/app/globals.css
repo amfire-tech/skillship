@@ -1,0 +1,10 @@
+/*
+  File:    frontend/src/app/globals.css
+  Purpose: Global Tailwind directives + a few CSS custom properties.
+  Owner:   Pranav
+  TODO:
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+    :root { --brand: #2563eb; }  // can be overridden per-school from API
+*/

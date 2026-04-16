@@ -1,0 +1,12 @@
+# File:    backend/requirements-dev.txt
+# Purpose: Dev-only dependencies (tests, linters, type checker).
+# Owner:   Navanish
+# TODO:
+#   -r requirements.txt
+#   pytest
+#   pytest-django
+#   pytest-cov
+#   factory-boy                    # test data builders
+#   ruff                           # lint + format (replaces flake8/black)
+#   mypy
+#   django-debug-toolbar

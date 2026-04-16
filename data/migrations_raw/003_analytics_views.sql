@@ -1,0 +1,6 @@
+-- File:    data/migrations_raw/003_analytics_views.sql
+-- Purpose: Materialized views for fast dashboard queries (school_kpi_mv, class_perf_mv, student_trend_mv).
+-- Why:     Live aggregates over 1M+ rows kill dashboards. Refresh views nightly via Celery.
+-- Owner:   Vishal
+-- TODO:    CREATE MATERIALIZED VIEW school_kpi_mv AS SELECT school_id, ... ;
+--          + REFRESH schedule: Celery job rebuilds at 02:30 daily.

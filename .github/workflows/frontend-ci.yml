@@ -1,0 +1,6 @@
+# File:    .github/workflows/frontend-ci.yml
+# Purpose: CI for the Next.js frontend — typecheck, lint, build.
+# Owner:   Pranav
+# TODO:
+#   on: pull_request  paths: ['frontend/**']
+#   steps: setup-node 20, npm ci, npm run lint, tsc --noEmit, npm run build.

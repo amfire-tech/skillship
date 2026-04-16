@@ -1,0 +1,10 @@
+-- File:    data/migrations_raw/002_rls_policies.sql
+-- Purpose: Row-Level Security — the DATABASE itself refuses to return another school's rows.
+-- Why:     Defense in depth. Even if a Django bug forgets a .filter, the DB still blocks it.
+-- Owner:   Navanish
+-- TODO:    For each tenant table:
+--            ALTER TABLE foo ENABLE ROW LEVEL SECURITY;
+--            CREATE POLICY tenant_isolation ON foo
+--              USING (school_id = current_setting('app.school_id')::uuid);
+--          Django middleware runs: SET app.school_id = '<uuid>' at start of each request.
+--          MAIN_ADMIN uses a superuser role that bypasses RLS.

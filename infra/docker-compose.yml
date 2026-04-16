@@ -1,0 +1,13 @@
+# File:    infra/docker-compose.yml
+# Purpose: Dev-time orchestration — postgres, redis, backend, ai-service, frontend, celery worker + beat.
+# Why:     One command (`docker compose up`) brings the whole stack up locally. Same shape in prod.
+# Owner:   Navanish
+# TODO:
+#   services:
+#     postgres:  image: pgvector/pgvector:pg16
+#     redis:     image: redis:7-alpine
+#     backend:   build: ../backend
+#     aiservice: build: ../ai-service
+#     frontend:  build: ../frontend
+#     worker:    build: ../backend ; command: celery -A jobs.celery_app worker -l info
+#     beat:      build: ../backend ; command: celery -A jobs.celery_app beat   -l info

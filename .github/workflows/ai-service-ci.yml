@@ -1,0 +1,6 @@
+# File:    .github/workflows/ai-service-ci.yml
+# Purpose: CI for the FastAPI AI service.
+# Owner:   Navanish
+# TODO:
+#   on: pull_request  paths: ['ai-service/**']
+#   steps: setup-python, pip install -r ai-service/requirements.txt, ruff, pytest.

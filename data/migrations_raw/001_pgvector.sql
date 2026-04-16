@@ -1,0 +1,17 @@
+-- File:    data/migrations_raw/001_pgvector.sql
+-- Purpose: Enable the pgvector extension and create the RAG table for content chunks.
+-- Why:     Django ORM cannot create PostgreSQL extensions; must be raw SQL.
+-- Owner:   Navanish
+-- TODO:
+--   CREATE EXTENSION IF NOT EXISTS vector;
+--   CREATE TABLE content_chunks (
+--     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+--     school_id uuid NOT NULL,
+--     content_id uuid NOT NULL,
+--     chunk_index int NOT NULL,
+--     chunk_text text NOT NULL,
+--     embedding vector(1024) NOT NULL,
+--     created_at timestamptz DEFAULT now()
+--   );
+--   CREATE INDEX ON content_chunks (school_id);
+--   CREATE INDEX ON content_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

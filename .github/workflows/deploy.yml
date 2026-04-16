@@ -1,0 +1,9 @@
+# File:    .github/workflows/deploy.yml
+# Purpose: On push to `main`, build Docker images + deploy to staging; manual approval to promote to prod.
+# Owner:   Navanish
+# TODO:
+#   on: push  branches: [main]
+#   jobs:
+#     build-and-push: build backend, ai-service, frontend images; push to registry.
+#     deploy-staging: ssh or k8s apply to staging; run smoke tests.
+#     deploy-prod:    environment with required reviewers; promote same image tag.

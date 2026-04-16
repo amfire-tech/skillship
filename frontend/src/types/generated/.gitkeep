@@ -1,0 +1,5 @@
+# File: frontend/src/types/generated/.gitkeep
+# Purpose: Keeps this folder in git even when empty.
+# Note:    This folder will be populated by `npm run gen:types` from Django's OpenAPI schema.
+#          Never hand-edit files in here — regenerate instead.
+# Owner:   Pranav

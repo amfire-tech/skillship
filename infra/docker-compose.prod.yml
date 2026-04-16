@@ -1,0 +1,5 @@
+# File:    infra/docker-compose.prod.yml
+# Purpose: Production overlay — replaces dev settings (volumes, tty) with prod values
+#          (managed Postgres URL, managed Redis, nginx reverse proxy, TLS).
+# Owner:   Navanish
+# TODO:    extends services from base compose; swaps in prod env_file, adds nginx service on 443.
