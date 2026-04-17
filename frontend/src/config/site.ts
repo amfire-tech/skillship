@@ -14,19 +14,15 @@ export const siteConfig = {
   footer: {
     company: [
       { label: "About Us", href: "/about" },
-      { label: "Careers", href: "/careers" },
-      { label: "Blog", href: "/blog" },
       { label: "Contact", href: "/contact" },
+      { label: "Request Demo", href: "/request-demo" },
     ],
     product: [
       { label: "Features", href: "/#features" },
       { label: "Workshops", href: "/workshops" },
       { label: "Marketplace", href: "/marketplace" },
-      { label: "Pricing", href: "/pricing" },
     ],
     resources: [
-      { label: "Documentation", href: "/docs" },
-      { label: "Help Center", href: "/help" },
       { label: "Privacy Policy", href: "/privacy" },
       { label: "Terms of Service", href: "/terms" },
     ],

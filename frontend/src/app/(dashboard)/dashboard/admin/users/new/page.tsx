@@ -8,7 +8,7 @@ const roles = [
     value: "subadmin",
     label: "Sub Admin",
     description: "Manages a set of schools and their workflows.",
-    href: "/admin/users/new/subadmin",
+    href: "/dashboard/admin/users/new/subadmin",
     tint: "bg-amber-50 text-amber-600",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -20,7 +20,7 @@ const roles = [
     value: "teacher",
     label: "Teacher",
     description: "Creates quizzes, reviews submissions, runs workshops.",
-    href: "/admin/users/new/teacher",
+    href: "/dashboard/admin/users/new/teacher",
     tint: "bg-primary/10 text-primary",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -32,7 +32,7 @@ const roles = [
     value: "principal",
     label: "Principal",
     description: "Oversees school performance and teacher activity.",
-    href: "/admin/users/new/principal",
+    href: "/dashboard/admin/users/new/principal",
     tint: "bg-violet-50 text-violet-600",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -44,7 +44,7 @@ const roles = [
     value: "student",
     label: "Student",
     description: "Takes quizzes, accesses courses, views progress.",
-    href: "/admin/users/new/student",
+    href: "/dashboard/admin/users/new/student",
     tint: "bg-teal-50 text-teal-600",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
