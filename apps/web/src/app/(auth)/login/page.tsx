@@ -6,7 +6,6 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import { getDefaultRouteForRole } from "@/lib/role-guard";
-import { seedCredentials, verifySeedCredential } from "@/lib/seed-credentials";
 import type { UserRole } from "@/types";
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -27,6 +26,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const roleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,33 +40,50 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showRoleMenu]);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     if (!role || !userId || !password) {
       setError("Please fill in all fields.");
       return;
     }
-    // --- Seed-credential check (replace with real API call later) ---
-    const match = verifySeedCredential(role as UserRole, userId, password);
-    if (!match) {
-      setError("Invalid credentials. Please try again.");
-      return;
+
+    const selectedRoleLabel = roleOptions.find((r) => r.value === role)?.label ?? role;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, password, role: selectedRoleLabel }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Invalid credentials. Please try again.");
+        return;
+      }
+
+      login(
+        {
+          id: data.user.id,
+          email: data.user.email ?? "",
+          name: data.user.user_id,
+          role: role as UserRole,
+        },
+        data.accessToken,
+        data.refreshToken
+      );
+      router.replace(getDefaultRouteForRole(role as UserRole));
+    } catch {
+      setError("Could not connect to server. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-    login(
-      {
-        id: `seed-${match.role}`,
-        email: match.email,
-        name: match.name,
-        role: match.role,
-      },
-      "seed-access-token"
-    );
-    router.replace(getDefaultRouteForRole(match.role));
   }
 
   const selectedRoleLabel = roleOptions.find((r) => r.value === role)?.label;
-
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--muted)]/40 px-4 py-10">
       {/* Ambient background */}
@@ -215,12 +232,15 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              className="group relative mt-2 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-accent text-[15px] font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.6)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-12px_rgba(5,150,105,0.7)]"
+              disabled={isLoading}
+              className="group relative mt-2 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-accent text-[15px] font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.6)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-12px_rgba(5,150,105,0.7)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              Login
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:translate-x-0.5">
-                <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-              </svg>
+              {isLoading ? "Logging in..." : "Login"}
+              {!isLoading && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:translate-x-0.5">
+                  <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+                </svg>
+              )}
             </button>
 
             <div className="pt-1 text-center">
@@ -239,34 +259,6 @@ export default function LoginPage() {
           <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
         </p>
 
-        {/* ── DEMO CREDENTIALS (remove when backend auth is live) ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-          className="mt-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50"
-        >
-          <div className="flex items-center gap-2 border-b border-amber-200 px-4 py-2.5">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-amber-600">
-              <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
-            </svg>
-            <p className="text-[11px] font-semibold text-amber-700">Demo credentials — click any row to fill</p>
-          </div>
-          <div className="divide-y divide-amber-100">
-            {seedCredentials.map((c) => (
-              <button
-                key={c.role}
-                type="button"
-                onClick={() => { setRole(c.role); setUserId(c.userId); setPassword(c.password); }}
-                className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-amber-100"
-              >
-                <span className="text-[11px] font-semibold capitalize text-amber-800">{c.role === "subadmin" ? "Sub Admin" : c.role === "admin" ? "Super Admin" : c.role.charAt(0).toUpperCase() + c.role.slice(1)}</span>
-                <span className="font-mono text-[10px] text-amber-700">{c.userId} / {c.password}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
-        {/* ── END DEMO CREDENTIALS ── */}
 
       </motion.div>
     </main>

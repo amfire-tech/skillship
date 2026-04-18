@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { useAuthStore } from "@/store/authStore";
 
 const roleMeta: Record<string, { label: string; color: string; fields: string[] }> = {
   subadmin: {
@@ -67,10 +68,14 @@ export default function CreateUserRolePage() {
   const role = (params?.role as string) ?? "";
   const meta = roleMeta[role];
 
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const refreshAuth = useAuthStore((s) => s.refreshAuth);
+
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [createdUserId, setCreatedUserId] = useState<string>("");
 
   if (!meta) {
     return (
@@ -88,16 +93,48 @@ export default function CreateUserRolePage() {
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateFields(meta.fields, values);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
-    // Backend team: replace with POST /api/users with { role, ...values }
     setIsLoading(true);
-    setTimeout(() => { setIsLoading(false); setSubmitted(true); }, 600);
+    try {
+      let token = accessToken;
+      if (!token) {
+        const ok = await refreshAuth();
+        if (!ok) {
+          setErrors({ form: "Session expired. Please log in again." });
+          setIsLoading(false);
+          return;
+        }
+        token = useAuthStore.getState().accessToken;
+      }
+      const res = await fetch("http://localhost:8000/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role, ...values }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrors({ form: data.message || "Failed to create user. Please try again." });
+        return;
+      }
+
+      setCreatedUserId(data.user_id);
+      setSubmitted(true);
+    } catch {
+      setErrors({ form: "Could not connect to server. Please try again." });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (submitted) {
@@ -117,8 +154,12 @@ export default function CreateUserRolePage() {
           <h2 className="mt-5 text-xl font-bold text-[var(--foreground)]">User Created!</h2>
           <p className="mt-2 text-sm text-[var(--muted-foreground)]">
             <span className="font-semibold text-[var(--foreground)]">{values.full_name || "The new user"}</span> has been added as a{" "}
-            <span className="font-semibold text-primary">{meta.label}</span>. Connect the backend to enable login and email delivery.
+            <span className="font-semibold text-primary">{meta.label}</span>.
           </p>
+          <div className="mt-3 rounded-xl bg-[var(--muted)]/50 px-5 py-3 text-center">
+            <p className="text-xs text-[var(--muted-foreground)]">Login User ID</p>
+            <p className="mt-0.5 font-mono text-lg font-bold text-primary">{createdUserId}</p>
+          </div>
           <div className="mt-7 flex gap-3">
             <button
               onClick={() => { setSubmitted(false); setValues({}); setErrors({}); }}
@@ -223,15 +264,9 @@ export default function CreateUserRolePage() {
               })}
             </div>
 
-            {/* Notice */}
-            <div className="mt-6 flex items-center gap-2 rounded-xl bg-[var(--muted)]/50 px-4 py-3">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-primary">
-                <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
-              </svg>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Backend: connect <code className="rounded bg-[var(--muted)] px-1 text-[10px]">POST /api/users</code> with <code className="rounded bg-[var(--muted)] px-1 text-[10px]">{"{ role, ...fields }"}</code>. In production, login credentials are emailed automatically.
-              </p>
-            </div>
+            {errors.form && (
+              <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{errors.form}</p>
+            )}
           </div>
 
           {/* Footer actions */}

@@ -12,6 +12,7 @@ import type { User } from "@/types";
 interface AuthState {
   user: User | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -19,7 +20,7 @@ interface AuthState {
 interface AuthActions {
   setUser: (user: User) => void;
   setAccessToken: (token: string) => void;
-  login: (user: User, accessToken: string) => void;
+  login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
@@ -29,6 +30,7 @@ interface AuthActions {
 const initialState: AuthState = {
   user: null,
   accessToken: null,
+  refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
 };
@@ -42,8 +44,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       setAccessToken: (accessToken) => set({ accessToken }),
 
-      login: (user, accessToken) =>
-        set({ user, accessToken, isAuthenticated: true, isLoading: false }),
+      login: (user, accessToken, refreshToken) =>
+        set({ user, accessToken, refreshToken, isAuthenticated: true, isLoading: false }),
 
       logout: () => set({ ...initialState }),
 
@@ -52,21 +54,24 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       setLoading: (isLoading) => set({ isLoading }),
 
       refreshAuth: async () => {
-        // Django sets refresh token as HttpOnly cookie.
-        // This call sends the cookie automatically via withCredentials.
-        // TODO (backend): uncomment when Django /auth/token/refresh/ is ready:
-        // try {
-        //   const res = await apiClient.post<{access: string}>("/auth/token/refresh/");
-        //   set({ accessToken: res.data.access });
-        //   return true;
-        // } catch {
-        //   get().clearAuth();
-        //   return false;
-        // }
-        //
-        // Stub: return false without destroying the session.
-        // Calling clearAuth() here would log the user out on every token expiry.
-        return false;
+        const { user, refreshToken } = get();
+        if (!user || !refreshToken) return false;
+        try {
+          const res = await fetch("http://localhost:8000/api/auth/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: user.name, refreshToken }),
+          });
+          if (!res.ok) {
+            get().clearAuth();
+            return false;
+          }
+          const data = await res.json();
+          set({ accessToken: data.accessToken });
+          return true;
+        } catch {
+          return false;
+        }
       },
     }),
     {
@@ -76,6 +81,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       // Access token stays in memory only — lost on refresh, re-obtained via cookie refresh.
       partialize: (state) => ({
         user: state.user,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }
