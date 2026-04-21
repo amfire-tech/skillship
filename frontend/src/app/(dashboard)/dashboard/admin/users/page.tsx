@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -52,6 +53,7 @@ const roleTabDefs: { label: string; value: Role }[] = [
 
 export default function UserManagementPage() {
   const toast = useToast();
+  const router = useRouter();
   const [activeRole, setActiveRole] = useState<Role>("all");
   const [search, setSearch] = useState("");
   const [confirmSuspend, setConfirmSuspend] = useState<UserRow | null>(null);
@@ -191,8 +193,8 @@ export default function UserManagementPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-3 text-xs">
-                        <button onClick={() => toast(`Viewing ${u.name}`, "info")} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                        <button onClick={() => toast(`Editing ${u.name}`, "info")} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                        <button onClick={() => router.push(`/dashboard/admin/users/${i + 1}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                        <button onClick={() => router.push(`/dashboard/admin/users/${i + 1}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
                         <button onClick={() => setConfirmSuspend(u)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Suspend</button>
                       </div>
                     </td>

@@ -191,8 +191,8 @@ export default function SchoolsManagementPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-3 text-xs">
-                        <button onClick={() => toast(`Viewing ${s.name}`, "info")} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                        <button onClick={() => toast(`Editing ${s.name}`, "info")} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                        <button onClick={() => router.push(`/dashboard/admin/schools/${i + 1}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                        <button onClick={() => router.push(`/dashboard/admin/schools/${i + 1}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
                         <button onClick={() => setConfirmRemove(s.name)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Remove</button>
                       </div>
                     </td>

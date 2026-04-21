@@ -1,9 +1,11 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useAuthStore } from "@/store/authStore";
+import { useToast } from "@/components/ui/Toast";
 
 const crumbMap: Record<string, string> = {
   dashboard: "Dashboard",
@@ -61,9 +63,20 @@ function buildCrumbs(pathname: string) {
 
 export function AdminTopbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const toast = useToast();
   const user = useAuthStore((s) => s.user);
   const crumbs = buildCrumbs(pathname);
   const { theme, setTheme } = useTheme();
+  const [query, setQuery] = useState("");
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    toast(`Searching for "${q}"`, "info");
+    setQuery("");
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-[var(--border)] bg-white/80 px-6 backdrop-blur-lg">
@@ -90,16 +103,18 @@ export function AdminTopbar() {
       <div className="flex-1" />
 
       {/* Search */}
-      <div className="relative hidden min-w-[280px] max-w-sm md:block">
+      <form onSubmit={handleSearch} className="relative hidden min-w-[280px] max-w-sm md:block">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
         </svg>
         <input
           type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Search schools, students, quizzes…"
           className="h-9 w-full rounded-full border border-[var(--border)] bg-[var(--muted)]/40 pl-9 pr-3 text-xs text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
         />
-      </div>
+      </form>
 
       {/* Theme toggle */}
       <button

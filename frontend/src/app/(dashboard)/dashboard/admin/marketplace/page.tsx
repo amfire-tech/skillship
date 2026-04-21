@@ -132,12 +132,13 @@ export default function MarketplaceManagementPage() {
                 <th className="px-5 py-3">Rating</th>
                 <th className="px-5 py-3">Featured</th>
                 <th className="px-5 py-3">Published</th>
+                <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {workshops.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
+                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
                     No workshops yet. Add one to get started.
                   </td>
                 </tr>
@@ -176,6 +177,10 @@ export default function MarketplaceManagementPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <Toggle on={w.published} onToggle={() => togglePublished(i)} />
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <button onClick={() => router.push(`/dashboard/admin/marketplace/${i + 1}`)}
+                      className="text-xs font-semibold text-primary transition-colors hover:text-primary/70">Edit</button>
                   </td>
                 </motion.tr>
               ))}

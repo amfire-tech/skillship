@@ -116,7 +116,7 @@ export default function GlobalQuizPage() {
       ) : (
         <AnimatePresence mode="popLayout">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((q, i) => (
+          {filtered.map((q, i) => { const idx = quizzes.indexOf(q); return (
             <motion.div
               key={q.title}
               initial={{ opacity: 0, y: 14 }}
@@ -151,12 +151,12 @@ export default function GlobalQuizPage() {
               <div className="mt-4 flex items-center justify-between text-xs">
                 <span className="text-[var(--muted-foreground)]">Updated {q.updated}</span>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => toast(`Opening "${q.title}"`, "info")} className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-primary transition-colors hover:bg-primary/5">Open</button>
-                  <button onClick={() => toast(`Editing "${q.title}"`, "info")} className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary">Edit</button>
+                  <button onClick={() => router.push(`/dashboard/admin/quizzes/${idx + 1}`)} className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-primary transition-colors hover:bg-primary/5">Open</button>
+                  <button onClick={() => router.push(`/dashboard/admin/quizzes/${idx + 1}`)} className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary">Edit</button>
                 </div>
               </div>
             </motion.div>
-          ))}
+          );})}
         </div>
         </AnimatePresence>
       )}

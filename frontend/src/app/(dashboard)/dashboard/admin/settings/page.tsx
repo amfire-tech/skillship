@@ -258,24 +258,69 @@ function OrgPanel() {
   );
 }
 
+interface FileInfo { name: string; size: string; preview: string }
+
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/svg+xml"];
+const MAX_SIZE = 2 * 1024 * 1024;
+
+function FileUploadField({ label, id, onFile, file }: { label: string; id: string; onFile: (f: FileInfo | null) => void; file: FileInfo | null }) {
+  const toast = useToast();
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!ALLOWED_TYPES.includes(f.type)) {
+      toast("Only PNG, JPG, SVG files allowed", "error");
+      e.target.value = "";
+      return;
+    }
+    if (f.size > MAX_SIZE) {
+      toast("File must be under 2 MB", "error");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      onFile({ name: f.name, size: `${(f.size / 1024).toFixed(1)} KB`, preview: reader.result as string });
+    };
+    reader.readAsDataURL(f);
+  }
+
+  return (
+    <Field label={label}>
+      <label htmlFor={id} className="relative flex h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)] transition-colors hover:border-primary/30 hover:text-primary overflow-hidden">
+        {file?.preview ? (
+          <img src={file.preview} alt="preview" className="absolute inset-0 h-full w-full object-contain p-2" />
+        ) : (
+          <>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+            <span>Click to upload</span>
+          </>
+        )}
+        <input id={id} type="file" accept=".png,.jpg,.jpeg,.svg" className="sr-only" onChange={handleChange} />
+      </label>
+      {file && (
+        <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-1.5 text-[11px]">
+          <span className="font-medium text-[var(--foreground)] truncate max-w-[180px]">{file.name}</span>
+          <span className="text-[var(--muted-foreground)] shrink-0 ml-2">{file.size}</span>
+          <button type="button" onClick={() => onFile(null)} className="ml-3 text-[var(--muted-foreground)] hover:text-red-500 shrink-0">✕</button>
+        </div>
+      )}
+    </Field>
+  );
+}
+
 function BrandingPanel() {
   const toast = useToast();
+  const [logo, setLogo] = useState<FileInfo | null>(null);
+  const [favicon, setFavicon] = useState<FileInfo | null>(null);
+
   return (
     <>
-      <PanelCard title="Logo and identity" description="Assets used across dashboards and public pages">
+      <PanelCard title="Logo and identity" description="Assets used across dashboards and public pages. PNG, JPG, SVG only — max 2 MB.">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Logo (PNG, SVG)">
-            <label className="flex h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)] transition-colors hover:border-primary/30 hover:text-primary">
-              <input type="file" accept="image/*" className="sr-only" onChange={() => toast("Logo selected", "success")} />
-              Drag and drop or click to upload
-            </label>
-          </Field>
-          <Field label="Favicon (32x32)">
-            <label className="flex h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--muted)]/40 text-xs text-[var(--muted-foreground)] transition-colors hover:border-primary/30 hover:text-primary">
-              <input type="file" accept="image/*" className="sr-only" onChange={() => toast("Favicon selected", "success")} />
-              Drag and drop
-            </label>
-          </Field>
+          <FileUploadField label="Logo (PNG / SVG)" id="branding-logo" file={logo} onFile={setLogo} />
+          <FileUploadField label="Favicon (32×32 PNG)" id="branding-favicon" file={favicon} onFile={setFavicon} />
         </div>
         <Field label="Primary color">
           <div className="flex items-center gap-2">
@@ -285,7 +330,7 @@ function BrandingPanel() {
         </Field>
         <SaveBar
           onSave={() => toast("Branding settings saved", "success")}
-          onCancel={() => toast("Changes discarded", "info")}
+          onCancel={() => { setLogo(null); setFavicon(null); toast("Changes discarded", "info"); }}
         />
       </PanelCard>
     </>

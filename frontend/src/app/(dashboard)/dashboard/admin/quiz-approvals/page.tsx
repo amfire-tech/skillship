@@ -33,8 +33,8 @@ const priorityColor: Record<ApprovalItem["priority"], string> = {
 export default function QuizApprovalPage() {
   const toast = useToast();
   const [queue, setQueue] = useState<ApprovalItem[]>(initialQueue);
-  const [approvedCount, setApprovedCount] = useState(28);
-  const [rejectedCount, setRejectedCount] = useState(3);
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [rejectedCount, setRejectedCount] = useState(0);
 
   function approve(title: string) {
     setQueue((prev) => prev.filter((i) => i.title !== title));
