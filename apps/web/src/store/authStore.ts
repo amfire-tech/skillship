@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { user, refreshToken } = get();
         if (!user || !refreshToken) return false;
         try {
-          const res = await fetch("http://localhost:8000/api/auth/refresh", {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8002/api"}/auth/refresh`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_id: user.name, refreshToken }),

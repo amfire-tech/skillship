@@ -3,7 +3,7 @@
 // New code should use: import { api } from "@/lib/api"
 // === Placeholder API Service for Django Backend ===
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8002/api";
 
 export async function apiFetch<T>(
   endpoint: string,

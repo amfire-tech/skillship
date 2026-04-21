@@ -112,7 +112,7 @@ export default function CreateUserRolePage() {
         }
         token = useAuthStore.getState().accessToken;
       }
-      const res = await fetch("http://localhost:8000/api/users", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8002/api"}/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -124,7 +124,7 @@ export default function CreateUserRolePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setErrors({ form: data.message || "Failed to create user. Please try again." });
+        setErrors({ form: data.detail || data.message || "Failed to create user. Please try again." });
         return;
       }
 
