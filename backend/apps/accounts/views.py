@@ -38,6 +38,13 @@ from .serializers import LoginSerializer, UserSerializer
 REFRESH_COOKIE_NAME = "refresh"
 REFRESH_COOKIE_PATH = "/api/v1/auth/"
 
+# DRF coerces a 401 to 403 when the view has no auth scheme to advertise via
+# the WWW-Authenticate header. Login/refresh accept credentials in the body
+# (or cookie), not in Authorization, so they have no auth classes — but the
+# *response* still wants to be 401 ("your credentials didn't work"), not 403
+# ("you have no business here"). Declaring the scheme keeps DRF honest.
+_BEARER_AUTH_HEADER = 'Bearer realm="api"'
+
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
     """Attach a rotated / freshly-issued refresh token as an HttpOnly cookie."""
@@ -60,6 +67,9 @@ def _clear_refresh_cookie(response: Response) -> None:
 class LoginView(APIView):
     authentication_classes: list = []
     permission_classes = [AllowAny]
+
+    def get_authenticate_header(self, request):
+        return _BEARER_AUTH_HEADER
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -86,6 +96,9 @@ class RefreshView(APIView):
 
     authentication_classes: list = []
     permission_classes = [AllowAny]
+
+    def get_authenticate_header(self, request):
+        return _BEARER_AUTH_HEADER
 
     def post(self, request):
         refresh_value = request.COOKIES.get(REFRESH_COOKIE_NAME)

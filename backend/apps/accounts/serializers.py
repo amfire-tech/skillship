@@ -18,7 +18,12 @@ from .models import User
 class UserSerializer(serializers.ModelSerializer):
     """Safe, read-centric user shape returned from /auth/me/ and the login body."""
 
-    school = serializers.PrimaryKeyRelatedField(read_only=True)
+    # Coerce the FK PK (a UUID) to its hyphenated string form so the
+    # response shape matches the frontend `User.school: string | null` type.
+    school = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+        pk_field=serializers.UUIDField(),
+    )
 
     class Meta:
         model = User
