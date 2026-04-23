@@ -1,13 +1,56 @@
 # File:    infra/docker-compose.yml
-# Purpose: Dev-time orchestration — postgres, redis, backend, ai-service, frontend, celery worker + beat.
-# Why:     One command (`docker compose up`) brings the whole stack up locally. Same shape in prod.
+# Purpose: Local dev data plane — postgres (pgvector) + redis.
 # Owner:   Navanish
-# TODO:
-#   services:
-#     postgres:  image: pgvector/pgvector:pg16
-#     redis:     image: redis:7-alpine
-#     backend:   build: ../backend
-#     aiservice: build: ../ai-service
-#     frontend:  build: ../frontend
-#     worker:    build: ../backend ; command: celery -A jobs.celery_app worker -l info
-#     beat:      build: ../backend ; command: celery -A jobs.celery_app beat   -l info
+#
+# Why this shape:
+#   The app services (backend / ai-service / frontend / celery) are run on the
+#   host during dev — `python manage.py runserver`, `npm run dev`, etc.
+#   Doing it that way keeps hot-reload fast and stack traces readable.
+#
+#   What you can't easily run on the host on Windows is Postgres-with-pgvector
+#   and Redis. So *those* live in compose. One command, no install ceremony.
+#
+# Use:
+#   docker compose -f infra/docker-compose.yml up -d
+#   docker compose -f infra/docker-compose.yml down            # keeps volumes
+#   docker compose -f infra/docker-compose.yml down -v         # wipes data
+#
+# When app services get production Dockerfiles, add them here behind a
+# `profiles: [full]` so the default `up` stays data-plane only.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: skillship-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: skillship
+      POSTGRES_USER: skillship
+      POSTGRES_PASSWORD: skillship
+    ports:
+      - "5432:5432"
+    volumes:
+      - skillship_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillship -d skillship"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: skillship-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - skillship_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  skillship_pgdata:
+  skillship_redisdata:
