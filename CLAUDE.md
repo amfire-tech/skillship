@@ -282,6 +282,9 @@ fix(schools): correct Plan choices — remove non-existent IB/Cambridge options
 feat(ai-service): wire career pilot to /api/career/ask
 ```
 
+### Commit authorship
+Never add `Co-Authored-By: Claude` or any `Co-Authored-By` trailer to commits. Claude is a tool, not a contributor. Adding it pollutes the GitHub contributors list.
+
 ### PR rules
 - Max ~400 lines changed. If bigger, split it.
 - Description: one paragraph on what changed and why.
