@@ -1,34 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-
+import { useAuthStore } from "@/store/authStore";
 import type { UserRole } from "@/types";
 
 type Role = "all" | UserRole;
 
-interface UserRow {
-  name: string;
+interface ApiUser {
+  id: string;
   email: string;
+  username: string;
+  first_name: string;
+  last_name: string;
   role: UserRole;
-  school: string;
-  joined: string;
-  status: "Active" | "Suspended" | "Invited";
+  school: string | null;
+  school_name: string | null;
+  phone: string | null;
+  admission_number: string | null;
+  is_active: boolean;
+  date_joined: string;
 }
-
-const users: UserRow[] = [
-  { name: "Aryan Gupta", email: "aryan.gupta@skillship.in", role: "MAIN_ADMIN", school: "Skillship HQ", joined: "Feb 12, 2025", status: "Active" },
-  { name: "Neha Verma", email: "neha.verma@skillship.in", role: "SUB_ADMIN", school: "North India region", joined: "Mar 2, 2025", status: "Active" },
-  { name: "Dr. Priya Sharma", email: "priya.sharma@dps.edu.in", role: "PRINCIPAL", school: "Delhi Public School, Noida", joined: "Jan 20, 2025", status: "Active" },
-  { name: "Rahul Iyer", email: "rahul.iyer@kv21.edu.in", role: "TEACHER", school: "Kendriya Vidyalaya, Sector 21", joined: "Apr 5, 2025", status: "Active" },
-  { name: "Ananya Kapoor", email: "ananya.k@student.edu.in", role: "STUDENT", school: "St. Xavier's High School", joined: "Jul 11, 2025", status: "Active" },
-  { name: "Karthik Reddy", email: "karthik@vidyanikethan.edu.in", role: "TEACHER", school: "Vidya Niketan School", joined: "Jun 28, 2025", status: "Invited" },
-  { name: "Sana Mehta", email: "sana.mehta@suns.edu.in", role: "STUDENT", school: "Sunrise Academy", joined: "Aug 9, 2025", status: "Suspended" },
-];
 
 const roleColor: Record<UserRole, string> = {
   MAIN_ADMIN: "bg-primary/10 text-primary border-primary/20",
@@ -46,12 +42,6 @@ const roleLabel: Record<UserRole, string> = {
   STUDENT: "Student",
 };
 
-const statusColor: Record<UserRow["status"], string> = {
-  Active: "bg-primary/10 text-primary border-primary/20",
-  Suspended: "bg-red-50 text-red-600 border-red-200",
-  Invited: "bg-amber-50 text-amber-700 border-amber-200",
-};
-
 const roleTabDefs: { label: string; value: Role }[] = [
   { label: "All", value: "all" },
   { label: "Super Admin", value: "MAIN_ADMIN" },
@@ -61,12 +51,48 @@ const roleTabDefs: { label: string; value: Role }[] = [
   { label: "Students", value: "STUDENT" },
 ];
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+
+async function getToken(): Promise<string | null> {
+  let token = useAuthStore.getState().accessToken;
+  if (!token) {
+    const ok = await useAuthStore.getState().refreshAuth();
+    if (!ok) return null;
+    token = useAuthStore.getState().accessToken;
+  }
+  return token;
+}
+
 export default function UserManagementPage() {
   const toast = useToast();
   const router = useRouter();
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<Role>("all");
   const [search, setSearch] = useState("");
-  const [confirmSuspend, setConfirmSuspend] = useState<UserRow | null>(null);
+  const [confirmSuspend, setConfirmSuspend] = useState<ApiUser | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    const token = await getToken();
+    if (!token) { setFetchError("Session expired. Please log in again."); setLoading(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/users/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { setFetchError("Failed to load users."); setLoading(false); return; }
+      const data = await res.json();
+      setUsers(data.results ?? []);
+    } catch {
+      setFetchError("Network error. Is the server running?");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const tabs = roleTabDefs.map((t) => ({
     ...t,
@@ -75,8 +101,33 @@ export default function UserManagementPage() {
 
   const filtered = (activeRole === "all" ? users : users.filter((u) => u.role === activeRole)).filter((u) => {
     const q = search.toLowerCase();
-    return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.school.toLowerCase().includes(q);
+    return !q
+      || `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
+      || u.email.toLowerCase().includes(q)
+      || (u.school_name ?? "").toLowerCase().includes(q);
   });
+
+  async function handleSuspend(user: ApiUser) {
+    const token = await getToken();
+    if (!token) return;
+    try {
+      await fetch(`${API_BASE}/users/${user.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ is_active: false }),
+      });
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_active: false } : u));
+      toast(`${user.first_name} ${user.last_name} suspended`, "error");
+    } catch {
+      toast("Failed to suspend user", "error");
+    } finally {
+      setConfirmSuspend(null);
+    }
+  }
+
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  }
 
   return (
     <div className="space-y-6">
@@ -150,71 +201,98 @@ export default function UserManagementPage() {
         transition={{ duration: 0.4, delay: 0.2 }}
         className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
       >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                <th className="px-5 py-3">User</th>
-                <th className="px-5 py-3">Role</th>
-                <th className="px-5 py-3">School / Scope</th>
-                <th className="px-5 py-3">Joined</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
-                    No users match your search.
-                  </td>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-sm text-[var(--muted-foreground)]">
+            <svg className="mr-2 animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Loading users…
+          </div>
+        ) : fetchError ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <p className="text-sm text-red-500">{fetchError}</p>
+            <button onClick={loadUsers} className="text-xs font-semibold text-primary underline">Retry</button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                  <th className="px-5 py-3">User</th>
+                  <th className="px-5 py-3">Role</th>
+                  <th className="px-5 py-3">School / Scope</th>
+                  <th className="px-5 py-3">Joined</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
-              ) : (
-                filtered.map((u, i) => (
-                  <motion.tr
-                    key={u.email}
-                    initial={{ opacity: 0, x: 8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.25 + i * 0.04 }}
-                    className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
-                  >
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
-                          {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-[var(--foreground)]">{u.name}</p>
-                          <p className="text-[11px] text-[var(--muted-foreground)]">{u.email}</p>
-                        </div>
-                      </div>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
+                      {users.length === 0 ? "No users found." : "No users match your search."}
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${roleColor[u.role]}`}>
-                        {roleLabel[u.role]}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.school}</td>
-                    <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.joined}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor[u.status]}`}>
-                        {u.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-3 text-xs">
-                        <button onClick={() => router.push(`/dashboard/admin/users/${i + 1}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                        <button onClick={() => router.push(`/dashboard/admin/users/${i + 1}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
-                        <button onClick={() => setConfirmSuspend(u)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Suspend</button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                  </tr>
+                ) : (
+                  filtered.map((u, i) => {
+                    const fullName = `${u.first_name} ${u.last_name}`.trim() || u.username;
+                    const initials = fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+                    const status = u.is_active ? "Active" : "Suspended";
+                    const statusColor = u.is_active
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "bg-red-50 text-red-600 border-red-200";
+                    return (
+                      <motion.tr
+                        key={u.id}
+                        initial={{ opacity: 0, x: 8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: 0.25 + i * 0.04 }}
+                        className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
+                      >
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-[var(--foreground)]">{fullName}</p>
+                              <p className="text-[11px] text-[var(--muted-foreground)]">{u.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${roleColor[u.role]}`}>
+                            {roleLabel[u.role]}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-[var(--muted-foreground)]">
+                          {u.school_name ?? (u.role === "MAIN_ADMIN" ? "Platform" : "—")}
+                        </td>
+                        <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{formatDate(u.date_joined)}</td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor}`}>
+                            {status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-3 text-xs">
+                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                            {u.is_active && (
+                              <button onClick={() => setConfirmSuspend(u)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Suspend</button>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </motion.div>
+
       {/* Suspend confirmation dialog */}
       <AnimatePresence>
         {confirmSuspend && (
@@ -242,7 +320,7 @@ export default function UserManagementPage() {
               </div>
               <h3 id="suspend-dialog-title" className="mt-4 text-base font-bold text-[var(--foreground)]">Suspend user?</h3>
               <p id="suspend-dialog-desc" className="mt-1.5 text-sm text-[var(--muted-foreground)]">
-                <span className="font-semibold text-[var(--foreground)]">{confirmSuspend.name}</span> will lose access to the platform immediately. You can reinstate them later.
+                <span className="font-semibold text-[var(--foreground)]">{confirmSuspend.first_name} {confirmSuspend.last_name}</span> will lose access to the platform immediately. You can reinstate them later.
               </p>
               <div className="mt-5 flex items-center gap-3">
                 <button
@@ -252,10 +330,7 @@ export default function UserManagementPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    toast(`${confirmSuspend.name} suspended`, "error");
-                    setConfirmSuspend(null);
-                  }}
+                  onClick={() => handleSuspend(confirmSuspend)}
                   className="flex-1 h-10 rounded-full bg-amber-500 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-amber-600"
                 >
                   Suspend

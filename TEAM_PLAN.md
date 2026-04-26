@@ -58,12 +58,12 @@ students, quizzes, and files — nothing from any other school. That property is
 
 | Person       | Primary role                                              | Main folders they own                                                                     |
 | ------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **Navanish** | Team lead · DevOps · AI plumbing                          | `backend/config/`, `backend/apps/common/`, `backend/apps/ai_bridge/`, `ai-service/`, `infra/`, `.github/workflows/`, root docs |
-| **Prashant** | Backend core — identity + schools + academics             | `backend/apps/accounts/`, `backend/apps/schools/`, `backend/apps/academics/`              |
-| **Vishal**   | Backend features — quizzes + content + analytics + jobs   | `backend/apps/quizzes/`, `backend/apps/content/`, `backend/apps/analytics/`, `backend/apps/notifications/`, `backend/jobs/` |
+| **Navanish** | Team lead · Backend · DevOps                              | `backend/` (all — config, apps, jobs)                                                     |
+| **Prashant** | AI service — all LLM features                             | `ai-service/` (all — routers, agents, engines, rag, schemas, prompts)                    |
+| **Vishal**   | Data — seed, fixtures, SQL                                | `data/`                                                                                   |
 | **Pranav**   | Frontend — everything the user sees                       | `frontend/`                                                                               |
 
-**Shared**: `data/` (seed + SQL), `docs/` (ADRs), code reviews.
+**Shared**: `infra/`, `.github/workflows/`, `docs/` (ADRs), root files (`CLAUDE.md`, `TEAM_PLAN.md`, `README.md`), code reviews.
 
 ### How this split lets us work in parallel
 

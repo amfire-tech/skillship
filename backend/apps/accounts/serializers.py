@@ -30,6 +30,10 @@ class UserSerializer(serializers.ModelSerializer):
         read_only=True,
         pk_field=serializers.UUIDField(),
     )
+    school_name = serializers.SerializerMethodField()
+
+    def get_school_name(self, obj):
+        return obj.school.name if obj.school_id else None
 
     class Meta:
         model = User
@@ -41,10 +45,17 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "school",
+            "school_name",
             "phone",
             "admission_number",
+            "is_active",
+            "date_joined",
         ]
-        read_only_fields = fields  # never mutated through auth endpoints
+        read_only_fields = [
+            "id", "email", "username", "first_name", "last_name",
+            "role", "school", "phone", "admission_number",
+            "is_active", "date_joined",
+        ]
 
 
 class LoginSerializer(serializers.Serializer):

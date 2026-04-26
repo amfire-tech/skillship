@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import { getDefaultRouteForRole } from "@/lib/role-guard";
-import { seedCredentials, verifySeedCredential, ROLE_LABEL } from "@/lib/seed-credentials";
+import { seedCredentials, ROLE_LABEL } from "@/lib/seed-credentials";
 import type { UserRole } from "@/types";
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -40,32 +40,30 @@ export default function LoginPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showRoleMenu]);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (!role || !userId || !password) {
+    if (!userId || !password) {
       setError("Please fill in all fields.");
       return;
     }
-    // --- Seed-credential check (replace with real API call when Django auth is ready) ---
-    const match = verifySeedCredential(role as UserRole, userId, password);
-    if (!match) {
-      setError("Invalid credentials. Please try again.");
-      return;
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userId, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.detail || data?.non_field_errors?.[0] || "Invalid credentials. Please try again.");
+        return;
+      }
+      login(data.user, data.access);
+      router.replace(getDefaultRouteForRole(data.user.role));
+    } catch {
+      setError("Network error. Is the server running?");
     }
-    login(
-      {
-        id: `seed-${match.role}`,
-        email: match.email,
-        username: match.userId,
-        first_name: match.first_name,
-        last_name: match.last_name,
-        role: match.role,
-        school: null,
-      },
-      "seed-access-token"
-    );
-    router.replace(getDefaultRouteForRole(match.role));
   }
 
   const selectedRoleLabel = roleOptions.find((r) => r.value === role)?.label;
@@ -127,7 +125,7 @@ export default function LoginPage() {
               <span className="pointer-events-none absolute left-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               </span>
-              <input type="text" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="User ID" autoComplete="username" className="h-[52px] w-full rounded-2xl border border-[var(--border)] bg-white pl-14 pr-4 text-[15px] text-[var(--foreground)] shadow-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10" />
+              <input type="email" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="Email address" autoComplete="email" className="h-[52px] w-full rounded-2xl border border-[var(--border)] bg-white pl-14 pr-4 text-[15px] text-[var(--foreground)] shadow-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10" />
             </div>
 
             {/* Password */}

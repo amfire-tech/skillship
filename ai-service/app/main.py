@@ -15,7 +15,7 @@ from google import genai
 from pgvector.psycopg import register_vector_async
 
 from app.config import settings
-from app.routers import career, tutor, quiz, content, reports, risk
+from app.routers import career, quiz, content
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -75,19 +75,18 @@ async def verify_internal_key_middleware(request, call_next):
 
 @app.get("/healthz", tags=["health"])
 async def health_check():
+    db = getattr(app.state, "db", None)
     return {
+        "service": "Skillship AI",
         "status": "ok",
         "model": settings.MODEL_NAME,
-        "db": "connected" if app.state.db else "unavailable",
+        "db": "connected" if db else "unavailable",
     }
 
 
 app.include_router(career.router, prefix="/api", tags=["career"])
-app.include_router(tutor.router, prefix="/api", tags=["tutor"])
 app.include_router(quiz.router, prefix="/api", tags=["quiz"])
 app.include_router(content.router, prefix="/api", tags=["content"])
-app.include_router(reports.router, prefix="/api", tags=["reports"])
-app.include_router(risk.router, prefix="/api", tags=["risk"])
 
 
 @app.get("/", tags=["root"])

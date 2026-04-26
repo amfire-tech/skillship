@@ -6,10 +6,14 @@ Environment-specific overrides live in dev.py / prod.py.
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse, unquote
+
+from dotenv import load_dotenv
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 # BASE_DIR = backend/
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 # ── Security ─────────────────────────────────────────────────────────────────
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key-change-me")
@@ -84,23 +88,17 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # ── Database ──────────────────────────────────────────────────────────────────
-# DATABASE_URL is parsed manually to avoid adding dj-database-url as a dep.
-# Format: postgres://user:pass@host:port/dbname
 _db_url = os.environ.get("DATABASE_URL", "postgres://skillship:skillship@localhost:5432/skillship")
-_db_parts = _db_url.replace("postgres://", "").replace("postgresql://", "")
-_user_pass, _host_db = _db_parts.split("@", 1)
-_db_user, _db_pass = _user_pass.split(":", 1)
-_host_port, _db_name = _host_db.split("/", 1)
-_db_host, _db_port = (_host_port.split(":", 1) + ["5432"])[:2]
+_parsed = urlparse(_db_url)
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": _db_name,
-        "USER": _db_user,
-        "PASSWORD": _db_pass,
-        "HOST": _db_host,
-        "PORT": _db_port,
+        "NAME": _parsed.path.lstrip("/"),
+        "USER": unquote(_parsed.username or ""),
+        "PASSWORD": unquote(_parsed.password or ""),
+        "HOST": _parsed.hostname or "localhost",
+        "PORT": str(_parsed.port or 5432),
         "ATOMIC_REQUESTS": True,
         "CONN_MAX_AGE": 60,
     }

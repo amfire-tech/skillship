@@ -56,9 +56,11 @@ class TenantScopedViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         if self._user_is_main_admin():
-            # MAIN_ADMIN may explicitly target a school via the request body.
-            # If they don't, the serializer's own validation will complain.
-            serializer.save()
+            # `school` is read_only in every serializer so it never lands in
+            # validated_data. For MAIN_ADMIN we must stamp it explicitly from
+            # the request body (validation already confirmed it exists).
+            school_id = self.request.data.get("school")
+            serializer.save(school_id=school_id)
         else:
             # Everyone else has their school stamped from the JWT user —
             # never from request data. This is non-negotiable.

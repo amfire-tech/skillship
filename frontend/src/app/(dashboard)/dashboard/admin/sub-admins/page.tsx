@@ -57,7 +57,7 @@ export default function SubAdminManagementPage() {
         subtitle={`${subadmins.length} sub-admins managing schools across regions`}
         action={
           <Link
-            href="/dashboard/admin/users/new/subadmin"
+            href="/dashboard/admin/users/new/SUB_ADMIN"
             className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
