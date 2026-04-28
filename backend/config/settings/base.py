@@ -4,35 +4,30 @@ Environment-specific overrides live in dev.py / prod.py.
 """
 
 import os
-from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse, unquote
 
 from dotenv import load_dotenv
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-# BASE_DIR = backend/
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 # ── Security ─────────────────────────────────────────────────────────────────
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key-change-me")
-DEBUG = False  # overridden in dev.py
+DEBUG = False
 ALLOWED_HOSTS: list[str] = []
 
 # ── Application registry ─────────────────────────────────────────────────────
 DJANGO_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
-    "django.contrib.messages",
     "django.contrib.staticfiles",
 ]
 
 THIRD_PARTY_APPS = [
     "rest_framework",
-    "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "corsheaders",
     "django_filters",
@@ -62,8 +57,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "apps.common.middleware.TenantMiddleware",  # AFTER auth
-    "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.common.middleware.TenantMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -105,8 +99,6 @@ DATABASES = {
 }
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-AUTH_USER_MODEL = "accounts.User"
-
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -134,12 +126,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ── Django REST Framework ─────────────────────────────────────────────────────
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_PAGINATION_CLASS": "apps.common.pagination.StandardPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_FILTER_BACKENDS": [
@@ -147,10 +135,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.UserRateThrottle",
-        "rest_framework.throttling.AnonRateThrottle",
-    ],
+    "DEFAULT_THROTTLE_CLASSES": [],
     "DEFAULT_THROTTLE_RATES": {
         "user": "120/min",
         "anon": "30/min",
@@ -162,17 +147,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# ── SimpleJWT ─────────────────────────────────────────────────────────────────
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
-    "AUTH_HEADER_TYPES": ("Bearer",),
-    "USER_ID_FIELD": "id",
-    "USER_ID_CLAIM": "user_id",
-}
-
 # ── drf-spectacular (OpenAPI docs) ───────────────────────────────────────────
 SPECTACULAR_SETTINGS = {
     "TITLE": "Skillship API",
@@ -182,7 +156,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS: list[str] = []  # overridden per environment
+CORS_ALLOWED_ORIGINS: list[str] = []
 CORS_ALLOW_CREDENTIALS = True
 
 # ── Celery ────────────────────────────────────────────────────────────────────

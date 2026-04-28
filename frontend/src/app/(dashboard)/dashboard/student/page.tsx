@@ -1,7 +1,5 @@
 "use client";
 
-import { useAuth } from "@/hooks/useAuth";
-
 const upcomingQuizzes = [
   { title: "Science Quiz — Chapter 5", class: "Class 9A", due: "Tomorrow", difficulty: "Medium" },
   { title: "Maths — Algebra Unit Test", class: "Class 9A", due: "In 3 days", difficulty: "Hard" },
@@ -21,8 +19,6 @@ const aiTools = [
 ];
 
 export default function StudentDashboard() {
-  const { displayName } = useAuth();
-
   // Progress ring values — wired to real API in Sprint 2
   const completed = 0;
   const total = 10;
@@ -35,7 +31,7 @@ export default function StudentDashboard() {
     <div className="space-y-8 p-6 lg:p-8">
       <div>
         <h1 className="text-2xl font-semibold text-[var(--foreground)]">
-          Hey, {displayName ?? "Student"} 👋
+          Hey, Student 👋
         </h1>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
           Keep going — live progress loads once Sprint 2 backend is ready.

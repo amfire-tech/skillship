@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useAuthStore } from "@/store/authStore";
-import { displayName } from "@/types";
 import { useToast } from "@/components/ui/Toast";
 
 const crumbMap: Record<string, string> = {
@@ -23,7 +21,6 @@ const crumbMap: Record<string, string> = {
   new: "New",
 };
 
-// Context-aware label for "new" segment based on parent route
 const newLabelByParent: Record<string, string> = {
   schools: "Add New School",
   quizzes: "New Quiz",
@@ -31,12 +28,10 @@ const newLabelByParent: Record<string, string> = {
   users: "Create User",
 };
 
-// Segments that are structural but not shown as separate crumbs
 const SKIP_SEGMENTS = new Set(["dashboard"]);
 
 function buildCrumbs(pathname: string) {
   const parts = pathname.split("/").filter(Boolean);
-  // Must be /dashboard/admin/...
   if (parts.length < 2 || parts[0] !== "dashboard" || parts[1] !== "admin") return [];
 
   const crumbs: { label: string; href: string }[] = [
@@ -55,7 +50,6 @@ function buildCrumbs(pathname: string) {
     }
     crumbs.push({ label, href: acc });
   }
-  // If exactly /dashboard/admin, add "Dashboard" as second crumb
   if (parts.length === 2) {
     crumbs.push({ label: "Dashboard", href: "/dashboard/admin" });
   }
@@ -64,9 +58,7 @@ function buildCrumbs(pathname: string) {
 
 export function AdminTopbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const toast = useToast();
-  const user = useAuthStore((s) => s.user);
   const crumbs = buildCrumbs(pathname);
   const { theme, setTheme } = useTheme();
   const [query, setQuery] = useState("");
@@ -149,11 +141,9 @@ export function AdminTopbar() {
       {/* Profile */}
       <div className="flex items-center gap-2.5 rounded-full border border-[var(--border)] bg-white px-1 py-1 pr-3 shadow-sm">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
-          {(user ? displayName(user) : "A").charAt(0).toUpperCase()}
+          A
         </div>
-        <span className="text-xs font-semibold text-[var(--foreground)]">
-          {user ? displayName(user) : "Admin"}
-        </span>
+        <span className="text-xs font-semibold text-[var(--foreground)]">Admin</span>
       </div>
     </header>
   );

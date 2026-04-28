@@ -1,246 +1,177 @@
-"""
-File:    backend/apps/accounts/serializers.py
-Purpose: DRF serializers for auth + user profile.
-Owner:   Prashant
+import re
+import uuid
 
-Public types here must match the frontend `User` and `AuthResponse` types in
-frontend/src/types/index.ts. If you change a field name or shape, run
-`npm run gen:types` in the frontend to regenerate the OpenAPI types.
-"""
-
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.cache import cache
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
-from rest_framework_simplejwt.tokens import RefreshToken
+from .models import SchoolRecord, UserAuth
 
-from apps.common.permissions import Role
-from apps.schools.models import School
+LOCKOUT_SECONDS = 60
 
-from .models import User
+ROLE_MAP = {
+    'MAIN_ADMIN': 'Super Admin',
+    'SUB_ADMIN':  'Sub Admin',
+    'PRINCIPAL':  'Principal',
+    'TEACHER':    'Teacher',
+    'STUDENT':    'Student',
+}
 
-
-class UserSerializer(serializers.ModelSerializer):
-    """Safe, read-centric user shape returned from /auth/me/ and the login body."""
-
-    # Coerce the FK PK (a UUID) to its hyphenated string form so the
-    # response shape matches the frontend `User.school: string | null` type.
-    school = serializers.PrimaryKeyRelatedField(
-        read_only=True,
-        pk_field=serializers.UUIDField(),
-    )
-    school_name = serializers.SerializerMethodField()
-
-    def get_school_name(self, obj):
-        return obj.school.name if obj.school_id else None
-
-    class Meta:
-        model = User
-        fields = [
-            "id",
-            "email",
-            "username",
-            "first_name",
-            "last_name",
-            "role",
-            "school",
-            "school_name",
-            "phone",
-            "admission_number",
-            "is_active",
-            "date_joined",
-        ]
-        read_only_fields = [
-            "id", "email", "username", "first_name", "last_name",
-            "role", "school", "phone", "admission_number",
-            "is_active", "date_joined",
-        ]
+ROLE_PREFIX_MAP = {
+    'SUB_ADMIN':  ('Sub Admin', 'SA'),
+    'TEACHER':    ('Teacher',   'TE'),
+    'PRINCIPAL':  ('Principal', 'PR'),
+}
 
 
 class LoginSerializer(serializers.Serializer):
-    """Email + password → validated user + issued token pair.
-
-    We do the lookup + password check ourselves (rather than subclassing
-    SimpleJWT's TokenObtainPairSerializer) because:
-      - SimpleJWT keys on USERNAME_FIELD, which is "username" here.
-      - We want email-based login without flipping USERNAME_FIELD globally
-        (that would cascade into admin, management commands, and fixtures).
-    """
-
-    email = serializers.EmailField()
+    identifier = serializers.CharField()  # accepts user_id or email
+    role = serializers.CharField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
     def validate(self, attrs):
-        email = attrs["email"].strip().lower()
-        password = attrs["password"]
+        identifier = attrs['identifier'].strip()
+        role = attrs['role'].strip().upper()
+        password = attrs['password']
 
-        user = User.objects.filter(email__iexact=email).first()
-        if user is None or not user.check_password(password):
-            raise AuthenticationFailed("Invalid email or password", code="invalid_credentials")
-        if not user.is_active:
-            raise AuthenticationFailed("Account is disabled", code="account_disabled")
+        db_role = ROLE_MAP.get(role, role)
 
-        refresh = RefreshToken.for_user(user)
-        attrs["user"] = user
-        attrs["access"] = str(refresh.access_token)
-        attrs["refresh"] = str(refresh)
+        user = UserAuth.objects.filter(
+            Q(user_id=identifier) | Q(email__iexact=identifier),
+            role=db_role,
+        ).first()
+
+        if user is None:
+            raise AuthenticationFailed('Invalid credentials.', code='invalid_credentials')
+
+        if user.is_locked is True:
+            raise AuthenticationFailed(
+                'Account is permanently locked. Contact your administrator.',
+                code='account_locked',
+            )
+
+        # 1-minute temporary lockout after a failed attempt
+        lockout_key = f'lockout_{user.user_id}_{user.role}'
+        if cache.get(lockout_key):
+            raise AuthenticationFailed(
+                'Too many failed attempts. Please wait 1 minute and try again.',
+                code='temp_locked',
+            )
+
+        if not check_password(password, user.password_hash):
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            user.save(update_fields=['failed_login_attempts'])
+            cache.set(lockout_key, True, LOCKOUT_SECONDS)
+            raise AuthenticationFailed('Invalid credentials.', code='invalid_credentials')
+
+        # Success — clear lockout, reset counter, record login time
+        cache.delete(lockout_key)
+        user.failed_login_attempts = 0
+        user.last_login_at = timezone.now()
+        user.save(update_fields=['failed_login_attempts', 'last_login_at'])
+
+        attrs['user'] = user
         return attrs
 
 
-# ── User CRUD serializers (used by /api/v1/users/) ──────────────────────────
+class CreateUserSerializer(serializers.Serializer):
+    full_name   = serializers.CharField()
+    email       = serializers.EmailField()
+    phone       = serializers.CharField(required=False, allow_blank=True, default='')
+    password    = serializers.CharField(write_only=True, min_length=8)
+    role        = serializers.CharField()
+    school_code = serializers.CharField(required=False, allow_blank=True, default='')
+    school_name = serializers.CharField(required=False, allow_blank=True, default='')
+    class_grade = serializers.CharField(required=False, allow_blank=True, default='')
 
-
-def _validate_role_school_invariant(role: str, school) -> None:
-    """The same invariant the DB CheckConstraints enforce, raised early so the
-    API user gets a friendly 400 instead of a bare IntegrityError."""
-    if role == User.Role.MAIN_ADMIN and school is not None:
-        raise serializers.ValidationError(
-            {"school": "MAIN_ADMIN must not be attached to a school."}
-        )
-    if role != User.Role.MAIN_ADMIN and school is None:
-        raise serializers.ValidationError(
-            {"school": "Non-admin users must be attached to a school."}
-        )
-
-
-class UserCreateSerializer(serializers.ModelSerializer):
-    """Create surface for /api/v1/users/.
-
-    Validation responsibilities (in order):
-      1. Required fields are present (DRF default).
-      2. Password meets Django's AUTH_PASSWORD_VALIDATORS.
-      3. role / school invariant matches the DB CheckConstraint.
-      4. The acting user is allowed to create the requested (role, school)
-         combination — see `validate()` below for the role-based gate.
-
-    `school` is read from the body for MAIN_ADMIN and *overridden* from the
-    actor's school for PRINCIPAL — a principal cannot place a user in
-    another school even by passing a stray school_id.
-    """
-
-    password = serializers.CharField(write_only=True, trim_whitespace=False)
-    school = serializers.PrimaryKeyRelatedField(
-        queryset=School.objects.all(),
-        required=False,
-        allow_null=True,
-        pk_field=serializers.UUIDField(),
-    )
-
-    class Meta:
-        model = User
-        fields = [
-            "id",
-            "email",
-            "username",
-            "first_name",
-            "last_name",
-            "role",
-            "school",
-            "phone",
-            "admission_number",
-            "password",
-        ]
-        read_only_fields = ["id"]
-        extra_kwargs = {
-            "email": {"required": True},
-            "username": {"required": True},
-            "role": {"required": True},
-        }
-
-    def validate_password(self, value):
-        try:
-            validate_password(value)
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(list(exc.messages)) from exc
-        return value
+    def validate_role(self, value):
+        valid = set(ROLE_PREFIX_MAP.keys()) | {'STUDENT'}
+        if value.upper() not in valid:
+            raise serializers.ValidationError('Invalid role.')
+        return value.upper()
 
     def validate_email(self, value):
-        # Surface duplicate emails as a clean 400, not a 500.
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
-        return value
-
-    def validate_username(self, value):
-        if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError("A user with this username already exists.")
+        if UserAuth.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError('A user with this email already exists.')
         return value
 
     def validate(self, attrs):
-        actor = self.context["request"].user
-        target_role = attrs.get("role")
-        target_school = attrs.get("school")
-
-        if actor.role == Role.PRINCIPAL:
-            # Principals create only TEACHER / STUDENT, only in their own school —
-            # we override school here so a stray body field can't break tenancy.
-            if target_role not in {User.Role.TEACHER, User.Role.STUDENT}:
+        if attrs.get('role') == 'STUDENT':
+            if not re.search(r'\d', attrs.get('class_grade', '')):
                 raise serializers.ValidationError(
-                    {"role": f"PRINCIPAL may only create TEACHER or STUDENT, not {target_role}."}
+                    {'class_grade': 'Must contain a grade number (e.g. 9A, 10B).'}
                 )
-            attrs["school"] = actor.school
-            target_school = actor.school
-
-        # Final invariant — applies to every actor (defence in depth alongside
-        # the DB CheckConstraint).
-        _validate_role_school_invariant(target_role, target_school)
         return attrs
+
+    def _next_user_id(self, prefix):
+        existing = UserAuth.objects.filter(
+            user_id__startswith=prefix
+        ).values_list('user_id', flat=True)
+        max_num = 0
+        for uid in existing:
+            try:
+                num = int(uid[len(prefix):])
+                if num > max_num:
+                    max_num = num
+            except ValueError:
+                pass
+        return f"{prefix}{max_num + 1:03d}"
+
+    def _resolve_school(self, school_code, school_name):
+        if not school_code:
+            return None
+        school = SchoolRecord.objects.filter(school_code=school_code).first()
+        if school:
+            return school.school_id
+        new_school = SchoolRecord(
+            school_id=uuid.uuid4(),
+            school_name=school_name or school_code,
+            school_code=school_code,
+            is_active=True,
+            created_at=timezone.now(),
+        )
+        new_school.save()
+        return new_school.school_id
 
     def create(self, validated_data):
-        password = validated_data.pop("password")
-        user = User(**validated_data)
-        user.set_password(password)
+        role_key = validated_data['role']
+
+        if role_key == 'STUDENT':
+            db_role = 'Student'
+            school_id = self._resolve_school(
+                validated_data.get('school_code', ''),
+                validated_data.get('school_name', ''),
+            )
+            school_name = validated_data.get('school_name', '') or validated_data.get('school_code', '')
+            school_char = school_name[0].upper() if school_name else ''
+            match = re.search(r'(\d+)\s*-?\s*([A-Za-z]?)', validated_data.get('class_grade', ''))
+            clean_grade = (match.group(1) + match.group(2).upper()) if match else ''
+            user_id = self._next_user_id(f"S{school_char}{clean_grade}")
+        else:
+            db_role, prefix = ROLE_PREFIX_MAP[role_key]
+            school_id = None
+            if role_key == 'PRINCIPAL':
+                school_id = self._resolve_school(
+                    validated_data.get('school_code', ''),
+                    validated_data.get('school_name', ''),
+                )
+            user_id = self._next_user_id(prefix)
+
+        user = UserAuth(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            full_name=validated_data['full_name'],
+            email=validated_data['email'],
+            phone=validated_data.get('phone', ''),
+            password_hash=make_password(validated_data['password']),
+            role=db_role,
+            school_id=school_id,
+            failed_login_attempts=0,
+            is_locked=False,
+            create_at=timezone.now(),
+        )
         user.save()
         return user
-
-
-class UserUpdateSerializer(serializers.ModelSerializer):
-    """Update surface for /api/v1/users/{id}/.
-
-    `role` and `school` are read-only on this path. Changing either is a
-    privilege-escalation footgun; for those use cases either delete and
-    recreate, or build a separate admin-only escalation endpoint with
-    its own audit trail.
-
-    Password changes go through the dedicated /set-password/ action so we
-    can enforce password validators and (later) emit an auth-revocation event.
-    """
-
-    school = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
-
-    class Meta:
-        model = User
-        fields = [
-            "id",
-            "email",
-            "username",
-            "first_name",
-            "last_name",
-            "role",
-            "school",
-            "phone",
-            "admission_number",
-            "is_active",
-        ]
-        read_only_fields = ["id", "role", "school"]
-
-    def validate_email(self, value):
-        qs = User.objects.filter(email__iexact=value)
-        if self.instance is not None:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("A user with this email already exists.")
-        return value
-
-
-class PasswordSetSerializer(serializers.Serializer):
-    """Body for POST /api/v1/users/{id}/set-password/."""
-
-    password = serializers.CharField(write_only=True, trim_whitespace=False)
-
-    def validate_password(self, value):
-        try:
-            validate_password(value)
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(list(exc.messages)) from exc
-        return value

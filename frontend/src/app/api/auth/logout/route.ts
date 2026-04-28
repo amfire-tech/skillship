@@ -1,24 +1,6 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-// ============================================================
-// Dev proxy: /api/auth/logout → Django POST /api/v1/auth/logout/
-// Django reads the refresh cookie, blacklists the token, clears the cookie.
-// We clear our own frontend-origin cookie regardless of backend outcome.
-// ============================================================
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
-
-export async function POST(request: NextRequest) {
-  const refreshToken = request.cookies.get("refresh")?.value;
-
-  if (refreshToken) {
-    await fetch(`${API_BASE}/auth/logout/`, {
-      method: "POST",
-      headers: { Cookie: `refresh=${refreshToken}` },
-    }).catch(() => {});
-  }
-
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set("refresh", "", { httpOnly: true, maxAge: 0, path: "/api/auth" });
-  return response;
+// TODO: implement logout route
+export async function POST() {
+  return NextResponse.json({ message: "Not implemented" }, { status: 501 });
 }

@@ -1,12 +1,9 @@
 """Root URL configuration."""
 
-from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
-    # Django admin
-    path("admin/", admin.site.urls),
     # API v1
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/users/", include("apps.accounts.users_urls")),

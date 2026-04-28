@@ -1,7 +1,5 @@
 "use client";
 
-import { useAuth } from "@/hooks/useAuth";
-
 const stats = [
   { label: "Total Students", value: "—", sub: "across all classes", icon: "👥" },
   { label: "Quiz Completion", value: "—%", sub: "this week", icon: "✅" },
@@ -10,13 +8,11 @@ const stats = [
 ];
 
 export default function PrincipalDashboard() {
-  const { displayName } = useAuth();
-
   return (
     <div className="space-y-8 p-6 lg:p-8">
       <div>
         <h1 className="text-2xl font-semibold text-[var(--foreground)]">
-          Welcome back, {displayName ?? "Principal"}
+          Welcome back, Principal
         </h1>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
           School overview — live data connects once Sprint 2 backend lands.

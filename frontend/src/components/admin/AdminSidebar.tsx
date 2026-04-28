@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
 
 interface NavItem {
@@ -44,7 +43,7 @@ const navItems: NavItem[] = [
     href: "/dashboard/admin/users",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /><path d="M12 11v0" />
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
       </svg>
     ),
   },
@@ -105,22 +104,11 @@ const navItems: NavItem[] = [
   },
 ];
 
-const roleLabel: Record<string, string> = {
-  admin: "Super Admin",
-  subadmin: "Sub Admin",
-  principal: "Principal",
-  teacher: "Teacher",
-  student: "Student",
-};
-
 export function AdminSidebar() {
   const pathname = usePathname();
-  const logout = useAuthStore((s) => s.logout);
-  const user = useAuthStore((s) => s.user);
   const router = useRouter();
 
   function handleLogout() {
-    logout();
     router.replace("/login");
   }
 
@@ -135,7 +123,7 @@ export function AdminSidebar() {
         </div>
         <div className="leading-tight">
           <p className="text-base font-bold text-primary">Skillship</p>
-          <p className="text-[11px] font-medium text-[var(--muted-foreground)]">{roleLabel[user?.role ?? ""] ?? "Admin"}</p>
+          <p className="text-[11px] font-medium text-[var(--muted-foreground)]">Admin</p>
         </div>
       </div>
 

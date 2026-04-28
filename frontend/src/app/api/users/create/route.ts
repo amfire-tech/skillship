@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const DJANGO_URL = "http://127.0.0.1:8000/api/v1/auth/login/";
+const DJANGO_URL = "http://127.0.0.1:8000/api/v1/auth/users/create/";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,9 +14,9 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(body),
       });
     } catch (networkErr) {
-      console.error("[login proxy] cannot reach Django:", networkErr);
+      console.error("[create-user proxy] cannot reach Django:", networkErr);
       return NextResponse.json(
-        { detail: "Cannot reach authentication server." },
+        { detail: "Cannot reach server." },
         { status: 503 }
       );
     }
@@ -26,16 +26,16 @@ export async function POST(request: NextRequest) {
     try {
       data = JSON.parse(text);
     } catch {
-      console.error("[login proxy] Django returned non-JSON:", text.slice(0, 200));
+      console.error("[create-user proxy] Django returned non-JSON:", text.slice(0, 200));
       return NextResponse.json(
-        { detail: "Unexpected response from authentication server." },
+        { detail: "Unexpected response from server." },
         { status: 502 }
       );
     }
 
     return NextResponse.json(data, { status: djangoRes.status });
   } catch (err) {
-    console.error("[login proxy] unexpected error:", err);
+    console.error("[create-user proxy] unexpected error:", err);
     return NextResponse.json({ detail: "Internal server error." }, { status: 500 });
   }
 }
