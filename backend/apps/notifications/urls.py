@@ -1,3 +1,15 @@
-"""Notification endpoints — will be populated when we build the notifications views."""
+"""
+File:    backend/apps/notifications/urls.py
+Purpose: URL routing for the notifications app.
+Owner:   Vishal
+"""
 
-urlpatterns = []
+from rest_framework.routers import DefaultRouter
+
+from .views import NotificationTemplateViewSet, NotificationViewSet
+
+router = DefaultRouter()
+router.register(r"", NotificationViewSet, basename="notification")
+router.register(r"templates", NotificationTemplateViewSet, basename="notificationtemplate")
+
+urlpatterns = router.urls
