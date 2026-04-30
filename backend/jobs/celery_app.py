@@ -1,13 +1,30 @@
 """
 File:    backend/jobs/celery_app.py
-Purpose: Celery app instance — defines the task queue, beat schedule, and auto-discovery.
-Why:     Background jobs (risk scan, weekly report, email sending) must not block HTTP requests.
+Purpose: Celery application — broker config, task auto-discovery, beat scheduler.
 Owner:   Navanish
-TODO:    - os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
-         - app = Celery("skillship"); app.config_from_object("django.conf:settings", namespace="CELERY")
-         - app.autodiscover_tasks()
-         - beat schedule:
-             * 02:00 daily     -> jobs.risk_alerts.scan_all_schools
-             * Sun 22:00       -> jobs.weekly_reports.generate_for_all
-             * 03:00 daily     -> analytics.services.rebuild_daily_stats_for_all
+
+How it wires up:
+  1. config/__init__.py imports `celery_app` from here so Django's startup sequence
+     bootstraps Celery automatically — no extra CLI flags needed for `manage.py`.
+  2. app.autodiscover_tasks() scans INSTALLED_APPS for tasks.py modules.
+     Tasks in this jobs/ package register via @shared_task which binds to the
+     default app at import time — no explicit include list needed.
+  3. The beat scheduler is django-celery-beat (DatabaseScheduler) — schedules are
+     managed via the Django admin, not hardcoded here.
 """
+
+import os
+
+from celery import Celery
+
+# Fallback for direct Celery invocation (e.g. `celery -A jobs.celery_app worker`).
+# When started via manage.py this env var is already set; setdefault is a no-op.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
+
+app = Celery("skillship")
+
+# Pull every CELERY_* key from Django settings — single source of truth.
+app.config_from_object("django.conf:settings", namespace="CELERY")
+
+# Discover @shared_task decorators in every app listed in INSTALLED_APPS.
+app.autodiscover_tasks()
