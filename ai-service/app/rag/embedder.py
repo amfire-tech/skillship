@@ -4,8 +4,9 @@ Purpose: Embed text chunks via Gemini and upsert into the content_chunks pgvecto
 """
 
 from __future__ import annotations
-import uuid
+
 import logging
+import uuid
 
 import psycopg
 from google import genai
@@ -41,6 +42,7 @@ async def upsert(
     school_id: uuid.UUID,
     content_id: uuid.UUID,
     chunks: list[str],
+    course_id: uuid.UUID | None = None,
 ) -> int:
     """Embed chunks and upsert into content_chunks. Idempotent — deletes old chunks first."""
     if not chunks:
@@ -54,14 +56,14 @@ async def upsert(
             (school_id, content_id),
         )
         rows = [
-            (uuid.uuid4(), school_id, content_id, idx, text, vec)
+            (uuid.uuid4(), school_id, course_id, content_id, idx, text, vec)
             for idx, (text, vec) in enumerate(zip(chunks, vectors))
         ]
         await cur.executemany(
             """
             INSERT INTO content_chunks
-                (id, school_id, content_id, chunk_index, chunk_text, embedding)
-            VALUES (%s, %s, %s, %s, %s, %s::vector)
+                (id, school_id, course_id, content_id, chunk_index, chunk_text, embedding)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::vector)
             """,
             rows,
         )

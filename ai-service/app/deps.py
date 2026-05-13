@@ -6,19 +6,22 @@ Purpose: FastAPI dependency-injection helpers — auth, Gemini client, DB connec
 from typing import Annotated
 
 import psycopg
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Security, status
+from fastapi.security import APIKeyHeader
 from google import genai
 
 from app.config import settings
 
+_api_key_header = APIKeyHeader(name="X-Internal-Key", auto_error=False)
 
-def verify_internal_key(x_internal_key: str = Header(...)) -> str:
-    if x_internal_key != settings.AI_SERVICE_INTERNAL_KEY:
+
+def verify_internal_key(api_key: str = Security(_api_key_header)) -> str:
+    if not api_key or api_key != settings.AI_SERVICE_INTERNAL_KEY:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid internal API key",
+            detail="Invalid or missing X-Internal-Key header",
         )
-    return x_internal_key
+    return api_key
 
 
 VerifiedKey = Annotated[str, Depends(verify_internal_key)]

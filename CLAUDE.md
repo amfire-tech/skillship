@@ -32,7 +32,7 @@ If you need to touch another person's folder, talk to them first and get a revie
 
 ### AI Service
 - **Python 3.12** · FastAPI ≥ 0.110 · uvicorn · pydantic ≥ 2.5 · pydantic-settings ≥ 2.1
-- **LLM: Google Gemini via `google-genai ≥ 1.0.0`** — model `gemini-1.5-flash` (default)
+- **LLM: Google Gemini via `google-genai ≥ 1.0.0`** — model `gemini-2.5-flash` (default)
 - Embeddings: `models/text-embedding-004` via the same google-genai client
 - pgvector ≥ 0.3.2 · psycopg[binary] ≥ 3.1.18 · pypdf ≥ 4.0.0
 
@@ -173,7 +173,7 @@ from app.config import settings
 
 async def run(client: genai.Client, ...):
     response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,          # "gemini-1.5-flash"
+        model=settings.MODEL_NAME,          # "gemini-2.5-flash"
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,

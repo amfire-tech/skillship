@@ -4,13 +4,15 @@ Purpose: Pydantic models for /career/ask endpoint.
 """
 
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 
 class CareerAskRequest(BaseModel):
     student_context: dict   # grade, subjects, scores, interests, etc.
     question: str
-    history: list[dict] = []   # [{"role": "user"|"assistant", "content": "..."}]
+    # [{"role": "user"|"assistant", "content": "..."}]
+    history: list[dict] = Field(default_factory=list)
 
 
 class Citation(BaseModel):

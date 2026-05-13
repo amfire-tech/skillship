@@ -4,7 +4,7 @@ Purpose: CareerPilot agent — personalised career path suggestions.
 """
 
 from __future__ import annotations
-import json
+
 import logging
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from google import genai
 from google.genai import types
 
 from app.config import settings
+from app.utils.json import parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,28 @@ async def run(
     question: str,
     history: list[dict],
 ) -> dict:
+    if settings.USE_MOCK_AI:
+        logger.info("Mock mode enabled; returned CareerPilot response without Gemini")
+        return {
+            "answer": (
+                "Based on your profile, start with one practical path and validate it "
+                "through projects and mentor feedback."
+            ),
+            "suggested_paths": ["AI Foundations", "Coding", "STEM Research"],
+            "confidence": 0.7,
+            "citations": [
+                {"label": "Mock profile", "detail": "Generated from local dev mock mode."}
+            ],
+        }
+
     context_lines = "\n".join(f"  {k}: {v}" for k, v in student_context.items())
     user_message = f"Student profile:\n{context_lines}\n\nQuestion: {question}"
 
     contents = [
-        {"role": "model" if m["role"] == "assistant" else "user",
-         "parts": [{"text": m["content"]}]}
+        {
+            "role": "model" if m["role"] == "assistant" else "user",
+            "parts": [{"text": m["content"]}],
+        }
         for m in history[-6:]
     ]
     contents.append({"role": "user", "parts": [{"text": user_message}]})
@@ -45,4 +62,4 @@ async def run(
         ),
     )
 
-    return json.loads(response.text)
+    return parse_llm_json(response.text, expected="object")

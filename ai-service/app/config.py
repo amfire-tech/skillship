@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
 
     # Model Configuration
-    MODEL_NAME: str = "gemini-1.5-flash"
+    MODEL_NAME: str = "gemini-2.5-flash"
     EMBEDDING_MODEL: str = "models/text-embedding-004"
 
     # Service Configuration
@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     # Logging
     LOG_LEVEL: str = "INFO"
+
+    # Dev mock mode — set true when Gemini API is unavailable
+    USE_MOCK_AI: bool = False
 
     class Config:
         env_file = ".env"

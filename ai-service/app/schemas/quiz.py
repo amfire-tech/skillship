@@ -4,8 +4,10 @@ Purpose: Pydantic request/response models for quiz endpoints.
 """
 
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from app.schemas.common import Question, Difficulty, QuestionType
+
+from app.schemas.common import Difficulty, Question, QuestionType
 
 
 class GenerateRequest(BaseModel):
@@ -13,7 +15,7 @@ class GenerateRequest(BaseModel):
     grade: str
     count: int = Field(default=5, ge=1, le=20)
     difficulty: Difficulty = Difficulty.MEDIUM
-    types: list[QuestionType] = [QuestionType.MCQ]
+    types: list[QuestionType] = Field(default_factory=lambda: [QuestionType.MCQ])
     course_context: str = ""    # optional extra context for the prompt
 
 
@@ -24,10 +26,11 @@ class GenerateResponse(BaseModel):
 class AdaptiveNextRequest(BaseModel):
     topic: str
     grade: str
-    attempt_history: list[dict]   # [{"correct": bool, "difficulty": str}, ...]
+    # [{"correct": bool, "difficulty": str}, ...]
+    attempt_history: list[dict] = Field(default_factory=list)
     last_difficulty: Difficulty = Difficulty.MEDIUM
     last_correct: bool = True
-    types: list[QuestionType] = [QuestionType.MCQ]
+    types: list[QuestionType] = Field(default_factory=lambda: [QuestionType.MCQ])
     course_context: str = ""
 
 

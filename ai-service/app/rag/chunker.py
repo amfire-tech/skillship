@@ -4,8 +4,9 @@ Purpose: Split documents into overlapping text chunks for embedding.
 """
 
 from __future__ import annotations
+
 import io
-from typing import Optional
+
 import pypdf
 
 
