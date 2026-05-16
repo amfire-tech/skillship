@@ -55,7 +55,7 @@ const tracks = [
 
 export function WorkshopCategoryShowcase() {
   return (
-    <section className="border-y border-[var(--border)] bg-[linear-gradient(180deg,#FFFFFF_0%,#F0FAF5_100%)] py-20 md:py-24">
+    <section className="border-y border-[var(--border)] bg-white py-20 dark:!bg-[var(--background)] md:py-24">
       <Container>
         <MotionSection className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -77,13 +77,13 @@ export function WorkshopCategoryShowcase() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.55, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-              className="group relative flex flex-col rounded-[24px] border border-[var(--border)] bg-white p-6 transition-all hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)] md:p-7"
+              className="group relative flex flex-col rounded-2xl border border-[var(--border)] bg-white p-6 transition-all hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)] md:p-7"
             >
               <div className="flex items-center justify-between">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)]">
                   {track.icon}
                 </div>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-primary">
                   {track.classRange}
                 </span>
               </div>
@@ -96,7 +96,7 @@ export function WorkshopCategoryShowcase() {
               </p>
 
               <div className="mt-6 space-y-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   Student outcomes
                 </p>
                 {track.outcomes.map((out, j) => (

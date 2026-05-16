@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { useAuthStore } from "@/store/authStore";
+import { API_BASE, getToken } from "@/lib/auth";
 
 const boardOptions = [
   { value: "CBSE", label: "CBSE" },
@@ -41,22 +41,14 @@ function validate(v: FormValues): FormErrors {
   return err;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-async function getToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (!token) {
-    const ok = await useAuthStore.getState().refreshAuth();
-    if (!ok) return null;
-    token = useAuthStore.getState().accessToken;
-  }
-  return token;
-}
-
 export default function AddSchoolPage() {
   const router = useRouter();
   const toast = useToast();
   const [values, setValues] = useState<FormValues>(initial);
+
+  useEffect(() => {
+    document.title = "New School — Skillship";
+  }, []);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -110,7 +102,7 @@ export default function AddSchoolPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col items-center rounded-[28px] border border-[var(--border)] bg-white p-10 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
+          className="flex flex-col items-center rounded-3xl border border-[var(--border)] bg-white p-6 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_16px_30px_-12px_rgba(5,150,105,0.5)]">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
@@ -152,9 +144,9 @@ export default function AddSchoolPage() {
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto max-w-2xl">
-        <div className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
           <div className="h-1.5 w-full bg-gradient-to-r from-primary to-accent" />
-          <div className="p-7 md:p-9">
+          <div className="p-6 md:p-9">
             <div className="mb-7 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.4)]">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -178,7 +170,7 @@ export default function AddSchoolPage() {
                 <input type="text" placeholder="e.g. Delhi Public School, Noida" value={values.name}
                   onChange={(e) => handleChange("name", e.target.value)} aria-invalid={!!errors.name}
                   className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.name ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`} />
-                {errors.name && <p role="alert" className="text-[11px] font-medium text-red-500">{errors.name}</p>}
+                {errors.name && <p role="alert" className="text-xs font-medium text-red-500">{errors.name}</p>}
               </motion.div>
 
               {/* Board */}
@@ -223,7 +215,7 @@ export default function AddSchoolPage() {
                   <button key={p.value} type="button" onClick={() => handleChange("plan", p.value)}
                     className={`rounded-xl border p-3 text-left transition-all ${values.plan === p.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-[var(--border)] bg-[var(--muted)]/30 hover:border-primary/30"}`}>
                     <p className="text-sm font-bold text-[var(--foreground)]">{p.label}</p>
-                    <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">{p.desc}</p>
+                    <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{p.desc}</p>
                   </button>
                 ))}
               </div>

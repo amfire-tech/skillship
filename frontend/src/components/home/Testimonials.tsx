@@ -1,3 +1,8 @@
+/*
+ * File:    frontend/src/components/home/Testimonials.tsx
+ * Purpose: Scrolling testimonials carousel shown on the public home page.
+ * Owner:   Pranav
+ */
 "use client";
 
 import { useRef } from "react";
@@ -106,7 +111,7 @@ function InfiniteMarquee() {
             whileHover={{ scale: 1.02, rotate: "0deg" }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             style={{ rotate: t.rotate }}
-            className="group relative flex w-[320px] shrink-0 flex-col justify-between overflow-hidden rounded-[22px] border border-[var(--border)] bg-white p-6 shadow-[0_8px_30px_-12px_rgba(5,150,105,0.15)] cursor-default"
+            className="group relative flex w-[320px] shrink-0 flex-col justify-between overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--card)] p-6 shadow-[0_8px_30px_-12px_rgba(5,150,105,0.15)] cursor-default"
           >
             {/* Large decorative " */}
             <div className="pointer-events-none absolute -right-2 -top-4 select-none font-serif text-[9rem] font-black leading-none text-primary/6">
@@ -119,7 +124,7 @@ function InfiniteMarquee() {
             {/* Stars */}
             <div className="flex gap-0.5 mb-3">
               {[...Array(5)].map((_, s) => (
-                <svg key={s} width="11" height="11" viewBox="0 0 24 24" fill="#059669">
+                <svg key={s} width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="text-primary">
                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                 </svg>
               ))}
@@ -137,9 +142,9 @@ function InfiniteMarquee() {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold text-[var(--foreground)]">{t.name}</p>
-                <p className="text-[11px] text-[var(--muted-foreground)]">{t.city}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">{t.city}</p>
               </div>
-              <span className="ml-auto shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              <span className="ml-auto shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-xs font-semibold text-primary">
                 {t.metric}
               </span>
             </figcaption>

@@ -20,5 +20,7 @@ export function getDefaultRouteForRole(role: UserRole): string {
 }
 
 export function isRoleAllowed(userRole: UserRole | undefined, allowedRole: UserRole): boolean {
+  // MAIN_ADMIN has platform-wide access — exempt from per-role route restrictions.
+  if (userRole === "MAIN_ADMIN") return true;
   return userRole === allowedRole;
 }

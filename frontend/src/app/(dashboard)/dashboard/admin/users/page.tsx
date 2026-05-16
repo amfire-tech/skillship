@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { useAuthStore } from "@/store/authStore";
+import { TableRowSkeleton } from "@/components/ui/TableRowSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { API_BASE, getToken } from "@/lib/auth";
 import type { UserRole } from "@/types";
 
 type Role = "all" | UserRole;
@@ -51,18 +53,6 @@ const roleTabDefs: { label: string; value: Role }[] = [
   { label: "Students", value: "STUDENT" },
 ];
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-async function getToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (!token) {
-    const ok = await useAuthStore.getState().refreshAuth();
-    if (!ok) return null;
-    token = useAuthStore.getState().accessToken;
-  }
-  return token;
-}
-
 export default function UserManagementPage() {
   const toast = useToast();
   const router = useRouter();
@@ -92,6 +82,10 @@ export default function UserManagementPage() {
     }
   }, []);
 
+  useEffect(() => {
+    document.title = "User Management — Skillship";
+  }, []);
+
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const tabs = roleTabDefs.map((t) => ({
@@ -111,11 +105,15 @@ export default function UserManagementPage() {
     const token = await getToken();
     if (!token) return;
     try {
-      await fetch(`${API_BASE}/users/${user.id}/`, {
+      const res = await fetch(`${API_BASE}/users/${user.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_active: false }),
       });
+      if (!res.ok) {
+        toast("Failed to suspend user. Please try again.", "error");
+        return;
+      }
       setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_active: false } : u));
       toast(`${user.first_name} ${user.last_name} suspended`, "error");
     } catch {
@@ -167,7 +165,7 @@ export default function UserManagementPage() {
               }`}
             >
               {t.label}
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-white/25" : "bg-[var(--muted)]"}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-xs ${active ? "bg-white/25" : "bg-[var(--muted)]"}`}>
                 {t.count}
               </span>
             </button>
@@ -202,11 +200,22 @@ export default function UserManagementPage() {
         className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
       >
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-[var(--muted-foreground)]">
-            <svg className="mr-2 animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Loading users…
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                  <th className="px-5 py-3">User</th>
+                  <th className="px-5 py-3">Role</th>
+                  <th className="px-5 py-3">School / Scope</th>
+                  <th className="px-5 py-3">Joined</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <TableRowSkeleton rows={6} columns={6} withAvatar />
+              </tbody>
+            </table>
           </div>
         ) : fetchError ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -217,7 +226,7 @@ export default function UserManagementPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   <th className="px-5 py-3">User</th>
                   <th className="px-5 py-3">Role</th>
                   <th className="px-5 py-3">School / Scope</th>
@@ -228,11 +237,14 @@ export default function UserManagementPage() {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
-                      {users.length === 0 ? "No users found." : "No users match your search."}
-                    </td>
-                  </tr>
+                  <tr><td colSpan={6} className="px-5 py-8">
+                    <EmptyState
+                      title={users.length === 0 ? "No users yet" : "No users match"}
+                      description={users.length === 0 ? "Create the first user — Sub-Admins, Principals, Teachers, or Students. They'll receive credentials by email." : "Try clearing the search or role filter."}
+                      action={users.length === 0 ? { label: "Create user", href: "/dashboard/admin/users/new" } : undefined}
+                      icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
+                    />
+                  </td></tr>
                 ) : (
                   filtered.map((u, i) => {
                     const fullName = `${u.first_name} ${u.last_name}`.trim() || u.username;
@@ -256,12 +268,12 @@ export default function UserManagementPage() {
                             </div>
                             <div>
                               <p className="font-semibold text-[var(--foreground)]">{fullName}</p>
-                              <p className="text-[11px] text-[var(--muted-foreground)]">{u.email}</p>
+                              <p className="text-xs text-[var(--muted-foreground)]">{u.email}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-5 py-3.5">
-                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${roleColor[u.role]}`}>
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${roleColor[u.role]}`}>
                             {roleLabel[u.role]}
                           </span>
                         </td>
@@ -270,16 +282,16 @@ export default function UserManagementPage() {
                         </td>
                         <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{formatDate(u.date_joined)}</td>
                         <td className="px-5 py-3.5">
-                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor}`}>
+                          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}>
                             {status}
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-3 text-xs">
-                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                          <div className="flex items-center justify-end gap-1 text-xs">
+                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-primary transition-colors hover:bg-primary/10 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/20">View</button>
+                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20">Edit</button>
                             {u.is_active && (
-                              <button onClick={() => setConfirmSuspend(u)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Suspend</button>
+                              <button onClick={() => setConfirmSuspend(u)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-300/40">Suspend</button>
                             )}
                           </div>
                         </td>

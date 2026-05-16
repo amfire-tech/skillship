@@ -6,10 +6,12 @@ export default function NotFound() {
       {/* Minimal branded header */}
       <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2" aria-label="Skillship home">
-            <span className="text-xl font-bold tracking-tight">
-              <span className="text-amber-500">SKILL</span>
-              <span className="text-teal-600">SHIP</span>
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Skillship home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-icon.png" alt="Skillship Edutech" width={36} height={36} className="h-9 w-9 rounded-full bg-black object-contain p-0.5" />
+            <span className="text-xl font-extrabold leading-none tracking-tight">
+              <span className="text-brand-orange">SKILL</span>
+              <span className="text-brand-teal">SHIP</span>
             </span>
           </Link>
         </div>

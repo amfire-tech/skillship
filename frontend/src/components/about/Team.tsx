@@ -44,7 +44,7 @@ export function Team() {
           </p>
         </MotionSection>
 
-        <div className="mt-12 divide-y divide-[var(--border)] rounded-[28px] border border-[var(--border)] bg-white shadow-[0_20px_60px_-40px_rgba(5,150,105,0.2)] md:mt-14">
+        <div className="mt-12 divide-y divide-[var(--border)] rounded-3xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-40px_rgba(5,150,105,0.2)] md:mt-14">
           {team.map((member, i) => (
             <motion.div
               key={member.name}
@@ -68,7 +68,7 @@ export function Team() {
               </div>
 
               <div className="hidden text-right md:block">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
                   Focus
                 </p>
                 <p className="mt-1 text-sm text-[var(--foreground)]">{member.focus}</p>

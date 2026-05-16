@@ -69,7 +69,7 @@ export function StorySection() {
             <div className="relative">
               <div className="absolute -inset-6 -z-10 rounded-[40px] bg-gradient-to-br from-primary/8 via-accent/5 to-transparent blur-2xl" />
 
-              <div className="rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] md:p-8">
+              <div className="rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] md:p-8">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                   <span className="h-2 w-2 rounded-full bg-red-400" />
                   The problem we saw
@@ -89,7 +89,7 @@ export function StorySection() {
                       className="relative flex items-start gap-3"
                     >
                       <span
-                        className="absolute flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[var(--muted)] text-[10px] font-bold text-[var(--muted-foreground)]"
+                        className="absolute flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[var(--muted)] text-xs font-bold text-[var(--muted-foreground)]"
                         style={{ left: "-29px", top: "-1px" }}
                       >
                         {String(i + 1).padStart(2, "0")}

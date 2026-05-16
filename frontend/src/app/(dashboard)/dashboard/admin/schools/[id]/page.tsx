@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
-import { useAuthStore } from "@/store/authStore";
+import { API_BASE, getToken } from "@/lib/auth";
 
 interface ApiSchool {
   id: string;
@@ -23,21 +23,9 @@ interface ApiSchool {
 const boardLabel: Record<string, string> = { CBSE: "CBSE", ICSE: "ICSE", STATE: "State Board" };
 const planLabel: Record<string, string> = { CORE: "Core", AGENTIC: "Agentic" };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-async function getToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (!token) {
-    const ok = await useAuthStore.getState().refreshAuth();
-    if (!ok) return null;
-    token = useAuthStore.getState().accessToken;
-  }
-  return token;
-}
-
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div>
-    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{label}</p>
+    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{label}</p>
     <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{value || "—"}</p>
   </div>
 );
@@ -171,7 +159,7 @@ export default function SchoolDetailPage() {
 
       {/* Details card */}
       <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="mb-5 text-[15px] font-semibold text-[var(--foreground)]">School Details</h2>
+        <h2 className="mb-5 text-sm font-semibold text-[var(--foreground)]">School Details</h2>
         {editing ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {([
@@ -182,7 +170,7 @@ export default function SchoolDetailPage() {
               { k: "address" as const, label: "Address" },
             ]).map(({ k, label, select }) => (
               <div key={k} className={`flex flex-col gap-1 ${k === "name" || k === "address" ? "sm:col-span-2" : ""}`}>
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{label}</label>
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{label}</label>
                 {select ? (
                   <select value={form[k]} onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                     className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">

@@ -68,12 +68,19 @@ export function Navbar() {
           className="flex h-16 items-center justify-between"
           aria-label="Main navigation"
         >
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2" aria-label={`${siteConfig.name} home`}>
-            <Image src="/logo-icon.png" alt="Skillship logo" width={38} height={38} className="object-contain" />
-            <span className="text-xl font-bold tracking-tight">
-              <span style={{ color: "#F59E0B" }}>SKILL</span>
-              <span style={{ color: "#0D9488" }}>SHIP</span>
+          {/* Logo — official brand: badge + SKILLSHIP wordmark */}
+          <Link href="/" className="flex items-center gap-2.5" aria-label={`${siteConfig.name} home`}>
+            <Image
+              src="/logo-icon.png"
+              alt="Skillship Edutech"
+              width={40}
+              height={40}
+              priority
+              className="h-10 w-10 shrink-0 rounded-full bg-black object-contain p-0.5"
+            />
+            <span className="text-xl font-extrabold leading-none tracking-tight">
+              <span className="text-brand-orange">SKILL</span>
+              <span className="text-brand-teal">SHIP</span>
             </span>
           </Link>
 

@@ -1,3 +1,8 @@
+/*
+ * File:    frontend/src/components/contact/ContactForm.tsx
+ * Purpose: Contact form that submits to /api/v1/contact/ with mailto fallback.
+ * Owner:   Pranav
+ */
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
@@ -51,6 +56,7 @@ export function ContactForm() {
   const [errors, setErrors] = useState<Partial<Record<keyof ContactFormValues, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function handleChange(
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -62,7 +68,7 @@ export function ContactForm() {
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const validationErrors = validate(values);
     if (Object.keys(validationErrors).length > 0) {
@@ -70,11 +76,29 @@ export function ContactForm() {
       return;
     }
     setIsLoading(true);
-    // Simulate submission — replace with real API call
-    setTimeout(() => {
-      setIsLoading(false);
+    setSubmitError(null);
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+      const res = await fetch(`${API_BASE}/contact/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
       setSubmitted(true);
-    }, 1200);
+    } catch {
+      // Fallback: open mailto so the user can still reach us
+      const subject = encodeURIComponent(`Contact from ${values.name} — ${values.schoolName}`);
+      const body = encodeURIComponent(
+        `Name: ${values.name}\nEmail: ${values.email}\nPhone: ${values.phone}\nSchool: ${values.schoolName}\nRole: ${values.role}\n\n${values.message}`
+      );
+      window.location.href = `mailto:hello@skillship.in?subject=${subject}&body=${body}`;
+      setSubmitError("Our server could not be reached. Your email client has been opened so you can send the message directly.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (submitted) {
@@ -83,7 +107,7 @@ export function ContactForm() {
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[28px] border border-primary/20 bg-white p-8 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.25)] text-center md:p-10"
+        className="relative overflow-hidden rounded-3xl border border-primary/20 bg-white p-8 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.25)] text-center md:p-10"
       >
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
         <div className="flex justify-center">
@@ -114,13 +138,13 @@ export function ContactForm() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.25)] md:p-8"
+      className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.25)] md:p-8"
     >
       {/* Decorative top bar */}
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
 
       <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           Contact form
         </div>
@@ -246,6 +270,12 @@ export function ContactForm() {
             )}
           </AnimatePresence>
         </div>
+
+        {submitError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+            {submitError}
+          </p>
+        )}
 
         <div className="flex flex-col-reverse items-start gap-4 border-t border-[var(--border)] pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">

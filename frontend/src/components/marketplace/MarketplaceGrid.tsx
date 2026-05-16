@@ -17,7 +17,7 @@ export function MarketplaceGrid({ workshops }: MarketplaceGridProps) {
             ))}
           </div>
         ) : (
-          <div className="rounded-[28px] border border-dashed border-[var(--border)] bg-white px-8 py-14 text-center">
+          <div className="rounded-3xl border border-dashed border-[var(--border)] bg-white px-8 py-14 text-center">
             <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
               No workshops match these filters
             </h3>

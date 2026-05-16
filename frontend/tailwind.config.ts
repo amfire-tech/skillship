@@ -51,6 +51,12 @@ const config: Config = {
           border: "#1E3A3A",
           text: "#F0FDF4",
         },
+        // Official Skillship brand wordmark colors (logo PDF)
+        brand: {
+          orange: "#F5A623",
+          teal:   "#2EB8B8",
+          cream:  "#FFF7E1",
+        },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

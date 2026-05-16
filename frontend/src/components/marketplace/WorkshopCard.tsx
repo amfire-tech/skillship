@@ -32,7 +32,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
   return (
     <Card
       hoverable
-      className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-[var(--border)] bg-white shadow-[0_18px_50px_-35px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-1"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-[0_18px_50px_-35px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-1"
     >
       <div className="relative aspect-[16/9] overflow-hidden border-b border-[var(--border)] bg-[var(--muted)]">
         <Image
@@ -63,7 +63,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
           </div>
 
           <div className="rounded-2xl bg-primary-50 px-3 py-2 text-right">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-600">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600">
               Price
             </p>
             <p className="mt-1 text-lg font-bold text-[var(--foreground)]">
@@ -74,7 +74,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
 
         <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[var(--muted)] p-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
               Duration
             </p>
             <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">
@@ -82,7 +82,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
               Class range
             </p>
             <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">

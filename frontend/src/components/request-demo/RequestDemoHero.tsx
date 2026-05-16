@@ -87,7 +87,7 @@ export function RequestDemoHero() {
               <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-gradient-to-br from-primary/20 to-transparent blur-3xl" />
               <div className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-gradient-to-br from-accent/20 to-transparent blur-3xl" />
 
-              <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.35)]">
+              <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.35)]">
                 {/* Window chrome */}
                 <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
                   <div className="flex items-center gap-2">
@@ -95,14 +95,14 @@ export function RequestDemoHero() {
                     <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
                     <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
                   </div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                     skillship.in/demo
                   </p>
                 </div>
 
                 {/* Calendar preview */}
                 <div className="mt-5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                     Pick a slot
                   </p>
                   <p className="mt-1 text-sm font-bold text-[var(--foreground)]">
@@ -128,7 +128,7 @@ export function RequestDemoHero() {
                             : "border-[var(--border)] bg-white"
                         }`}
                       >
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                           {d.day}
                         </p>
                         <p className={`mt-0.5 text-lg font-bold ${d.active ? "text-primary" : "text-[var(--foreground)]"}`}>
@@ -167,11 +167,11 @@ export function RequestDemoHero() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-[var(--foreground)]">{slot.time}</p>
-                            <p className="text-[11px] text-[var(--muted-foreground)]">{slot.len} · Video call</p>
+                            <p className="text-xs text-[var(--muted-foreground)]">{slot.len} · Video call</p>
                           </div>
                         </div>
                         {slot.active && (
-                          <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
+                          <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-white">
                             Selected
                           </span>
                         )}
@@ -194,7 +194,7 @@ export function RequestDemoHero() {
                         Confirmed within 1 business hour
                       </p>
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Free</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">Free</span>
                   </motion.div>
                 </div>
               </div>

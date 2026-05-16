@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useRouter } from "next/navigation";
@@ -106,14 +107,14 @@ const navItems: NavItem[] = [
 ];
 
 const roleLabel: Record<string, string> = {
-  admin: "Super Admin",
-  subadmin: "Sub Admin",
-  principal: "Principal",
-  teacher: "Teacher",
-  student: "Student",
+  MAIN_ADMIN: "Super Admin",
+  SUB_ADMIN: "Sub Admin",
+  PRINCIPAL: "Principal",
+  TEACHER: "Teacher",
+  STUDENT: "Student",
 };
 
-export function AdminSidebar() {
+export function AdminSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
@@ -128,14 +129,13 @@ export function AdminSidebar() {
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-white">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)]">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2 2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-          </svg>
-        </div>
+        <Image src="/logo-icon.png" alt="Skillship Edutech" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full bg-black object-contain p-0.5" />
         <div className="leading-tight">
-          <p className="text-base font-bold text-primary">Skillship</p>
-          <p className="text-[11px] font-medium text-[var(--muted-foreground)]">{roleLabel[user?.role ?? ""] ?? "Admin"}</p>
+          <p className="text-base font-extrabold leading-none tracking-tight">
+            <span className="text-brand-orange">SKILL</span>
+            <span className="text-brand-teal">SHIP</span>
+          </p>
+          <p className="mt-1 text-xs font-medium text-[var(--muted-foreground)]">{roleLabel[user?.role ?? ""] ?? "Admin"}</p>
         </div>
       </div>
 
@@ -150,6 +150,7 @@ export function AdminSidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  onClick={onClose}
                   className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all ${
                     active
                       ? "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)]"

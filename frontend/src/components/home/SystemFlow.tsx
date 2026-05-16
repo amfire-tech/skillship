@@ -57,7 +57,7 @@ const stages = [
 
 export function SystemFlow() {
   return (
-    <section className="relative overflow-hidden border-y border-[var(--border)] bg-[linear-gradient(180deg,#FFFFFF_0%,#F0FAF5_100%)] py-20 md:py-28">
+    <section className="relative overflow-hidden border-y border-[var(--border)] bg-[var(--muted)]/30 py-20 md:py-28">
       <Container>
         <MotionSection className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -115,15 +115,15 @@ export function SystemFlow() {
                   className="flex flex-col items-center text-center"
                 >
                   <div
-                    className={`relative z-10 flex h-[104px] w-[104px] items-center justify-center rounded-[24px] border-2 ${
+                    className={`relative z-10 flex h-[104px] w-[104px] items-center justify-center rounded-2xl border-2 ${
                       stage.highlight
                         ? "border-primary bg-gradient-to-br from-primary to-accent text-white shadow-[0_20px_50px_-15px_rgba(5,150,105,0.5)]"
-                        : "border-[var(--border)] bg-white text-primary shadow-sm"
+                        : "border-[var(--border)] bg-[var(--card)] text-primary shadow-sm"
                     }`}
                   >
                     {/* Pulse ring for AI stage */}
                     {stage.highlight && (
-                      <span className="absolute inset-0 rounded-[24px] border-2 border-primary/40 animate-[ping_2s_ease-in-out_infinite]" />
+                      <span className="absolute inset-0 rounded-2xl border-2 border-primary/40 animate-[ping_2s_ease-in-out_infinite]" />
                     )}
                     {stage.icon}
                   </div>
@@ -156,7 +156,7 @@ export function SystemFlow() {
                   className={`relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 ${
                     stage.highlight
                       ? "border-primary bg-gradient-to-br from-primary to-accent text-white"
-                      : "border-[var(--border)] bg-white text-primary"
+                      : "border-[var(--border)] bg-[var(--card)] text-primary"
                   }`}
                   style={{ marginLeft: "-33px" }}
                 >

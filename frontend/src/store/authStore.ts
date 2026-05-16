@@ -7,6 +7,7 @@ import type { User } from "@/types";
 // Access token: memory only (never persisted — XSS safe)
 // Refresh token: HttpOnly cookie (managed by Django, JS never touches it)
 // Only user + isAuthenticated are persisted to survive page reload.
+// hasHydrated: gates auth checks until localStorage is read on reload.
 // ============================================================
 
 interface AuthState {
@@ -14,6 +15,7 @@ interface AuthState {
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasHydrated: boolean;
 }
 
 interface AuthActions {
@@ -23,6 +25,7 @@ interface AuthActions {
   logout: () => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
+  setHasHydrated: (v: boolean) => void;
   refreshAuth: () => Promise<boolean>;
 }
 
@@ -31,42 +34,57 @@ const initialState: AuthState = {
   accessToken: null,
   isAuthenticated: false,
   isLoading: false,
+  hasHydrated: false,
 };
 
 export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // Single-flight guard — per-store instance; prevents SSR cross-request sharing
+      // and double refresh race (interceptor + layout both calling refresh).
+      let _refreshInFlight: Promise<boolean> | null = null;
+
+      return {
       ...initialState,
 
       setUser: (user) => set({ user }),
 
       setAccessToken: (accessToken) => set({ accessToken }),
 
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
       login: (user, accessToken) =>
         set({ user, accessToken, isAuthenticated: true, isLoading: false }),
 
-      logout: () => set({ ...initialState }),
+      logout: () => set({ ...initialState, hasHydrated: true }),
 
-      clearAuth: () => set({ ...initialState }),
+      clearAuth: () => set({ ...initialState, hasHydrated: true }),
 
       setLoading: (isLoading) => set({ isLoading }),
 
       refreshAuth: async () => {
-        try {
-          const res = await fetch("/api/auth/refresh", { method: "POST" });
-          if (!res.ok) {
+        if (_refreshInFlight) return _refreshInFlight;
+        _refreshInFlight = (async () => {
+          try {
+            const res = await fetch("/api/auth/refresh", { method: "POST" });
+            if (!res.ok) {
+              get().clearAuth();
+              return false;
+            }
+            const data = await res.json();
+            set({ accessToken: data.access, isAuthenticated: true });
+            return true;
+          } catch {
             get().clearAuth();
             return false;
+          } finally {
+            _refreshInFlight = null;
           }
-          const data = await res.json();
-          set({ accessToken: data.access });
-          return true;
-        } catch {
-          get().clearAuth();
-          return false;
-        }
+        })();
+        return _refreshInFlight;
       },
-    }),
+    };
+    },
     {
       name: "skillship-auth",
       storage: createJSONStorage(() => localStorage),
@@ -76,6 +94,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Called once localStorage is read. Safe to run auth checks now.
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function ForgotPasswordPage() {
@@ -10,7 +10,11 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    document.title = "Reset Password — Skillship";
+  }, []);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     if (!email.trim()) {
@@ -22,11 +26,22 @@ export default function ForgotPasswordPage() {
       return;
     }
     setIsLoading(true);
-    // Simulate — replace with real API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        setError("Failed to send reset email. Please try again.");
+        return;
+      }
       setSubmitted(true);
-    }, 1200);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -42,16 +57,16 @@ export default function ForgotPasswordPage() {
         className="relative w-full max-w-md"
       >
         {/* Brand */}
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2 2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <p className="text-lg font-bold tracking-tight text-[var(--foreground)]">Skillship</p>
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-icon.png" alt="Skillship Edutech" width={44} height={44} className="h-11 w-11 rounded-full bg-black object-contain p-0.5" />
+          <p className="text-xl font-extrabold leading-none tracking-tight">
+            <span className="text-brand-orange">SKILL</span>
+            <span className="text-brand-teal">SHIP</span>
+          </p>
         </div>
 
-        <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white/90 p-7 shadow-[0_30px_80px_-40px_rgba(5,150,105,0.3)] backdrop-blur-xl md:p-8">
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white/90 p-7 shadow-[0_30px_80px_-40px_rgba(5,150,105,0.3)] backdrop-blur-xl md:p-8">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
 
           <AnimatePresence mode="wait">
@@ -101,13 +116,15 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => { setEmail(e.target.value); setError(""); }}
                       placeholder="your@email.com"
                       autoComplete="email"
-                      className="h-[52px] w-full rounded-2xl border border-[var(--border)] bg-white pl-14 pr-4 text-[15px] text-[var(--foreground)] shadow-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10"
+                      className="h-[52px] w-full rounded-2xl border border-[var(--border)] bg-white pl-14 pr-4 text-sm text-[var(--foreground)] shadow-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10"
                     />
                   </div>
 
                   <AnimatePresence>
                     {error && (
                       <motion.p
+                        role="alert"
+                        aria-live="assertive"
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
@@ -121,7 +138,7 @@ export default function ForgotPasswordPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="group relative mt-2 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-accent text-[15px] font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.6)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="group relative mt-2 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-accent text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.6)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isLoading ? (
                       <>

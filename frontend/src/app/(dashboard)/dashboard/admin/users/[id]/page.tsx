@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
-import { useAuthStore } from "@/store/authStore";
+import { API_BASE, getToken } from "@/lib/auth";
 
 interface ApiUser {
   id: string;
@@ -37,21 +37,9 @@ const roleLabels: Record<string, string> = {
   STUDENT: "Student",
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-async function getToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (!token) {
-    const ok = await useAuthStore.getState().refreshAuth();
-    if (!ok) return null;
-    token = useAuthStore.getState().accessToken;
-  }
-  return token;
-}
-
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div>
-    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{label}</p>
+    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{label}</p>
     <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{value || "—"}</p>
   </div>
 );
@@ -204,10 +192,10 @@ export default function UserDetailPage() {
           <div>
             <p className="font-bold text-[var(--foreground)]">{fullName}</p>
             <div className="mt-1 flex gap-2">
-              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${roleColors[user.role] ?? "bg-gray-100 text-gray-600"}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${roleColors[user.role] ?? "bg-gray-100 text-gray-600"}`}>
                 {roleLabels[user.role] ?? user.role}
               </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${user.is_active ? "bg-primary/10 text-primary" : "bg-red-100 text-red-600"}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${user.is_active ? "bg-primary/10 text-primary" : "bg-red-100 text-red-600"}`}>
                 {user.is_active ? "Active" : "Suspended"}
               </span>
             </div>
@@ -218,7 +206,7 @@ export default function UserDetailPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             {(["first_name", "last_name", "email", "phone"] as const).map((k) => (
               <div key={k} className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                   {k === "first_name" ? "First Name" : k === "last_name" ? "Last Name" : k === "email" ? "Email" : "Phone"}
                 </label>
                 <input

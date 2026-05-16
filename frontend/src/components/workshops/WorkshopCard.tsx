@@ -51,12 +51,12 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
 
       <CardContent className="flex h-full flex-col p-4 md:p-5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={categoryVariants[workshop.category]} className="px-2.5 py-0.5 text-[11px]">
+          <Badge variant={categoryVariants[workshop.category]} className="px-2.5 py-0.5 text-xs">
             {categoryLabels[workshop.category]}
           </Badge>
           <Badge
             variant={difficultyVariants[workshop.difficulty]}
-            className="px-2.5 py-0.5 text-[11px]"
+            className="px-2.5 py-0.5 text-xs"
           >
             {difficultyLabels[workshop.difficulty]}
           </Badge>
@@ -72,7 +72,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
 
         <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[var(--muted)] p-3">
           <div>
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
               Duration
             </dt>
             <dd className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">
@@ -80,7 +80,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+            <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
               Class range
             </dt>
             <dd className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">
@@ -93,7 +93,7 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
           <Link href={`/workshops/${workshop.slug}`}>
             <Button
               variant="secondary"
-              className="h-10 w-full rounded-full border-primary/20 bg-white px-4 text-sm text-[var(--foreground)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/35"
+              className="h-10 w-full rounded-full border-primary/20 bg-[var(--card)] px-4 text-sm text-[var(--foreground)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/35"
             >
               View Details
             </Button>

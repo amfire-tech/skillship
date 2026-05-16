@@ -9,7 +9,7 @@ interface AdminErrorProps {
 
 export default function AdminError({ error, reset }: AdminErrorProps) {
   useEffect(() => {
-    console.error("[Admin Error]", error);
+    if (process.env.NODE_ENV !== "production") console.error("[Admin Error]", error);
   }, [error]);
 
   return (

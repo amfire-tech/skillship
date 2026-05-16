@@ -41,7 +41,7 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className="rounded-2xl border border-[var(--border)] bg-white p-5"
+      className="rounded-2xl border border-[var(--border)] bg-white dark:bg-[var(--card)] p-5"
     >
       <div>
         <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{title}</h3>
@@ -58,12 +58,12 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
         >
           <defs>
             <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="rgb(5,150,105)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="rgb(5,150,105)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--color-primary, #059669)" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="var(--color-primary, #059669)" stopOpacity="0" />
             </linearGradient>
             <linearGradient id="lineStroke" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="rgb(5,150,105)" />
-              <stop offset="100%" stopColor="rgb(13,148,136)" />
+              <stop offset="0%" stopColor="var(--color-primary, #059669)" />
+              <stop offset="100%" stopColor="var(--color-accent, #0d9488)" />
             </linearGradient>
           </defs>
 
@@ -72,8 +72,8 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
             const y = yFor(t);
             return (
               <g key={i}>
-                <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="rgb(226,232,240)" strokeDasharray="3 4" />
-                <text x={padL - 8} y={y + 3} fontSize="10" textAnchor="end" fill="rgb(100,116,139)">
+                <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="var(--color-border, #e2e8f0)" strokeDasharray="3 4" />
+                <text x={padL - 8} y={y + 3} fontSize="10" textAnchor="end" fill="var(--color-muted-foreground, #64748b)">
                   {Math.round(t)}
                 </text>
               </g>
@@ -112,8 +112,8 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
                 cx={xFor(i)}
                 cy={yFor(d.value)}
                 r="3.5"
-                fill="white"
-                stroke="rgb(5,150,105)"
+                fill="var(--background)"
+                stroke="var(--color-primary, #059669)"
                 strokeWidth="2"
               />
               {/* Invisible larger hit area */}
@@ -138,7 +138,7 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
                 x2={tooltip.x}
                 y1={padT}
                 y2={H - padB}
-                stroke="rgb(5,150,105)"
+                stroke="var(--color-primary, #059669)"
                 strokeWidth="1"
                 strokeDasharray="3 3"
                 opacity="0.5"
@@ -149,14 +149,14 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
                 width="62"
                 height="22"
                 rx="6"
-                fill="rgb(5,150,105)"
+                fill="var(--color-primary, #059669)"
               />
               <text
                 x={tooltip.x > W / 2 ? tooltip.x - 41 : tooltip.x + 41}
                 y={tooltip.y - 13}
                 fontSize="11"
                 textAnchor="middle"
-                fill="white"
+                fill="var(--background)"
                 fontWeight="600"
               >
                 {tooltip.label}: {tooltip.value}
@@ -172,7 +172,7 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
               y={H - 8}
               fontSize="10"
               textAnchor="middle"
-              fill="rgb(100,116,139)"
+              fill="var(--color-muted-foreground, #64748b)"
             >
               {d.label}
             </text>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -47,6 +47,10 @@ const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 
 export default function SettingsPage() {
   const [active, setActive] = useState<TabKey>("organization");
+
+  useEffect(() => {
+    document.title = "Settings — Skillship";
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -221,7 +225,7 @@ function OrgPanel() {
               aria-describedby={errors.name ? "org-name-err" : undefined}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.name ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
             />
-            {errors.name && <p id="org-name-err" className="text-[11px] font-medium text-red-500">{errors.name}</p>}
+            {errors.name && <p id="org-name-err" className="text-xs font-medium text-red-500">{errors.name}</p>}
           </Field>
           <Field label="Primary domain"><Input value={form.domain} onChange={set("domain")} /></Field>
           <Field label="Support email">
@@ -232,7 +236,7 @@ function OrgPanel() {
               aria-describedby={errors.email ? "org-email-err" : undefined}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.email ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
             />
-            {errors.email && <p id="org-email-err" className="text-[11px] font-medium text-red-500">{errors.email}</p>}
+            {errors.email && <p id="org-email-err" className="text-xs font-medium text-red-500">{errors.email}</p>}
           </Field>
           <Field label="Support phone">
             <input
@@ -242,7 +246,7 @@ function OrgPanel() {
               aria-describedby={errors.phone ? "org-phone-err" : undefined}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.phone ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
             />
-            {errors.phone && <p id="org-phone-err" className="text-[11px] font-medium text-red-500">{errors.phone}</p>}
+            {errors.phone && <p id="org-phone-err" className="text-xs font-medium text-red-500">{errors.phone}</p>}
           </Field>
           <Field label="Registered address">
             <Input value={form.address} onChange={set("address")} />
@@ -300,7 +304,7 @@ function FileUploadField({ label, id, onFile, file }: { label: string; id: strin
         <input id={id} type="file" accept=".png,.jpg,.jpeg,.svg" className="sr-only" onChange={handleChange} />
       </label>
       {file && (
-        <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-1.5 text-[11px]">
+        <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-1.5 text-xs">
           <span className="font-medium text-[var(--foreground)] truncate max-w-[180px]">{file.name}</span>
           <span className="text-[var(--muted-foreground)] shrink-0 ml-2">{file.size}</span>
           <button type="button" onClick={() => onFile(null)} className="ml-3 text-[var(--muted-foreground)] hover:text-red-500 shrink-0">✕</button>

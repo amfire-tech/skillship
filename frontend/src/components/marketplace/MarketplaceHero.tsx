@@ -18,7 +18,7 @@ const catalogPreview = [
 
 export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
   return (
-    <section className="relative overflow-hidden border-b border-[var(--border)] bg-[radial-gradient(ellipse_at_top_left,_rgba(5,150,105,0.08),_transparent_50%),linear-gradient(180deg,#FAFFFE_0%,#F0FAF5_100%)] pb-16 pt-20 md:pb-20 md:pt-24 lg:pt-28">
+    <section className="relative overflow-hidden border-b border-[var(--border)] bg-white pb-16 pt-20 dark:!bg-[var(--background)] md:pb-20 md:pt-24 lg:pt-28">
       <div
         className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-30"
         style={{ maskImage: "linear-gradient(to bottom, rgba(255,255,255,0.9), transparent 75%)" }}
@@ -87,14 +87,14 @@ export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
             <div className="relative">
               <div className="absolute -inset-6 -z-10 rounded-[40px] bg-gradient-to-br from-primary/15 via-accent/10 to-transparent blur-2xl" />
 
-              <div className="relative rounded-[28px] border border-[var(--border)] bg-white p-5 shadow-[0_30px_70px_-35px_rgba(5,150,105,0.3)] md:p-6">
+              <div className="relative rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[0_30px_70px_-35px_rgba(5,150,105,0.3)] md:p-6">
                 {/* Mock header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-primary" />
                     <span className="text-xs font-semibold text-[var(--foreground)]">Live catalog</span>
                   </div>
-                  <div className="flex items-center gap-1.5 rounded-md bg-[var(--muted)] px-2 py-1 text-[10px] text-[var(--muted-foreground)]">
+                  <div className="flex items-center gap-1.5 rounded-md bg-[var(--muted)] px-2 py-1 text-xs text-[var(--muted-foreground)]">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
                     </svg>
@@ -110,7 +110,7 @@ export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.5 + i * 0.06, duration: 0.3 }}
-                      className={`rounded-full px-3 py-1 text-[11px] font-medium ${
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${
                         i === 0
                           ? "bg-gradient-to-r from-primary to-accent text-white"
                           : "border border-[var(--border)] bg-white text-[var(--muted-foreground)]"
@@ -146,7 +146,7 @@ export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
                             {item.title}
                           </p>
                         </div>
-                        <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                        <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
                           {item.meta}
                         </p>
                       </div>
@@ -155,7 +155,7 @@ export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
                   ))}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-[11px] text-[var(--muted-foreground)]">
+                <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3 text-xs text-[var(--muted-foreground)]">
                   <span>Showing 3 of {totalCount} programs</span>
                   <span className="font-semibold text-primary">View all →</span>
                 </div>

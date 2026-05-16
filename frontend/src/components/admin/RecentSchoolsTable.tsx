@@ -1,39 +1,87 @@
+/*
+ * File:    frontend/src/components/admin/RecentSchoolsTable.tsx
+ * Purpose: Recently joined schools table on the MAIN_ADMIN dashboard.
+ *          Fetches latest 5 schools from the real API. No hardcoded data.
+ * Owner:   Pranav
+ */
+
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { API_BASE, getToken } from "@/lib/auth";
 
-interface SchoolRow {
+interface School {
+  id: string;
   name: string;
-  date: string;
+  board: "CBSE" | "ICSE" | "STATE" | string;
   city: string;
-  students: string;
-  plan: "Premium" | "Standard" | "Basic";
-  status: "Active" | "Pending";
+  state: string;
+  is_active: boolean;
+  created_at?: string;
 }
 
-const rows: SchoolRow[] = [
-  { name: "Kendriya Vidyalaya, Sector 21", date: "Mar 5, 2026", city: "Chandigarh", students: "1,240", plan: "Premium", status: "Active" },
-  { name: "Delhi Public School, Noida", date: "Mar 4, 2026", city: "Noida", students: "2,100", plan: "Premium", status: "Active" },
-  { name: "St. Xavier's High School", date: "Mar 3, 2026", city: "Mumbai", students: "880", plan: "Standard", status: "Pending" },
-  { name: "Vidya Niketan School", date: "Mar 2, 2026", city: "Hyderabad", students: "650", plan: "Basic", status: "Active" },
-  { name: "Sunrise Academy", date: "Mar 1, 2026", city: "Jaipur", students: "420", plan: "Basic", status: "Pending" },
-];
+interface PaginatedSchools {
+  results?: School[];
+}
 
-const planClass: Record<SchoolRow["plan"], string> = {
-  Premium: "bg-amber-50 text-amber-700 border-amber-200",
-  Standard: "bg-violet-50 text-violet-700 border-violet-200",
-  Basic: "bg-slate-50 text-slate-600 border-slate-200",
+const boardClass: Record<string, string> = {
+  CBSE:  "bg-blue-50 text-blue-700 border-blue-200",
+  ICSE:  "bg-violet-50 text-violet-700 border-violet-200",
+  STATE: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-const statusClass: Record<SchoolRow["status"], string> = {
-  Active: "bg-primary/10 text-primary border-primary/20",
-  Pending: "bg-amber-50 text-amber-700 border-amber-200",
-};
+const statusClass = (active: boolean): string =>
+  active
+    ? "bg-primary/10 text-primary border-primary/20"
+    : "bg-amber-50 text-amber-700 border-amber-200";
+
+function formatDate(iso?: string): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-[var(--border)]/60 last:border-0">
+      <td className="py-3 pr-4"><div className="h-4 w-48 animate-pulse rounded bg-[var(--muted)]" /></td>
+      <td className="py-3 pr-4"><div className="h-4 w-24 animate-pulse rounded bg-[var(--muted)]" /></td>
+      <td className="py-3 pr-4"><div className="h-5 w-14 animate-pulse rounded-full bg-[var(--muted)]" /></td>
+      <td className="py-3 pr-4"><div className="h-5 w-16 animate-pulse rounded-full bg-[var(--muted)]" /></td>
+      <td className="py-3"><div className="h-4 w-16 animate-pulse rounded bg-[var(--muted)]" /></td>
+    </tr>
+  );
+}
 
 export function RecentSchoolsTable() {
   const router = useRouter();
+  const [schools, setSchools] = useState<School[] | null>(null); // null = loading
+  const [error, setError] = useState(false);
+
+  const load = useCallback(async () => {
+    const token = await getToken();
+    if (!token) { setError(true); setSchools([]); return; }
+    try {
+      const res = await fetch(`${API_BASE}/schools/?ordering=-created_at&page_size=5`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { setError(true); setSchools([]); return; }
+      const data: PaginatedSchools = await res.json();
+      setSchools((data.results ?? []).slice(0, 5));
+    } catch {
+      setError(true);
+      setSchools([]);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -57,48 +105,64 @@ export function RecentSchoolsTable() {
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
-            <tr className="border-b border-[var(--border)] text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+            <tr className="border-b border-[var(--border)] text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
               <th className="py-3 pr-4">School name</th>
               <th className="py-3 pr-4">City</th>
-              <th className="py-3 pr-4">Students</th>
-              <th className="py-3 pr-4">Plan</th>
+              <th className="py-3 pr-4">Board</th>
               <th className="py-3 pr-4">Status</th>
               <th className="py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <motion.tr
-                key={r.name}
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, delay: 0.3 + i * 0.05 }}
-                className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
-              >
-                <td className="py-3 pr-4">
-                  <p className="font-semibold text-[var(--foreground)]">{r.name}</p>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">{r.date}</p>
+            {schools === null ? (
+              Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+            ) : error ? (
+              <tr>
+                <td colSpan={5} className="py-10 text-center text-sm text-[var(--muted-foreground)]">
+                  Could not load schools — check API connection.
                 </td>
-                <td className="py-3 pr-4 text-[var(--muted-foreground)]">{r.city}</td>
-                <td className="py-3 pr-4 text-[var(--foreground)]">{r.students}</td>
-                <td className="py-3 pr-4">
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${planClass[r.plan]}`}>
-                    {r.plan}
-                  </span>
+              </tr>
+            ) : schools.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-10 text-center text-sm text-[var(--muted-foreground)]">
+                  No schools yet
                 </td>
-                <td className="py-3 pr-4">
-                  <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusClass[r.status]}`}>
-                    {r.status}
-                  </span>
-                </td>
-                <td className="py-3">
-                  <div className="flex items-center gap-3 text-xs">
-                    <button onClick={() => router.push("/dashboard/admin/schools")} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                    <button onClick={() => router.push("/dashboard/admin/schools")} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
-                  </div>
-                </td>
-              </motion.tr>
-            ))}
+              </tr>
+            ) : (
+              schools.map((s, i) => (
+                <motion.tr
+                  key={s.id}
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.35, delay: 0.3 + i * 0.05 }}
+                  className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
+                >
+                  <td className="py-3 pr-4">
+                    <p className="font-semibold text-[var(--foreground)]">{s.name}</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">{formatDate(s.created_at)}</p>
+                  </td>
+                  <td className="py-3 pr-4 text-[var(--muted-foreground)]">
+                    {[s.city, s.state].filter(Boolean).join(", ") || "—"}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${boardClass[s.board] ?? "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                      {s.board}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass(s.is_active)}`}>
+                      {s.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="py-3">
+                    <div className="flex items-center gap-3 text-xs">
+                      <button onClick={() => router.push(`/dashboard/admin/schools/${s.id}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
+                      <button onClick={() => router.push(`/dashboard/admin/schools/${s.id}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
+                    </div>
+                  </td>
+                </motion.tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
-
-// Backend team: POST /api/quizzes with this payload:
-// { title, subject, grade, duration_minutes, instructions, status: "Draft" }
-// Returns: { id, ...quiz }
-// Then redirect to /admin/quizzes/:id for question builder
+import { API_BASE, getToken } from "@/lib/auth";
 
 const subjects = ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "History", "Geography", "English", "Computer Science", "Hindi"];
 const grades = ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
@@ -29,15 +25,20 @@ export default function NewQuizPage() {
   const router = useRouter();
   const [values, setValues] = useState<FormValues>(initial);
   const [titleError, setTitleError] = useState("");
+
+  useEffect(() => {
+    document.title = "New Quiz — Skillship";
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   function set(key: keyof FormValues, val: string) {
     setValues((p) => ({ ...p, [key]: val }));
     if (key === "title" && titleError) setTitleError("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!values.title.trim()) {
       setTitleError("Quiz title is required");
@@ -47,9 +48,36 @@ export default function NewQuizPage() {
       setTitleError("Title must be at least 5 characters");
       return;
     }
-    // TODO (backend): replace with POST /api/quizzes → then navigate to question builder
     setIsLoading(true);
-    setTimeout(() => { setIsLoading(false); setSubmitted(true); }, 600);
+    setApiError(null);
+    try {
+      const token = await getToken();
+      if (!token) { setApiError("Session expired — please log in again."); setIsLoading(false); return; }
+      const durationMinutes = parseInt(values.duration) || 30;
+      const res = await fetch(`${API_BASE}/quizzes/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: values.title.trim(),
+          subject: values.subject,
+          grade: values.grade,
+          duration_minutes: durationMinutes,
+          instructions: values.instructions.trim(),
+          status: "DRAFT",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setApiError(err?.detail ?? err?.title?.[0] ?? "Failed to create quiz. Try again.");
+        setIsLoading(false);
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setApiError("Network error — check server connection.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (submitted) {
@@ -59,7 +87,7 @@ export default function NewQuizPage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col items-center rounded-[28px] border border-[var(--border)] bg-white p-10 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
+          className="flex flex-col items-center rounded-3xl border border-[var(--border)] bg-white p-6 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -114,10 +142,10 @@ export default function NewQuizPage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto max-w-2xl"
       >
-        <div className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
           <div className="h-1.5 w-full bg-gradient-to-r from-primary to-accent" />
 
-          <div className="p-7 md:p-9">
+          <div className="p-6 md:p-9">
             <div className="mb-7 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -147,7 +175,7 @@ export default function NewQuizPage() {
                       : "border-[var(--border)] focus:border-primary focus:ring-primary/10"
                   }`}
                 />
-                {titleError && <p id="quiz-title-err" role="alert" className="text-[11px] font-medium text-red-500">{titleError}</p>}
+                {titleError && <p id="quiz-title-err" role="alert" className="text-xs font-medium text-red-500">{titleError}</p>}
               </motion.div>
 
               {/* Subject */}
@@ -175,7 +203,7 @@ export default function NewQuizPage() {
                       key={d}
                       type="button"
                       onClick={() => set("duration", d)}
-                      className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-all ${
+                      className={`inline-flex min-h-8 items-center rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
                         values.duration === d
                           ? "border-primary bg-primary text-white"
                           : "border-[var(--border)] bg-white text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary"
@@ -206,12 +234,14 @@ export default function NewQuizPage() {
                 <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
               </svg>
               <p className="text-xs text-amber-700">
-                Backend: connect <code className="rounded bg-amber-100 px-1 text-[10px]">POST /api/quizzes</code>. After creation, redirect to question builder at <code className="rounded bg-amber-100 px-1 text-[10px]">/admin/quizzes/:id/questions</code>.
+                Backend: connect <code className="rounded bg-amber-100 px-1 text-xs">POST /api/quizzes</code>. After creation, redirect to question builder at <code className="rounded bg-amber-100 px-1 text-xs">/admin/quizzes/:id/questions</code>.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] px-7 py-4 md:px-9">
+          <div className="border-t border-[var(--border)] px-7 py-4 md:px-9">
+            {apiError && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{apiError}</p>}
+            <div className="flex items-center justify-end gap-3">
             <Link href="/dashboard/admin/quizzes" className="h-10 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">
               Cancel
             </Link>
@@ -231,6 +261,7 @@ export default function NewQuizPage() {
               )}
               {isLoading ? "Saving…" : "Create Quiz"}
             </button>
+            </div>
           </div>
         </div>
       </motion.form>

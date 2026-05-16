@@ -37,13 +37,20 @@ export function Footer() {
         <div className="grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand Column */}
           <div>
-            <Link href="/" className="flex items-center gap-2" aria-label={`${siteConfig.name} home`}>
-              <Image src="/logo-icon.png" alt="Skillship logo" width={38} height={38} className="object-contain" />
-              <span className="text-lg font-bold tracking-tight">
-                <span className="text-amber-500">SKILL</span>
-                <span className="text-teal-600">SHIP</span>
+            <Link href="/" className="flex items-center gap-2.5" aria-label={`${siteConfig.name} home`}>
+              <Image
+                src="/logo-icon.png"
+                alt="Skillship Edutech"
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-full bg-black object-contain p-0.5"
+              />
+              <span className="text-lg font-extrabold leading-none tracking-tight">
+                <span className="text-brand-orange">SKILL</span>
+                <span className="text-brand-teal">SHIP</span>
               </span>
             </Link>
+            <p className="mt-3 text-xs italic text-emerald-200/70"># Where Fun Meets Learning</p>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-emerald-200/60">
               AI-powered school management and career guidance for Indian schools
               delivering future-ready education.

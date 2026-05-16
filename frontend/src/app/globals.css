@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
 @layer base {
   :root {
     --background: #FAFFFE;
@@ -32,8 +30,136 @@
     @apply border-[var(--border)];
   }
 
+  html, body {
+    @apply overflow-x-clip;
+  }
+
   body {
     @apply bg-[var(--background)] text-[var(--foreground)] font-sans antialiased;
+  }
+
+  /* Keyboard-only focus ring — never shows on mouse click */
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * Dark-mode contrast safety net.
+ * Many components use hardcoded light utilities (bg-white, text-gray-900, etc.)
+ * without dark: variants. Re-map them under .dark so all pages stay readable
+ * without touching every component file.
+ *
+ * Scope: only re-map BACKGROUNDS and NEUTRAL FOREGROUND text. We deliberately
+ * do NOT remap text-white because it is overwhelmingly used on top of
+ * gradients/primary buttons where it should stay white in both themes.
+ */
+@layer utilities {
+  /* Card / surface backgrounds — translucency preserved via /opacity suffixes
+     handled by Tailwind, plain bg-white is the common case. */
+  .dark .bg-white { background-color: var(--card); }
+  /* Translucent white variants (bg-white/60..95) — used heavily on hero cards.
+     Use rgba on the dark card colour so the glassy effect survives. */
+  .dark .bg-white\/60  { background-color: rgb(22 32 50 / 0.60); }
+  .dark .bg-white\/70  { background-color: rgb(22 32 50 / 0.70); }
+  .dark .bg-white\/80  { background-color: rgb(22 32 50 / 0.80); }
+  .dark .bg-white\/90  { background-color: rgb(22 32 50 / 0.90); }
+  .dark .bg-white\/95  { background-color: rgb(22 32 50 / 0.95); }
+  .dark .hover\:bg-white:hover { background-color: var(--card); }
+  .dark .hover\:bg-gray-50:hover { background-color: var(--muted); }
+  .dark .bg-gray-50,
+  .dark .bg-slate-50,
+  .dark .bg-neutral-50,
+  .dark .bg-gray-100,
+  .dark .bg-slate-100,
+  .dark .bg-neutral-100 { background-color: var(--muted); }
+
+  /* Neutral foreground text — anything that was meant to be near-black in light
+     mode should become the theme foreground in dark mode. */
+  .dark .text-gray-900,
+  .dark .text-slate-900,
+  .dark .text-neutral-900,
+  .dark .text-gray-800,
+  .dark .text-slate-800,
+  .dark .text-neutral-800,
+  .dark .text-black { color: var(--foreground); }
+
+  .dark .text-gray-700,
+  .dark .text-slate-700,
+  .dark .text-neutral-700,
+  .dark .text-gray-600,
+  .dark .text-slate-600,
+  .dark .text-neutral-600,
+  .dark .text-gray-500,
+  .dark .text-slate-500,
+  .dark .text-neutral-500 { color: var(--muted-foreground); }
+
+  /* Borders — keep separators visible on the dark background. */
+  .dark .border-gray-200,
+  .dark .border-slate-200,
+  .dark .border-neutral-200,
+  .dark .border-gray-100,
+  .dark .border-slate-100 { border-color: var(--border); }
+
+  /* Higher-opacity translucent whites used on hero pills/cards. */
+  .dark .bg-white\/85  { background-color: rgb(22 32 50 / 0.85); }
+  .dark .bg-white\/\[0\.98\] { background-color: rgb(22 32 50 / 0.98); }
+
+  /* Brand-tinted ultra-light backgrounds (Tailwind 50 shades) — these
+     are pale tints in light mode but read as "white" in dark mode.
+     Remap to a translucent primary tint so the brand colour survives. */
+  .dark .bg-primary-50    { background-color: rgb(5 150 105 / 0.12); }
+  .dark .bg-accent-50     { background-color: rgb(13 148 136 / 0.12); }
+  .dark .bg-emerald-50    { background-color: rgb(5 150 105 / 0.12); }
+  .dark .bg-teal-50       { background-color: rgb(13 148 136 / 0.12); }
+  .dark .bg-green-50      { background-color: rgb(5 150 105 / 0.12); }
+  .dark .hover\:bg-green-100:hover { background-color: rgb(5 150 105 / 0.18); }
+  .dark .hover\:bg-red-50:hover    { background-color: rgb(220 38 38 / 0.15); }
+
+  /* Gradient stops — light neutral / brand 50 shades remapped to dark tokens. */
+  .dark .from-white {
+    --tw-gradient-from: var(--card) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(22 32 50 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+  .dark .from-slate-50,
+  .dark .from-gray-50,
+  .dark .from-neutral-50 {
+    --tw-gradient-from: var(--muted) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(22 32 50 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+  .dark .from-primary-50,
+  .dark .from-emerald-50,
+  .dark .from-green-50 {
+    --tw-gradient-from: rgb(5 150 105 / 0.18) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(5 150 105 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+  .dark .from-accent-50,
+  .dark .from-teal-50 {
+    --tw-gradient-from: rgb(13 148 136 / 0.18) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(13 148 136 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+  .dark .to-white          { --tw-gradient-to: var(--card) var(--tw-gradient-to-position); }
+  .dark .to-slate-50,
+  .dark .to-gray-50,
+  .dark .to-neutral-50     { --tw-gradient-to: var(--muted) var(--tw-gradient-to-position); }
+  .dark .via-white {
+    --tw-gradient-via-position: ;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--card) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
   }
 }
 

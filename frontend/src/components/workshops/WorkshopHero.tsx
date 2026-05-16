@@ -117,7 +117,7 @@ export function WorkshopHero({ featuredWorkshop, totalCount }: WorkshopHeroProps
               <div className="absolute -inset-6 -z-10 rounded-[40px] bg-gradient-to-br from-primary/15 via-accent/10 to-transparent blur-2xl" />
 
               {/* Main featured card */}
-              <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-4 shadow-[0_30px_70px_-35px_rgba(5,150,105,0.35)] md:p-5">
+              <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-4 shadow-[0_30px_70px_-35px_rgba(5,150,105,0.35)] md:p-5">
                 <div className="relative overflow-hidden rounded-[20px] bg-[var(--muted)]">
                   <Image
                     src={featuredWorkshop.image}
@@ -141,7 +141,7 @@ export function WorkshopHero({ featuredWorkshop, totalCount }: WorkshopHeroProps
 
                 <div className="mt-5 flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
                       Most booked this month
                     </p>
                     <h2 className="mt-2 text-xl font-bold tracking-tight text-[var(--foreground)] md:text-2xl">
@@ -155,16 +155,16 @@ export function WorkshopHero({ featuredWorkshop, totalCount }: WorkshopHeroProps
                 </p>
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-gradient-to-br from-[var(--muted)] to-white px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                  <div className="rounded-xl bg-gradient-to-br from-[var(--muted)] to-[var(--card)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                       Duration
                     </p>
                     <p className="mt-1.5 text-sm font-bold text-[var(--foreground)]">
                       {featuredWorkshop.duration}
                     </p>
                   </div>
-                  <div className="rounded-xl bg-gradient-to-br from-[var(--muted)] to-white px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                  <div className="rounded-xl bg-gradient-to-br from-[var(--muted)] to-[var(--card)] px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                       Class range
                     </p>
                     <p className="mt-1.5 text-sm font-bold text-[var(--foreground)]">
@@ -187,7 +187,7 @@ export function WorkshopHero({ featuredWorkshop, totalCount }: WorkshopHeroProps
                   </svg>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                     Outcome
                   </p>
                   <p className="text-xs font-bold text-[var(--foreground)]">Hands-on, measurable</p>

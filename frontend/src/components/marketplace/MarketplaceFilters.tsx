@@ -49,7 +49,7 @@ export function MarketplaceFilters({
   }
 
   return (
-    <Card className="rounded-[28px] border-[var(--border)] bg-white shadow-[0_24px_60px_-40px_rgba(15,23,42,0.18)]">
+    <Card className="rounded-3xl border-[var(--border)] bg-white shadow-[0_24px_60px_-40px_rgba(15,23,42,0.18)]">
       <CardContent className="space-y-8 p-6 md:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

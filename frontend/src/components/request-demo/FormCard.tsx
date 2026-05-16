@@ -1,3 +1,8 @@
+/*
+ * File:    frontend/src/components/request-demo/FormCard.tsx
+ * Purpose: Demo request form that submits to /api/v1/demo-requests/ with mailto fallback.
+ * Owner:   Pranav
+ */
 "use client";
 
 import Link from "next/link";
@@ -66,6 +71,7 @@ export function FormCard() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function handleChange(
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -77,7 +83,7 @@ export function FormCard() {
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const validationErrors = validate(formState);
     if (Object.keys(validationErrors).length > 0) {
@@ -85,11 +91,29 @@ export function FormCard() {
       return;
     }
     setIsLoading(true);
-    // Simulate submission — replace with real API call
-    setTimeout(() => {
-      setIsLoading(false);
+    setSubmitError(null);
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+      const res = await fetch(`${API_BASE}/demo-requests/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formState),
+      });
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
       setSubmitted(true);
-    }, 1400);
+    } catch {
+      // Fallback: open mailto so the user can still reach us
+      const subject = encodeURIComponent(`Demo request — ${formState.schoolName}`);
+      const body = encodeURIComponent(
+        `School: ${formState.schoolName}\nPrincipal: ${formState.principalName}\nCity: ${formState.city}\nStudents: ${formState.studentRange}\nPhone: ${formState.phoneNumber}\nEmail: ${formState.emailAddress}\nBoard: ${formState.schoolBoard}`
+      );
+      window.location.href = `mailto:hello@skillship.in?subject=${subject}&body=${body}`;
+      setSubmitError("Our server could not be reached. Your email client has been opened so you can send the request directly.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (submitted) {
@@ -98,7 +122,7 @@ export function FormCard() {
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[28px] border border-primary/20 bg-white p-10 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.3)] text-center"
+        className="relative overflow-hidden rounded-3xl border border-primary/20 bg-white p-6 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.3)] text-center"
       >
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
         <div className="flex justify-center">
@@ -109,7 +133,7 @@ export function FormCard() {
           </div>
         </div>
         <h2 className="mt-5 text-2xl font-bold tracking-tight text-[var(--foreground)]">Request submitted!</h2>
-        <p className="mt-3 text-[15px] leading-7 text-[var(--muted-foreground)]">
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
           Thank you, <span className="font-semibold text-[var(--foreground)]">{formState.principalName}</span>. A Skillship specialist will reach out to{" "}
           <span className="font-semibold text-primary">{formState.emailAddress}</span> within one business day.
         </p>
@@ -130,20 +154,20 @@ export function FormCard() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.3)] md:p-10"
+      className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-35px_rgba(5,150,105,0.3)]"
     >
       {/* Gradient top bar */}
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
 
       <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           Demo request
         </div>
         <h2 className="mt-3 text-[26px] font-bold tracking-[-0.02em] text-[var(--foreground)] md:text-[28px]">
           Tell us about your school
         </h2>
-        <p className="mt-2 text-[15px] leading-7 text-[var(--muted-foreground)]">
+        <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
           A specialist from your region will reach out within one business day
           to confirm a time that works.
         </p>
@@ -272,6 +296,12 @@ export function FormCard() {
             Your details stay confidential — we never share them with third parties.
           </p>
         </div>
+
+        {submitError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+            {submitError}
+          </p>
+        )}
 
         <div className="pt-1">
           <Button

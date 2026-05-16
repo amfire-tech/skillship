@@ -34,7 +34,7 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
 
       <div aria-hidden="true" className="mt-5 flex h-[220px] items-end gap-2">
         {/* Y ticks */}
-        <div className="flex h-full flex-col justify-between py-1 text-[10px] text-[var(--muted-foreground)]">
+        <div className="flex h-full flex-col justify-between py-1 text-xs text-[var(--muted-foreground)]">
           {ticks.slice().reverse().map((t) => (
             <span key={t}>{t}</span>
           ))}
@@ -60,7 +60,7 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
               >
                 {/* Tooltip */}
                 {isHovered && (
-                  <div className="absolute bottom-[calc(100%+6px)] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--foreground)] px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg">
+                  <div className="absolute bottom-[calc(100%+6px)] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--foreground)] px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
                     {d.label}: {d.value}
                     <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--foreground)]" />
                   </div>
@@ -79,7 +79,7 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
 
       <div className="mt-2 flex items-end gap-3 pl-6">
         {data.map((d) => (
-          <span key={d.label} className="flex-1 text-center text-[10px] text-[var(--muted-foreground)]">
+          <span key={d.label} className="flex-1 text-center text-xs text-[var(--muted-foreground)]">
             {d.label}
           </span>
         ))}

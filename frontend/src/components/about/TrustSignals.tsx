@@ -49,7 +49,7 @@ const signals = [
 
 export function TrustSignals() {
   return (
-    <section className="relative overflow-hidden border-y border-[var(--border)] bg-[linear-gradient(180deg,#F0FAF5_0%,#FFFFFF_100%)] py-20 md:py-24">
+    <section className="relative overflow-hidden border-y border-[var(--border)] bg-[var(--muted)]/30 py-20 md:py-24">
       <Container>
         <MotionSection className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -68,7 +68,7 @@ export function TrustSignals() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.55, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-              className="group flex items-start gap-5 rounded-[24px] border border-[var(--border)] bg-white p-6 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)] md:p-7"
+              className="group flex items-start gap-5 rounded-2xl border border-[var(--border)] bg-white dark:bg-[var(--background)] p-6 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)] md:p-7"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-gradient-to-br group-hover:from-primary group-hover:to-accent group-hover:text-white">
                 {s.icon}

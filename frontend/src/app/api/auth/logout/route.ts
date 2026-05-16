@@ -12,13 +12,16 @@ export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get("refresh")?.value;
 
   if (refreshToken) {
+    // Send refresh token in body — SimpleJWT TokenBlacklistView requires {"refresh": "..."}
     await fetch(`${API_BASE}/auth/logout/`, {
       method: "POST",
-      headers: { Cookie: `refresh=${refreshToken}` },
+      headers: { "Content-Type": "application/json", Cookie: `refresh=${refreshToken}` },
+      body: JSON.stringify({ refresh: refreshToken }),
     }).catch(() => {});
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set("refresh", "", { httpOnly: true, maxAge: 0, path: "/api/auth" });
+  // Path must match login cookie path ("/") so the cookie is actually cleared.
+  response.cookies.set("refresh", "", { httpOnly: true, maxAge: 0, path: "/" });
   return response;
 }
