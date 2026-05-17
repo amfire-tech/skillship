@@ -26,7 +26,9 @@ HttpOnly cookies. This is what keeps it safe from XSS.
 from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.generics import RetrieveAPIView
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -219,3 +221,42 @@ class UsersViewSet(ModelViewSet):
         target.set_password(serializer.validated_data["password"])
         target.save(update_fields=["password"])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ── Bulk CSV upload (Phase 4.5) ─────────────────────────────────────────
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-upload",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def bulk_upload(self, request):
+        """
+        POST /api/v1/users/bulk-upload/
+
+        Multipart form with a `file` field.
+
+        Required columns: `username, email, first_name, last_name, role, password`
+        Optional: `admission_number`
+        MAIN_ADMIN may include an optional `school` column (slug or UUID).
+        PRINCIPAL uploads only land in their own school regardless of `school`.
+
+        Role whitelist: STUDENT, TEACHER, SUB_ADMIN. MAIN_ADMIN and PRINCIPAL
+        cannot be created via bulk upload — they have to be set up explicitly.
+
+        Response: {total_rows, created, errors: [{row, message}]}
+        """
+        upload = request.FILES.get("file")
+        if upload is None:
+            raise DRFValidationError({"file": "CSV file is required."})
+        if upload.size and upload.size > 5 * 1024 * 1024:
+            raise DRFValidationError({"file": "CSV must be 5 MB or smaller."})
+
+        try:
+            text = upload.read().decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise DRFValidationError({"file": "CSV must be UTF-8 encoded."}) from exc
+
+        from . import bulk as _bulk
+        result = _bulk.import_users_csv(actor=request.user, csv_text=text)
+        return Response(result)

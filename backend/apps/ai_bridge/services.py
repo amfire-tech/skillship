@@ -92,6 +92,13 @@ def career_ask(*, school: School, user: User, payload: dict[str, Any]) -> dict[s
     )
 
 
+def college_finder(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
+    return _execute(
+        kind=_Kind.COLLEGE_FINDER, school=school, created_by=user,
+        payload=payload, call=ai_client.college_finder,
+    )
+
+
 def generate_questions(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
     return _execute(
         kind=_Kind.QUESTION_GEN, school=school, created_by=user,
@@ -99,10 +106,39 @@ def generate_questions(*, school: School, user: User, payload: dict[str, Any]) -
     )
 
 
+def generate_from_pdf(
+    *,
+    school: School,
+    user: User,
+    pdf_bytes: bytes,
+    filename: str,
+    form_fields: dict[str, Any],
+) -> dict[str, Any]:
+    """PDF upload variant — payload is multipart, not JSON."""
+    # request_json stores only the metadata, not the file bytes (would blow up storage).
+    audit_payload = {**form_fields, "filename": filename, "pdf_bytes": len(pdf_bytes)}
+    return _execute(
+        kind=_Kind.QUESTION_GEN_PDF,
+        school=school,
+        created_by=user,
+        payload=audit_payload,
+        call=lambda _p: ai_client.generate_from_pdf(
+            pdf_bytes=pdf_bytes, filename=filename, form_fields=form_fields,
+        ),
+    )
+
+
 def adaptive_next(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
     return _execute(
         kind=_Kind.ADAPTIVE_NEXT, school=school, created_by=user,
         payload=payload, call=ai_client.adaptive_next,
+    )
+
+
+def grade_short(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
+    return _execute(
+        kind=_Kind.GRADE_SHORT, school=school, created_by=user,
+        payload=payload, call=ai_client.grade_short,
     )
 
 

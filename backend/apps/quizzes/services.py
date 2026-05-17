@@ -424,3 +424,128 @@ def _expire_locked_attempt(attempt: QuizAttempt) -> None:
     attempt.status = QuizAttempt.Status.EXPIRED
     attempt.submitted_at = timezone.now()
     attempt.save(update_fields=["status", "submitted_at", "updated_at"])
+
+
+# ── CSV bulk import (Phase 4.4) ─────────────────────────────────────────────
+
+
+_CSV_REQUIRED_COLUMNS = ("text", "type", "difficulty", "points")
+_CSV_LETTER_TO_INDEX = {"A": 0, "B": 1, "C": 2, "D": 3}
+
+
+def import_questions_csv(*, bank: QuestionBank, created_by, csv_text: str) -> dict:
+    """Parse a CSV string and create one Question per row inside the bank.
+
+    Failures are reported per-row; valid rows still commit so a partial CSV
+    isn't blocked by one bad line. Rows in error never increment `created`.
+
+    Returns: {total_rows, created, errors: [{row, message}, ...]}
+    """
+    import csv as _csv
+    import io as _io
+
+    reader = _csv.DictReader(_io.StringIO(csv_text))
+    if reader.fieldnames is None:
+        return {"total_rows": 0, "created": 0, "errors": [{"row": 0, "message": "CSV is empty."}]}
+
+    missing = [c for c in _CSV_REQUIRED_COLUMNS if c not in reader.fieldnames]
+    if missing:
+        return {
+            "total_rows": 0, "created": 0,
+            "errors": [{"row": 0, "message": f"Missing required columns: {', '.join(missing)}"}],
+        }
+
+    created = 0
+    errors: list[dict] = []
+    total = 0
+
+    for row_idx, row in enumerate(reader, start=2):  # row 1 is the header
+        total += 1
+        try:
+            q = _build_question_from_row(bank=bank, created_by=created_by, row=row)
+            q.save()
+            created += 1
+        except (ValueError, KeyError) as exc:
+            errors.append({"row": row_idx, "message": str(exc)})
+
+    return {"total_rows": total, "created": created, "errors": errors}
+
+
+def _build_question_from_row(*, bank: QuestionBank, created_by, row: dict) -> Question:
+    text = (row.get("text") or "").strip()
+    if not text:
+        raise ValueError("`text` is empty.")
+
+    type_raw = (row.get("type") or "").strip().upper()
+    if type_raw not in {"MCQ", "TRUE_FALSE", "SHORT_ANSWER"}:
+        raise ValueError(f"`type` must be MCQ / TRUE_FALSE / SHORT_ANSWER (got {type_raw!r}).")
+
+    difficulty_raw = (row.get("difficulty") or "").strip().upper() or "MEDIUM"
+    if difficulty_raw not in {"EASY", "MEDIUM", "HARD"}:
+        raise ValueError(f"`difficulty` must be EASY / MEDIUM / HARD (got {difficulty_raw!r}).")
+
+    try:
+        points = int(row.get("points") or 1)
+    except ValueError as exc:
+        raise ValueError("`points` must be an integer.") from exc
+    if points < 1 or points > 255:
+        raise ValueError("`points` must be between 1 and 255.")
+
+    options: list[dict] = []
+    correct_option_ids: list[str] = []
+    accepted_answers: list[str] = []
+
+    if type_raw == "MCQ":
+        for letter in ("A", "B", "C", "D"):
+            cell = (row.get(f"option_{letter.lower()}") or "").strip()
+            if cell:
+                options.append({"id": letter.lower(), "text": cell})
+        if len(options) < 2:
+            raise ValueError("MCQ rows need at least two `option_*` columns filled.")
+        raw_correct = (row.get("correct") or "").strip().upper()
+        if not raw_correct:
+            raise ValueError("MCQ rows need `correct` set to one or more of A/B/C/D.")
+        # Allow "A" or "A,C" for multi-select MCQ.
+        for letter in (c.strip() for c in raw_correct.split(",")):
+            if letter not in _CSV_LETTER_TO_INDEX:
+                raise ValueError(f"`correct` letter {letter!r} is not A/B/C/D.")
+            idx = _CSV_LETTER_TO_INDEX[letter]
+            if idx >= len(options):
+                raise ValueError(f"`correct` letter {letter!r} but no option_{letter.lower()} was provided.")
+            correct_option_ids.append(options[idx]["id"])
+
+    elif type_raw == "TRUE_FALSE":
+        options = [{"id": "true", "text": "True"}, {"id": "false", "text": "False"}]
+        raw = (row.get("correct") or "").strip().lower()
+        if raw in {"true", "t", "yes", "1"}:
+            correct_option_ids = ["true"]
+        elif raw in {"false", "f", "no", "0"}:
+            correct_option_ids = ["false"]
+        else:
+            raise ValueError("TRUE_FALSE rows need `correct` = True / False.")
+
+    else:  # SHORT_ANSWER
+        raw = (row.get("accepted_answers") or "").strip()
+        if not raw:
+            raise ValueError("SHORT_ANSWER rows need `accepted_answers` (pipe-separated).")
+        accepted_answers = [a.strip().lower() for a in raw.split("|") if a.strip()]
+        if not accepted_answers:
+            raise ValueError("SHORT_ANSWER `accepted_answers` is empty after parsing.")
+
+    tags_raw = (row.get("tags") or "").strip()
+    tags = [t.strip() for t in tags_raw.split("|") if t.strip()]
+
+    return Question(
+        school_id=bank.school_id,
+        bank=bank,
+        created_by=created_by,
+        text=text,
+        type=type_raw,
+        difficulty=difficulty_raw,
+        options=options,
+        correct_option_ids=correct_option_ids,
+        accepted_answers=accepted_answers,
+        tags=tags,
+        points=points,
+        explanation=(row.get("explanation") or "").strip(),
+    )

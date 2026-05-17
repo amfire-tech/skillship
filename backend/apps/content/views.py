@@ -47,13 +47,22 @@ class MarketplaceListingViewSet(ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="purchase", permission_classes=[IsAuthenticated])
     def purchase(self, request, pk=None):
+        """
+        POST /api/v1/content/marketplace/{id}/purchase/
+        Body (optional): {"course_id": "<uuid>"} — target course in buyer's school.
+
+        Copies the listing into the buyer's tenant as a ContentItem. MAIN_ADMIN
+        is rejected because they do not belong to any school.
+        """
         from .services import purchase_listing
         from .serializers import ContentItemSerializer as CISerializer
 
         listing = self.get_object()
+        course_id = request.data.get("course_id") if isinstance(request.data, dict) else None
         content_item = purchase_listing(
             listing=listing,
             buyer_school_id=request.user.school_id,
             buyer_user=request.user,
+            course_id=course_id,
         )
         return Response(CISerializer(content_item).data, status=status.HTTP_201_CREATED)
