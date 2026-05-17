@@ -13,7 +13,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
-import { API_BASE, getToken } from "@/lib/auth";
+import { API_BASE, apiFetch, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 
@@ -129,12 +129,10 @@ export default function CareerPilotPage() {
     setMessages((cur) => [...cur, { role: "user", content: q, ts: Date.now() }]);
     setInput("");
     setThinking(true);
-    const token = await getToken();
-    if (!token) { toast("Session expired", "error"); setThinking(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/career/ask/`, {
+      const res = await apiFetch(`/ai/career/ask/`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: q,
           language: lang === "HI" ? "hi" : "en",
@@ -219,7 +217,7 @@ export default function CareerPilotPage() {
         <div className="flex-1 overflow-y-auto p-6">
           <AnimatePresence mode="wait">
             {tab === "roadmap"  && <RoadmapTab key="rm"  data={roadmap}  studentName={displayName ?? "Student"} />}
-            {tab === "colleges" && <CollegesTab key="cl" data={filteredColleges} query={collegeQuery} setQuery={setCollegeQuery} />}
+            {tab === "colleges" && <CollegeFinderTab key="cl" />}
             {tab === "quiz"     && <QuizTab key="qz" />}
             {tab === "careers"  && <RecommendationsTab key="rc" data={recommendations} />}
           </AnimatePresence>
@@ -296,34 +294,208 @@ function RoadmapTab({ data, studentName }: { data: RoadmapStage[] | null; studen
   );
 }
 
-function CollegesTab({ data, query, setQuery }: { data: College[] | null; query: string; setQuery: (q: string) => void }) {
+// ─── College Finder ──────────────────────────────────────────────────────────
+// Three-step form (state → city → specialization). Submits to
+// POST /api/v1/ai/career/college-finder/ which proxies to the Gemini agent.
+// Ranking comes from NIRF; agent is instructed to set nirf_rank=null when uncertain.
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman & Nicobar", "Chandigarh", "Dadra & Nagar Haveli and Daman & Diu",
+  "Delhi", "Jammu & Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
+];
+
+const SPECIALIZATIONS = [
+  "Computer Science Engineering",
+  "Artificial Intelligence & Machine Learning",
+  "Information Technology",
+  "Electronics & Communication",
+  "Electrical Engineering",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Chemical Engineering",
+  "Aerospace Engineering",
+  "Robotics Engineering",
+  "Biotechnology",
+  "Data Science",
+  "Cyber Security",
+  "Bachelor of Business Administration (BBA)",
+  "Commerce (B.Com)",
+  "Economics (B.A.)",
+  "Medicine (MBBS)",
+  "Pharmacy (B.Pharm)",
+  "Architecture (B.Arch)",
+  "Design (B.Des)",
+  "Law (BA LLB)",
+  "Pure Sciences (B.Sc Physics/Chemistry/Maths)",
+];
+
+interface AiCollege {
+  name: string;
+  city: string;
+  state: string;
+  type: string;
+  nirf_rank: number | null;
+  nirf_score: number | null;
+  why_recommended: string;
+  typical_cutoff: string | null;
+  website: string | null;
+}
+
+interface AiCollegeResponse {
+  state: string;
+  city: string;
+  specialization: string;
+  results: AiCollege[];
+  note: string;
+}
+
+function CollegeFinderTab() {
+  const toast = useToast();
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+  const [spec, setSpec] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [data, setData] = useState<AiCollegeResponse | null>(null);
+
+  const canSubmit = state.length > 1 && city.trim().length > 1 && spec.length > 1 && !busy;
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setBusy(true);
+    setData(null);
+    try {
+      const res = await apiFetch(`/ai/career/college-finder/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state, city: city.trim(), specialization: spec }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast(body?.detail ?? `College finder failed (${res.status})`, "error");
+        return;
+      }
+      const json = (await res.json()) as AiCollegeResponse;
+      setData(json);
+      if (!json.results?.length) toast("No matches — try a nearby city or broader specialization.", "info");
+    } catch {
+      toast("Network error", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4" role="tabpanel">
-      <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">College Finder</h3>
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search college, city, or program (e.g. IIT Delhi, B.Tech)" className="h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]" />
-      {data === null ? (
-        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-[var(--muted)]/40" />)}</div>
-      ) : data.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[var(--border)] py-10 text-center text-sm text-[var(--muted-foreground)]">No colleges in catalog yet.</div>
-      ) : (
-        <ul className="space-y-2">
-          {data.slice(0, 12).map((c) => (
-            <li key={c.id} className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-3 transition-colors hover:bg-[var(--muted)]/60">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">{c.name}</p>
-                  <p className="text-xs text-[var(--muted-foreground)]">{[c.city, c.state].filter(Boolean).join(", ") || "—"}{c.fees ? ` · ${c.fees}` : ""}</p>
-                  {c.programs && c.programs.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {c.programs.slice(0, 4).map((p) => <span key={p} className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{p}</span>)}
-                    </div>
+      <div>
+        <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">College Finder</h3>
+        <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+          AI picks the best colleges based on NIRF rankings for the state, city, and specialization you choose.
+        </p>
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 p-4">
+        <label className="block">
+          <span className="text-xs font-semibold text-[var(--muted-foreground)]">1. State</span>
+          <select
+            required
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+          >
+            <option value="">Select a state…</option>
+            {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-semibold text-[var(--muted-foreground)]">2. City</span>
+          <input
+            required
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="e.g. Mumbai, Pune, Bengaluru"
+            className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-semibold text-[var(--muted-foreground)]">3. Specialization</span>
+          <select
+            required
+            value={spec}
+            onChange={(e) => setSpec(e.target.value)}
+            className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+          >
+            <option value="">Select a branch / specialization…</option>
+            {SPECIALIZATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? "Searching…" : "Find Colleges"}
+        </button>
+      </form>
+
+      {busy && (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-[var(--muted)]/40" />)}
+        </div>
+      )}
+
+      {data && data.results.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Showing top {data.results.length} colleges for <span className="font-semibold text-[var(--foreground)]">{data.specialization}</span> in {data.city}, {data.state}.
+          </p>
+          <ul className="space-y-2">
+            {data.results.map((c, idx) => (
+              <li key={`${c.name}-${idx}`} className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-3 transition-colors hover:bg-[var(--muted)]/60">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--foreground)]">{c.name}</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">{[c.city, c.state].filter(Boolean).join(", ")} · {c.type}</p>
+                    <p className="mt-2 text-sm text-[var(--foreground)]">{c.why_recommended}</p>
+                    {c.typical_cutoff && (
+                      <p className="mt-1 text-xs text-[var(--muted-foreground)]"><span className="font-semibold">Cutoff:</span> {c.typical_cutoff}</p>
+                    )}
+                    {c.website && (
+                      <a href={c.website} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-primary hover:underline">
+                        Visit website →
+                      </a>
+                    )}
+                  </div>
+                  {c.nirf_rank ? (
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">NIRF #{c.nirf_rank}</span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-xs font-semibold text-[var(--muted-foreground)]">Unranked</span>
                   )}
                 </div>
-                {c.nirf_rank && <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">NIRF #{c.nirf_rank}</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+          {data.note && (
+            <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted)]/30 p-3 text-xs text-[var(--muted-foreground)]">
+              <span className="font-semibold">Note:</span> {data.note}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!busy && !data && (
+        <div className="rounded-xl border border-dashed border-[var(--border)] py-10 text-center text-sm text-[var(--muted-foreground)]">
+          Fill out the form above to get NIRF-ranked colleges for your stream.
+        </div>
       )}
     </motion.div>
   );

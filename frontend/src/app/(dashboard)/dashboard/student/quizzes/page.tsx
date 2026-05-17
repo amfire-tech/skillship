@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { getToken, API_BASE } from "@/lib/auth";
+import { apiFetch, getToken, API_BASE } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -19,6 +19,15 @@ interface Quiz {
   due_date?: string | null;
   subject?: string;
   description?: string;
+}
+
+interface Assignment {
+  id: string;
+  quiz: string;
+  quiz_title?: string;
+  due_at?: string | null;
+  student?: string | null;
+  klass?: string | null;
 }
 
 const difficultyStyle: Record<string, string> = {
@@ -50,6 +59,7 @@ function QuizSkeleton() {
 
 export default function StudentQuizzesPage() {
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -58,21 +68,21 @@ export default function StudentQuizzesPage() {
     if (!token) { setError("Authentication failed."); return; }
 
     try {
-      const res = await fetch(`${API_BASE}/quizzes/?status=PUBLISHED`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [qRes, aRes] = await Promise.all([
+        fetch(`${API_BASE}/quizzes/?status=PUBLISHED`, { headers: { Authorization: `Bearer ${token}` } }),
+        apiFetch(`/quizzes/assignments/`),
+      ]);
 
-      if (!res.ok) {
+      if (!qRes.ok) {
         setError("Failed to load quizzes. Please try again.");
         setQuizzes([]);
-        return;
+      } else {
+        setQuizzes(asArray<Quiz>(await qRes.json()));
       }
-
-      const data = await res.json();
-      setQuizzes(asArray<Quiz>(data));
+      setAssignments(aRes.ok ? asArray<Assignment>(await aRes.json()) : []);
     } catch {
       setError("Network error. Please check your connection and try again.");
-      setQuizzes([]);
+      setQuizzes([]); setAssignments([]);
     }
   }, []);
 
@@ -97,6 +107,51 @@ export default function StudentQuizzesPage() {
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
+      )}
+
+      {/* Assigned to you — only when the student actually has assignments */}
+      {assignments !== null && assignments.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+              Assigned to you ({assignments.length})
+            </h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {assignments.map((a) => {
+              const overdue = a.due_at ? new Date(a.due_at).getTime() < Date.now() : false;
+              return (
+                <div
+                  key={a.id}
+                  className="rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm flex flex-col gap-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-[var(--foreground)] leading-snug">{a.quiz_title ?? "Assigned quiz"}</h3>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase ${a.student ? "bg-amber-100 text-amber-700" : "bg-cyan-100 text-cyan-700"}`}>
+                      {a.student ? "Personal" : "Class"}
+                    </span>
+                  </div>
+                  {a.due_at ? (
+                    <p className={`text-[12px] ${overdue ? "text-red-600 font-semibold" : "text-[var(--muted-foreground)]"}`}>
+                      {overdue ? "Overdue · " : "Due "}
+                      <span className="font-medium">{new Date(a.due_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                    </p>
+                  ) : (
+                    <p className="text-[12px] text-[var(--muted-foreground)]">No due date</p>
+                  )}
+                  <div className="mt-auto flex justify-end">
+                    <Link
+                      href={`/dashboard/student/quizzes/${a.quiz}`}
+                      className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+                    >
+                      Start
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Loading skeletons */}

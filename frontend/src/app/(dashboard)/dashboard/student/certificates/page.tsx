@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { API_BASE, getToken } from "@/lib/auth";
+import { apiFetch } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -42,13 +42,32 @@ export default function CertificatesPage() {
 
   const load = useCallback(async () => {
     setError(null);
-    const token = await getToken();
-    if (!token) { setError("Session expired."); setCerts([]); return; }
     try {
-      const res = await fetch(`${API_BASE}/certificates/`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 404) { setCerts([]); return; }
+      // Plan 01 doesn't have a /certificates endpoint yet — derive certificates
+      // from passed quiz attempts. Each passed submitted attempt = one certificate.
+      const res = await apiFetch(`/quizzes/attempts/`);
       if (!res.ok) { setError(`Failed (${res.status})`); setCerts([]); return; }
-      setCerts(asArray<Certificate>(await res.json()));
+      type Attempt = {
+        id: string;
+        quiz_title?: string;
+        quiz_subject?: string;
+        status?: string;
+        score_percent?: number | null;
+        submitted_at?: string;
+        passed?: boolean | null;
+      };
+      const list = asArray<Attempt>(await res.json());
+      const earned: Certificate[] = list
+        .filter((a) => a.status === "SUBMITTED" && (a.passed === true))
+        .map((a) => ({
+          id:         a.id,
+          title:      a.quiz_title ? `${a.quiz_title} — Certificate of Achievement` : "Certificate",
+          quiz_title: a.quiz_title,
+          subject:    a.quiz_subject,
+          score:      a.score_percent ?? undefined,
+          issued_at:  a.submitted_at,
+        }));
+      setCerts(earned);
     } catch {
       setError("Network error.");
       setCerts([]);

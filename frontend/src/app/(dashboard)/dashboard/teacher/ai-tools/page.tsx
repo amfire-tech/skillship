@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { API_BASE, getToken } from "@/lib/auth";
+import { API_BASE, apiFetch, getToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
 
 type ToolKey = "generate" | "grade" | "search" | "adaptive";
@@ -154,10 +154,10 @@ function ContentSearchInline() {
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setBusy(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/content/search/`, {
+      const res = await apiFetch(`/ai/content/search/`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q.trim(), top_k: 5 }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q.trim(), k: 5 }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

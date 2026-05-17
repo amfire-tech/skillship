@@ -65,9 +65,9 @@ export default function TeachersManagementPage() {
     setUploading(true);
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setUploading(false); return; }
+    // Backend reads each row's `role` column — no need to send a form-level role.
     const form = new FormData();
     form.append("file", file);
-    form.append("role", "TEACHER");
     try {
       const res = await fetch(`${API_BASE}/users/bulk-upload/`, {
         method: "POST",
@@ -80,7 +80,15 @@ export default function TeachersManagementPage() {
         return;
       }
       const data = await res.json().catch(() => ({}));
-      toast(`Imported ${data?.created ?? "teachers"} successfully`, "success");
+      const created = Number(data?.created ?? 0);
+      const errors: Array<{ row: number; message: string }> = data?.errors ?? [];
+      if (created > 0) toast(`Imported ${created} teacher${created === 1 ? "" : "s"}.`, "success");
+      if (errors.length > 0) {
+        const sample = errors[0];
+        toast(`${errors.length} row${errors.length === 1 ? "" : "s"} skipped — row ${sample.row}: ${sample.message}`, "info");
+        console.warn("[bulk-upload] row errors:", errors);
+      }
+      if (created === 0 && errors.length === 0) toast("CSV had no rows to import.", "info");
       await load();
     } catch {
       toast("Network error during upload", "error");
