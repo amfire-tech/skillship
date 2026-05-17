@@ -1,0 +1,22 @@
+# File: frontend/.dockerignore
+.env
+.env.local
+.env.*.local
+node_modules/
+.next/
+out/
+build/
+.vercel/
+coverage/
+jest.config.ts
+jest.setup.ts
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+*.log

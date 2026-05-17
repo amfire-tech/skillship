@@ -1,0 +1,21 @@
+# File: ai-service/.dockerignore
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+pytest-cache-files-*/
+.coverage
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+*.md

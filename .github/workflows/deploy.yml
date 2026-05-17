@@ -1,9 +1,180 @@
 # File:    .github/workflows/deploy.yml
-# Purpose: On push to `main`, build Docker images + deploy to staging; manual approval to promote to prod.
-# Owner:   Navanish
-# TODO:
-#   on: push  branches: [main]
-#   jobs:
-#     build-and-push: build backend, ai-service, frontend images; push to registry.
-#     deploy-staging: ssh or k8s apply to staging; run smoke tests.
-#     deploy-prod:    environment with required reviewers; promote same image tag.
+# Purpose: Build all three service images, push to GHCR, deploy to staging
+#          (auto on push-to-main), then promote to prod with manual approval.
+# Owner:   Navanish (Phase 5)
+#
+# Required repo settings before this can run:
+#   1. GitHub → Settings → Environments: create `staging` (no protection) and
+#      `production` (required reviewers: ≥1). Both need these env-level secrets:
+#        - SSH_HOST          # e.g. staging.skillship.com
+#        - SSH_USER          # e.g. ubuntu
+#        - SSH_PRIVATE_KEY   # private key matching the host's authorized_keys
+#        - DEPLOY_DIR        # path on the VPS where the repo is checked out,
+#                            # e.g. /opt/skillship
+#   2. Repo Settings → Actions → General → "Workflow permissions":
+#      set to "Read and write" so GITHUB_TOKEN can push to GHCR.
+
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # also lets you re-run by hand
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false  # we don't want a newer push to abort an in-flight deploy
+
+env:
+  REGISTRY: ghcr.io
+  # The image base name is derived from the repo path (e.g. ghcr.io/amfire-tech/skillship_test-backend).
+  IMAGE_OWNER: ${{ github.repository_owner }}
+  IMAGE_REPO: ${{ github.event.repository.name }}
+
+jobs:
+  # ── 1. Build & push all three images to GHCR ────────────────────────────
+  build:
+    name: Build & push (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            context: backend
+            dockerfile: backend/Dockerfile
+          - service: ai-service
+            context: ai-service
+            dockerfile: ai-service/Dockerfile
+          - service: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: |
+          OWNER_LOWER="$(echo '${{ env.IMAGE_OWNER }}' | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo '${{ env.IMAGE_REPO }}' | tr '[:upper:]' '[:lower:]')"
+          SHA_SHORT="${GITHUB_SHA::7}"
+          BASE="${{ env.REGISTRY }}/${OWNER_LOWER}/${REPO_LOWER}-${{ matrix.service }}"
+          echo "image_base=${BASE}" >> $GITHUB_OUTPUT
+          echo "image_tag=${SHA_SHORT}" >> $GITHUB_OUTPUT
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_base }}:${{ steps.meta.outputs.image_tag }}
+            ${{ steps.meta.outputs.image_base }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,scope=${{ matrix.service }},mode=max
+          # Frontend bakes NEXT_PUBLIC_API_BASE_URL at build time. Override per
+          # environment if staging and prod use different API URLs — for now
+          # they share one, and it's read from a repo-level variable.
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+
+  # ── 2. Auto-deploy main → staging ───────────────────────────────────────
+  deploy-staging:
+    name: Deploy → staging
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.skillship.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_DIR }}"
+            git fetch --quiet origin main
+            git reset --hard origin/main
+            # Pull the freshly-built images CI just pushed.
+            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod pull
+            # Apply Django migrations once before bringing the services up.
+            # The backend image already has manage.py + code on board.
+            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod \
+              run --rm backend python manage.py migrate --noinput
+            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d
+            # Cull any old image layers to keep the VPS disk healthy.
+            docker image prune -f --filter "until=168h"
+
+      - name: Smoke test
+        run: |
+          set -e
+          # Give the stack ~30s to settle (nginx waits on healthy backend+frontend).
+          for i in $(seq 1 30); do
+            if curl -fsS "https://staging.skillship.example.com/healthz/" >/dev/null; then
+              echo "Staging healthz OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Staging never became healthy"
+          exit 1
+
+  # ── 3. Manual-approval promotion → production ──────────────────────────
+  deploy-production:
+    name: Deploy → production (manual gate)
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment:
+      # GitHub-side "required reviewers" on this environment is what makes
+      # this job wait for human approval. Without that, this would auto-fire.
+      name: production
+      url: https://skillship.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_DIR }}"
+            git fetch --quiet origin main
+            git reset --hard origin/main
+            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod pull
+            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod \
+              run --rm backend python manage.py migrate --noinput
+            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d
+            docker image prune -f --filter "until=168h"
+
+      - name: Smoke test
+        run: |
+          set -e
+          for i in $(seq 1 30); do
+            if curl -fsS "https://skillship.example.com/healthz/" >/dev/null; then
+              echo "Production healthz OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production never became healthy"
+          exit 1
