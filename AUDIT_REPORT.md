@@ -23,8 +23,11 @@ Refreshed audit performed after the Phase 1 backend gap-closure and Phase 2.1 PD
 | **Test coverage** | 136 tests | **260 tests passing** | +124 new tests across all previously-untested apps + Phases 2/3/4 |
 | Frontend role dashboards | ⚠️ Hardcoded | ✅ Wired (Phase 3) | After audit only `admin/reports` + `admin/settings` were 100% placeholder; reports rewritten to use Phase 2 exports |
 | Frontend AI integration | ❌ Not built | ✅ Wired | Career chat, College Finder, AI question generator, content search, grade-short — all using `apiFetch` auto-refresh |
-| `.github/workflows/deploy.yml` | ❌ Empty | ❌ Empty | Still TODO — Phase 5 |
-| `infra/docker-compose.prod.yml` | ❌ Empty | ❌ Empty | Still TODO — Phase 5 |
+| `.github/workflows/deploy.yml` | ❌ Empty | ✅ Done (16 May) | Matrix build → GHCR → auto-staging → manual-prod with smoke tests |
+| `infra/docker-compose.prod.yml` | ❌ Empty | ✅ Done (16 May) | 8 services (backend / ai / frontend / 2 celery / redis / nginx / certbot), healthchecks, named volumes |
+| `infra/nginx/nginx.conf` | ❌ TODO | ✅ Done (16 May) | TLS, HSTS, security headers, path routing, ACME passthrough |
+| `backend/config/settings/prod.py` | ❌ TODO | ✅ Done (16 May) | Fail-fast on missing secrets, full security headers, structured logging |
+| **3 production Dockerfiles** | ❌ TODO stubs | ✅ Done (16 May) | Multi-stage, non-root, healthchecked, `apt-get upgrade` for patch currency |
 | **PDF + Excel report exports** | ❌ Not built | ✅ Done (16 May) | 3 endpoints, role-scoped, tenant-scoped, 11/11 tests |
 | **Skill-wise analytics (per-tag breakdown)** | ❌ Not built | ✅ Done (16 May) | Student + class endpoints, 9/9 tests, no migration (uses existing `Question.tags`) |
 | **School/class benchmarking** | ❌ Not built | ✅ Done (16 May) | `/api/v1/analytics/benchmarking/?level=class|school`, percentile bands, 9/9 tests |
@@ -44,7 +47,7 @@ Refreshed audit performed after the Phase 1 backend gap-closure and Phase 2.1 PD
 ### Honest gaps still open going into Phase 4
 
 - `pgvector` extension is not installed on the Supabase DB — `/api/content/search` and `/api/content/ingest` return 503 until enabled.
-- `infra/docker-compose.prod.yml` and `.github/workflows/deploy.yml` are still TODO stubs. Production deploy will need both filled in (Phase 5).
+- ~~`infra/docker-compose.prod.yml` and `.github/workflows/deploy.yml` are still TODO stubs~~ → done in Phase 5 on 16 May. Production infra files + handoff runbook at [infra/DEPLOY.md](infra/DEPLOY.md).
 - ~~21 dashboard sub-pages still render placeholder data~~ → audit showed only 2 were truly placeholder; both addressed in Phase 3.
 - `admin/settings` (platform-level org/branding/integrations) intentionally deferred — Plan 02 territory.
 - ~~`/users/bulk-upload/` endpoint missing~~ → built in Phase 4.5. Frontend pages that called it now work.
