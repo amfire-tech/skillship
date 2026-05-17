@@ -162,6 +162,74 @@ Backend full pytest — **229/229 passing** (no regressions from the serializer 
 
 All 260 tests green. `test_isolation.py` still 7/7.
 
+---
+
+### Phase 5 — Production infrastructure · ✅ DONE 16 May
+
+The four files the original audit flagged as ❌ Empty (`backend/Dockerfile`, `ai-service/Dockerfile`, `frontend/Dockerfile`, `infra/docker-compose.prod.yml`, `.github/workflows/deploy.yml`, `infra/nginx/nginx.conf`, `backend/config/settings/prod.py`) are all now production-grade. Five decisions locked in with the user up front: **Hetzner/DigitalOcean VPS + docker-compose · GHCR · Sentry deferred · auto-staging + manual prod**.
+
+#### Phase 5.1 — Production Dockerfiles
+- **[backend/Dockerfile](backend/Dockerfile)** — multi-stage Python 3.12-slim, non-root `app` user (uid 1001), gunicorn with `gthread` workers (3 workers × 2 threads), `collectstatic` on boot, `/healthz/` healthcheck, `apt-get upgrade` to pull current Debian patches. Build deps for psycopg + reportlab + Pillow + openpyxl, scrubbed from the runtime image.
+- **[ai-service/Dockerfile](ai-service/Dockerfile)** — single-uvicorn-process by design (async Gemini calls don't need worker concurrency; scale via replicas). Public traffic never reaches this container — only Django speaks to it over the internal compose network behind `X-Internal-Key`.
+- **[frontend/Dockerfile](frontend/Dockerfile)** — three-stage build using **Next.js standalone output** (`next.config.js` now has `output: "standalone"`). Final image ~150 MB vs ~1 GB for a default Next build. `NEXT_PUBLIC_API_BASE_URL` baked at build time via Docker `ARG` — CI reads it from a repo Variable.
+- **[backend/.dockerignore](backend/.dockerignore)**, [ai-service/.dockerignore](ai-service/.dockerignore), [frontend/.dockerignore](frontend/.dockerignore) — keep `.env*`, `__pycache__`, `.venv`, `node_modules`, `.git`, tests, and editor junk out of every image layer. Critical for both image size and secret hygiene.
+
+#### Phase 5.2 — Production docker-compose
+- **[infra/docker-compose.prod.yml](infra/docker-compose.prod.yml)** — eight services, two networks. Public-facing **nginx** is the only thing on the public bridge. Everything else (`backend`, `celery-worker`, `celery-beat`, `ai-service`, `frontend`, `redis`, `certbot`) lives on `skillship_internal`. Postgres is intentionally NOT in the compose — it's Supabase (managed pgvector).
+- **celery-worker + celery-beat** split into separate services. Beat is single-replica (scheduler can't run twice).
+- **Healthchecks + restart policies** on every service so `depends_on: condition: service_healthy` actually means something.
+- **Image tags** read from env (`BACKEND_IMAGE`, `AI_SERVICE_IMAGE`, `FRONTEND_IMAGE`) — pin to a SHA tag for deterministic deploys or leave `:latest` for rolling.
+- **Named volumes**: `redis_data` (AOF persistence), `media_data` (auto-reports + uploads), `certbot_certs`, `certbot_www`.
+
+#### Phase 5.3 — Production nginx
+- **[infra/nginx/nginx.conf](infra/nginx/nginx.conf)** — `:80` redirects to `:443` (with ACME challenge passthrough at `/.well-known/acme-challenge/` so cert renewals don't go through the redirect).
+- **`:443`** terminates TLS (TLS 1.2/1.3, modern ciphers, HSTS), sets full security header suite (`HSTS`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, strict `Referrer-Policy`, restrictive `Permissions-Policy`), then proxies by path:
+  - `/healthz/` → backend (with `access_log off` to keep monitor pings out of logs)
+  - `/api/`, `/admin/`, `/static/`, `/media/` → backend
+  - `/` → frontend (with WS upgrade headers ready for future use)
+- **`client_max_body_size 10M`** matches the AI bridge PDF cap + leaves headroom for CSV uploads.
+- **Upstream keepalive 16** to backend and frontend so nginx doesn't burn TCP setup on every request.
+
+#### Phase 5.4 — GitHub Actions deploy pipeline
+- **[.github/workflows/deploy.yml](.github/workflows/deploy.yml)** — three jobs.
+  1. **build** — Matrix over the three services. Parallel builds with GitHub Actions cache (`type=gha,scope=<service>`). Pushes two tags per service to GHCR: short SHA (immutable) + `latest` (rolling).
+  2. **deploy-staging** — Auto on `push: main`. SSH'es into the staging VPS using env-level secrets, `git pull` + `compose pull` + `migrate` + `compose up -d`, prunes old image layers >7 days. Smoke tests `https://staging.../healthz/` with a 30×5s retry loop.
+  3. **deploy-production** — Same script targeting prod env. Gated by GitHub Environment **Required reviewers** rule — won't run until a human approves.
+- **`concurrency: deploy-${{ github.ref }}` with `cancel-in-progress: false`** so a fast follow-up push doesn't abort an in-flight deploy.
+- Required GitHub config (documented in `infra/DEPLOY.md`):
+  - Environment secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DEPLOY_DIR` per environment.
+  - Repo variable: `NEXT_PUBLIC_API_BASE_URL` (baked into the frontend image at build).
+  - Workflow permissions: "Read and write" so `GITHUB_TOKEN` can push to GHCR.
+
+#### Phase 5.5 — Env template + handoff doc + prod settings
+- **[infra/.env.prod.example](infra/.env.prod.example)** — template covering Django secret + ALLOWED_HOSTS + CSRF trusted origins + DATABASE_URL + AI_SERVICE_INTERNAL_KEY + GEMINI_API_KEY + image tag overrides. Explicit note that `NEXT_PUBLIC_API_BASE_URL` is NOT read here (it's a build-time GitHub variable).
+- **[infra/DEPLOY.md](infra/DEPLOY.md)** — full runbook: VPS bootstrap, DNS records, first-time Let's Encrypt cert issuance, cert renewal cron, first deploy commands, CI/CD wiring (every secret/variable/environment-rule the workflow needs), day-2 ops (logs, shell, restart, rollback, backups), explicit list of what's deferred to Phase 6 (Sentry init, S3 for media, Cloudflare in front), and a smoke checklist for every deploy.
+- **[backend/config/settings/prod.py](backend/config/settings/prod.py)** — previously a TODO comment. Now: `DEBUG=False` enforced, fails fast on missing/dev `DJANGO_SECRET_KEY`, fails fast on missing `DJANGO_ALLOWED_HOSTS`, derives CSRF trusted origins from env (or auto-builds `https://<host>` from ALLOWED_HOSTS), trusts `X-Forwarded-Proto: https` from nginx, HSTS at 1 day initially (room to raise), full secure-cookie + nosniff + referrer-policy suite, one-line stdout logging for journald/Loki ingestion. Sentry init left commented (Phase 6 work).
+
+#### Phase 5 — What's still deferred (with reasons)
+- **Sentry init in Django + AI service** — user chose to skip until DSN is provisioned (Phase 6 or post-launch).
+- **`sentry-sdk` not yet added to `ai-service/requirements.txt`** — will be added with the init wiring.
+- **S3/CDN for `/media/`** — currently `FileSystemStorage` on the VPS via the `media_data` volume. Fine for ≤ a few GB; swap to `django-storages[boto3]` when storage or geographic latency demands it.
+- **Cloudflare in front of nginx** — optional. Easy to add post-launch: flip DNS proxy on, add an `Authenticated Origin Pulls` rule.
+- **Bootstrap nginx config for the very first TLS issuance** — `DEPLOY.md` documents the manual workaround; could be automated by shipping a `nginx-bootstrap.conf` and swapping after first cert.
+
+#### Phase 5 — Total
+
+| | Pre Phase 5 | **Post Phase 5** |
+|---|---|---|
+| Production Dockerfiles | 3 TODO stubs | **3 multi-stage, non-root, healthchecked** |
+| `infra/docker-compose.prod.yml` | 5-line TODO | **8 services, 2 networks, healthchecks, named volumes** |
+| `infra/nginx/nginx.conf` | 9-line TODO | **TLS + HSTS + security headers + path routing** |
+| `.github/workflows/deploy.yml` | 9-line TODO | **Matrix build → GHCR → auto-staging → manual-prod, with smoke tests** |
+| `backend/config/settings/prod.py` | 1-line TODO | **Hardened: fail-fast on missing secrets, full security headers, structured logging** |
+| Handoff doc | None | **[infra/DEPLOY.md](infra/DEPLOY.md) — first-deploy runbook + day-2 ops** |
+| Backend test suite | 260/260 | **260/260 still passing** |
+| Overall Plan 01 | ~93% | **~97% — deploy machinery + runbook ready; needs DNS + VPS + GitHub secrets to fire** |
+
+`test_isolation.py` still 7/7. Tenant contract intact.
+
+---
+
 #### Phase 4.8 — Frontend wiring for Phase 4 features · ✅ done 16 May
 
 Mindful, additive changes — every touched file kept its existing API and prior tests still pass. Each new piece uses `apiFetch` for auto-refresh-on-401.
