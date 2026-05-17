@@ -27,12 +27,13 @@ from __future__ import annotations
 import logging
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -41,7 +42,7 @@ from apps.common.permissions import Role
 from apps.common.viewsets import TenantScopedViewSet
 
 from . import services
-from .models import Answer, Question, QuestionBank, Quiz, QuizAttempt
+from .models import Answer, Question, QuestionBank, Quiz, QuizAssignment, QuizAttempt
 from .permissions import (
     CanAuthorContent,
     CanPublishQuiz,
@@ -53,6 +54,7 @@ from .serializers import (
     QuestionSerializer,
     QuestionStudentSerializer,
     QuestionBankSerializer,
+    QuizAssignmentSerializer,
     QuizAttemptReadSerializer,
     QuizSerializer,
     QuizStudentSerializer,
@@ -79,6 +81,48 @@ class QuestionBankViewSet(TenantScopedViewSet):
             serializer.save(school_id=school_id, created_by=self.request.user)
         else:
             serializer.save(school_id=self.request.user.school_id, created_by=self.request.user)
+
+    # ── CSV bulk import (Phase 4.4) ─────────────────────────────────────────
+
+    @extend_schema(
+        request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}},
+        responses={200: dict, 400: _BAD_REQUEST},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="import-csv",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_csv(self, request, id=None):
+        """
+        POST /api/v1/quizzes/banks/{id}/import-csv/
+
+        Multipart form with a `file` field. Each row becomes a Question.
+        Required columns: `text, type, difficulty, points`
+        MCQ rows: `option_a, option_b, option_c, option_d, correct` (correct = A/B/C/D)
+        TRUE_FALSE rows: `correct` = "True" or "False"
+        SHORT_ANSWER rows: `accepted_answers` = pipe-separated accepted texts
+        Optional: `tags` (pipe-separated), `explanation`
+
+        Response: {created: N, errors: [{row, message}], total_rows: N}
+        """
+        from . import services as _qsvc  # late import to avoid cycle
+
+        bank: QuestionBank = self.get_object()
+        upload = request.FILES.get("file")
+        if upload is None:
+            raise ValidationError({"file": "CSV file is required."})
+        if upload.size and upload.size > 5 * 1024 * 1024:
+            raise ValidationError({"file": "CSV must be 5 MB or smaller."})
+
+        try:
+            text = upload.read().decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValidationError({"file": "CSV must be UTF-8 encoded."}) from exc
+
+        result = _qsvc.import_questions_csv(bank=bank, created_by=request.user, csv_text=text)
+        return Response(result)
 
 
 # ── Question ────────────────────────────────────────────────────────────────
@@ -209,6 +253,90 @@ class QuizViewSet(TenantScopedViewSet):
         except DjangoValidationError as exc:
             raise ValidationError({"detail": _err(exc)}) from exc
         return Response(QuizSerializer(quiz).data)
+
+    # ── Rankings / leaderboard ──────────────────────────────────────────────
+
+    @extend_schema(
+        responses={200: OpenApiResponse(description="Ordered leaderboard of best attempts per student.")},
+    )
+    @action(detail=True, methods=["get"], url_path="rankings")
+    def rankings(self, request, id=None):
+        """
+        GET /api/v1/quizzes/quizzes/{id}/rankings/?limit=20
+
+        One row per student — their **best submitted attempt** for this quiz.
+        Tie-breaker on equal scores is earlier submission time.
+        Scoped to the quiz's school (tenant isolation is enforced by `get_object`).
+
+        STUDENT callers see the same board so they can locate themselves;
+        if their best attempt is outside the top-N, a `self` row is appended.
+        """
+        quiz = self.get_object()
+
+        try:
+            limit = int(request.query_params.get("limit", 20))
+        except ValueError:
+            limit = 20
+        limit = max(1, min(limit, 200))
+
+        # Postgres-only `distinct('student_id')` pattern — best row per student.
+        # The order_by prefix must lead with the distinct column.
+        best_per_student = list(
+            QuizAttempt.objects
+            .filter(
+                school_id=quiz.school_id,
+                quiz_id=quiz.id,
+                status=QuizAttempt.Status.SUBMITTED,
+            )
+            .select_related("student")
+            .order_by("student_id", "-score_percent", "submitted_at")
+            .distinct("student_id")
+        )
+
+        # Now re-sort across the whole set on score / time-to-submit.
+        best_per_student.sort(
+            key=lambda a: (
+                -(float(a.score_percent) if a.score_percent is not None else -1.0),
+                a.submitted_at or a.started_at,
+            )
+        )
+
+        def row(rank: int, a: QuizAttempt) -> dict:
+            duration_s = None
+            if a.submitted_at and a.started_at:
+                duration_s = int((a.submitted_at - a.started_at).total_seconds())
+            return {
+                "rank":           rank,
+                "attempt_id":     str(a.id),
+                "student_id":     str(a.student_id),
+                "student_name":   a.student.get_full_name() or a.student.username,
+                "score_percent":  float(a.score_percent) if a.score_percent is not None else None,
+                "points_earned": a.points_earned,
+                "points_total":  a.points_total,
+                "correct_count": a.correct_count,
+                "duration_seconds": duration_s,
+                "submitted_at": a.submitted_at,
+            }
+
+        top = [row(i + 1, a) for i, a in enumerate(best_per_student[:limit])]
+
+        body: dict = {
+            "quiz_id":  str(quiz.id),
+            "count":    len(best_per_student),
+            "limit":    limit,
+            "results":  top,
+        }
+
+        # Locate the requesting student if outside the top-N.
+        if request.user.role == Role.STUDENT:
+            self_idx = next(
+                (i for i, a in enumerate(best_per_student) if a.student_id == request.user.id),
+                None,
+            )
+            if self_idx is not None and self_idx >= limit:
+                body["self"] = row(self_idx + 1, best_per_student[self_idx])
+
+        return Response(body)
 
     # ── Student: start an attempt ───────────────────────────────────────────
 
@@ -346,6 +474,73 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
         if u.role == Role.STUDENT and attempt.student_id != u.id:
             raise NotFound()  # don't reveal existence
         return attempt
+
+
+# ── QuizAssignment ──────────────────────────────────────────────────────────
+
+
+class QuizAssignmentViewSet(TenantScopedViewSet):
+    """
+    /api/v1/quizzes/assignments/
+
+    Teachers + Principals + SubAdmins can create / list / delete assignments.
+    Students see only the assignments addressed to them (directly via
+    `student=me` or transitively via a `klass` they're enrolled in).
+    """
+
+    queryset = QuizAssignment.objects.select_related(
+        "quiz", "student", "klass", "klass__academic_year",
+    ).all()
+    serializer_class = QuizAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "head", "options", "post", "delete"]
+    lookup_field = "id"
+
+    def get_queryset(self) -> QuerySet[QuizAssignment]:
+        u = self.request.user
+        qs = super().get_queryset()
+        if u.role == Role.MAIN_ADMIN:
+            pass  # cross-school
+        elif u.role == Role.STUDENT:
+            # Direct assignments + class assignments where I'm currently enrolled.
+            from apps.academics.models import Enrollment
+            enrolled_classes = Enrollment.objects.filter(
+                school_id=u.school_id, student_id=u.id, withdrawn_on__isnull=True,
+            ).values_list("klass_id", flat=True)
+            qs = qs.filter(school_id=u.school_id).filter(
+                Q(student_id=u.id) | Q(klass_id__in=list(enrolled_classes))
+            )
+        else:
+            # Teachers + principals + sub-admins see everything in their school.
+            qs = qs.filter(school_id=u.school_id)
+
+        # Optional filters
+        quiz_id = self.request.query_params.get("quiz")
+        if quiz_id:
+            qs = qs.filter(quiz_id=quiz_id)
+        student_id = self.request.query_params.get("student")
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+        klass_id = self.request.query_params.get("klass")
+        if klass_id:
+            qs = qs.filter(klass_id=klass_id)
+        return qs
+
+    def perform_create(self, serializer):
+        u = self.request.user
+        if u.role not in {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN, Role.MAIN_ADMIN}:
+            raise ValidationError({"detail": "Only staff can assign quizzes."})
+        if self._user_is_main_admin():
+            school_id = self.request.data.get("school")
+        else:
+            school_id = u.school_id
+        serializer.save(school_id=school_id, assigned_by=u)
+
+    def perform_destroy(self, instance):
+        u = self.request.user
+        if u.role not in {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN, Role.MAIN_ADMIN}:
+            raise ValidationError({"detail": "Only staff can revoke assignments."})
+        instance.delete()
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────

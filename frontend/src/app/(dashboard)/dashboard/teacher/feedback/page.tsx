@@ -9,7 +9,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_BASE, getToken } from "@/lib/auth";
+import { API_BASE, apiFetch, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 
@@ -78,13 +78,13 @@ export default function FeedbackSystemPage() {
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setGrading(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/quizzes/grade-short/`, {
+      const res = await apiFetch(`/ai/quiz/grade-short/`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: active.question_text,
+          question_text:  active.question_text,
+          rubric:         active.expected_answer,
           student_answer: active.answer_text,
-          expected_answer: active.expected_answer,
         }),
       });
       if (!res.ok) {

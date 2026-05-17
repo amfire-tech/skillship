@@ -1,5 +1,62 @@
 # Skillship Project — Full Audit Report
 
+> **2026-05-16 update** — A new live audit has been performed during the Phase 1 + 2 sprint. See the **Current State (2026-05-16)** section directly below. The original 2026-04-30 audit is preserved further down for historical comparison.
+
+---
+
+## Current State (2026-05-16)
+
+Refreshed audit performed after the Phase 1 backend gap-closure and Phase 2.1 PDF/Excel exports. Live `staging` branch at commit `d3711b2` plus uncommitted Phase 1+2 work.
+
+| Area | 2026-04-30 | **2026-05-16** | Notes |
+|------|------------|----------------|-------|
+| Backend foundation (common, accounts, schools, academics) | ✅ Done | ✅ Done | 136 tests passing on these layers |
+| Backend `quizzes` app | ❌ Empty | ✅ Done | + rankings endpoint added 16 May |
+| Backend `content` app | ❌ Empty | ✅ Done | + marketplace purchase hardened |
+| Backend `analytics` app | ❌ Empty | ✅ Done | + Celery scheduled (daily 02:30 IST / weekly Mon 03:00 IST) + PDF/Excel exports |
+| Backend `notifications` app | ❌ Empty | ✅ Done | own-scope, mark-read, mark-all-read |
+| Backend `ai_bridge` app | ❌ Empty | ✅ Done | 7 endpoints (career, college-finder, generate, generate-from-pdf, adaptive-next, grade-short, content-search) |
+| AI service routers | ✅ Done | ✅ Done | + new College Finder agent (NIRF-grounded) |
+| Database — pgvector extension | ❌ Not installed | ⚠️ Optional | only `/content/search` needs it; service falls back to "unavailable" if not present |
+| Database — migrations | ⚠️ Partial | ✅ Applied | ai_bridge.0002, 0003 / analytics.0002 all on staging Supabase |
+| Seed data / demo accounts | ❌ Empty | ✅ 7 users | passwords reset to `Skillship#Test-2026` on 16 May |
+| **Test coverage** | 136 tests | **260 tests passing** | +124 new tests across all previously-untested apps + Phases 2/3/4 |
+| Frontend role dashboards | ⚠️ Hardcoded | ✅ Wired (Phase 3) | After audit only `admin/reports` + `admin/settings` were 100% placeholder; reports rewritten to use Phase 2 exports |
+| Frontend AI integration | ❌ Not built | ✅ Wired | Career chat, College Finder, AI question generator, content search, grade-short — all using `apiFetch` auto-refresh |
+| `.github/workflows/deploy.yml` | ❌ Empty | ❌ Empty | Still TODO — Phase 5 |
+| `infra/docker-compose.prod.yml` | ❌ Empty | ❌ Empty | Still TODO — Phase 5 |
+| **PDF + Excel report exports** | ❌ Not built | ✅ Done (16 May) | 3 endpoints, role-scoped, tenant-scoped, 11/11 tests |
+| **Skill-wise analytics (per-tag breakdown)** | ❌ Not built | ✅ Done (16 May) | Student + class endpoints, 9/9 tests, no migration (uses existing `Question.tags`) |
+| **School/class benchmarking** | ❌ Not built | ✅ Done (16 May) | `/api/v1/analytics/benchmarking/?level=class|school`, percentile bands, 9/9 tests |
+| **Monthly + yearly auto-report Celery** | ❌ Stub only | ✅ Done (16 May) | PDF rendered + stored as ContentItem; cron on 1st of month / Jan 1; 9/9 tests |
+| **Quiz assignment (Teacher → Student / Class)** | ❌ Not built | ✅ Done (16 May) | `QuizAssignment` model + `/assignments/` viewset, 14/14 tests |
+| **CSV bulk question import** | ❌ Not built | ✅ Done (16 May) | `POST /banks/{id}/import-csv/`, 7/7 tests |
+| **CSV users bulk upload** | ❌ Not built | ✅ Done (16 May) | `POST /users/bulk-upload/`, 10/10 tests; principal cannot smuggle cross-school users |
+
+### Real bugs caught & fixed during this sprint
+
+1. **`ai_bridge/client.py` multipart serializer** — `data=list[tuple]` form caused httpx to emit tuples instead of bytes in the multipart stream. Would have failed every PDF upload in production. Fixed by switching to `data=dict` with httpx's repeated-key serialisation.
+2. **Frontend `getToken()` did not refresh on 401** — only refreshed when the access token was missing entirely. Stale tokens after 15 min idle showed "Given token not valid" toast. Fixed with `apiFetch()` wrapper that transparently refreshes + retries once.
+3. **Frontend AI paths missing `/ai/` prefix** — Career Pilot, AI Tools content search, and Feedback grade-short all posted to wrong Django URLs and got 404s. Fixed in three pages.
+4. **DRF `?format=` 404 trap** — DRF's `DefaultContentNegotiation` raises NotFound when `?format=pdf` doesn't match a registered renderer. Export endpoints now use `?fmt=` and document why.
+5. **Marketplace purchase crashed for MAIN_ADMIN** — `school_id=None` was passed to `purchase_listing` which queried `Course.objects.filter(school_id=None)` and returned arbitrary rows. Fixed with explicit guard + tests.
+
+### Honest gaps still open going into Phase 4
+
+- `pgvector` extension is not installed on the Supabase DB — `/api/content/search` and `/api/content/ingest` return 503 until enabled.
+- `infra/docker-compose.prod.yml` and `.github/workflows/deploy.yml` are still TODO stubs. Production deploy will need both filled in (Phase 5).
+- ~~21 dashboard sub-pages still render placeholder data~~ → audit showed only 2 were truly placeholder; both addressed in Phase 3.
+- `admin/settings` (platform-level org/branding/integrations) intentionally deferred — Plan 02 territory.
+- ~~`/users/bulk-upload/` endpoint missing~~ → built in Phase 4.5. Frontend pages that called it now work.
+- `Sentry` SDK is in `requirements.txt` but `sentry_sdk.init(...)` is not invoked in either Django or AI service. (Phase 5)
+- AI service has no automated tests yet — `ai-service/tests/` directory exists but is empty.
+- ~~Teacher → Student quiz assignment model + endpoint + UI~~ → backend done (4.1–4.3). Frontend UI to surface assignments to students still pending.
+- ~~**Frontend integration for Phase 4 features**~~ → done in Phase 4.8 on 16 May. Teacher quiz-detail has Assign button + modal + assignments list with revoke. Student/quizzes page surfaces a dedicated "Assigned to you" section. Sub-admin/question-bank has a bank-picker CSV upload modal with per-row error reporting. Principal/students + principal/teachers bulk-upload buttons now wired to the real `/users/bulk-upload/` endpoint with proper partial-success UX.
+
+---
+
+## Original Audit (2026-04-30) — preserved below
+
 **Date:** 2026-04-30  
 **Audited by:** Claude Code (on behalf of Vishal)  
 **Purpose:** 2-week sprint to production — identify exactly what is done vs. remaining

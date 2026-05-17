@@ -7,11 +7,12 @@
 
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_BASE, getToken } from "@/lib/auth";
+import { API_BASE, apiFetch, getToken } from "@/lib/auth";
+import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
@@ -78,8 +79,6 @@ function SearchIcon() {
 export default function QuestionBankPage() {
   const toast = useToast();
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   function addToWizard(q: Question) {
     const opts = q.options ?? q.choices ?? [];
     if (opts.length < 2) {
@@ -110,6 +109,7 @@ export default function QuestionBankPage() {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -155,14 +155,15 @@ export default function QuestionBankPage() {
     });
   }, [questions, search, activeSubject, activeDifficulty]);
 
-  async function handleBulkUpload(file: File) {
+  // Bank-scoped CSV upload — backend endpoint is /quizzes/banks/{id}/import-csv/.
+  async function uploadCsvToBank(bankId: string, file: File): Promise<{ created: number; errors: { row: number; message: string }[]; total_rows: number } | null> {
     setUploading(true);
     const token = await getToken();
-    if (!token) { toast("Session expired", "error"); setUploading(false); return; }
+    if (!token) { toast("Session expired", "error"); setUploading(false); return null; }
     const form = new FormData();
     form.append("file", file);
     try {
-      const res = await fetch(`${API_BASE}/quizzes/questions/bulk-upload/`, {
+      const res = await fetch(`${API_BASE}/quizzes/banks/${bankId}/import-csv/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -170,16 +171,18 @@ export default function QuestionBankPage() {
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         toast(errBody?.detail ?? `Upload failed (${res.status})`, "error");
-        return;
+        return null;
       }
-      const data = await res.json().catch(() => ({}));
-      toast(`Imported ${data?.created ?? "questions"} successfully`, "success");
+      const data = await res.json();
+      if (data?.created > 0) toast(`Imported ${data.created} question${data.created === 1 ? "" : "s"}.`, "success");
+      if ((data?.errors ?? []).length > 0) toast(`${data.errors.length} row${data.errors.length === 1 ? "" : "s"} skipped — see details.`, "info");
       await load();
+      return data;
     } catch {
       toast("Network error during upload", "error");
+      return null;
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -196,20 +199,10 @@ export default function QuestionBankPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleBulkUpload(f);
-            }}
-          />
           <button
             type="button"
             disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setCsvModalOpen(true)}
             className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-60 dark:bg-[var(--background)]"
           >
             <UploadIcon />
@@ -406,7 +399,163 @@ export default function QuestionBankPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Bulk-upload CSV modal — bank picker + file picker + result detail */}
+      <AnimatePresence>
+        {csvModalOpen && (
+          <BulkUploadCsvModal
+            onClose={() => setCsvModalOpen(false)}
+            onUpload={uploadCsvToBank}
+            uploading={uploading}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+
+// ─── Bulk CSV upload modal ───────────────────────────────────────────────────
+
+interface BankSummary { id: string; name: string; subject?: string; }
+type UploadResult = { created: number; errors: { row: number; message: string }[]; total_rows: number } | null;
+
+function BulkUploadCsvModal({
+  onClose,
+  onUpload,
+  uploading,
+}: {
+  onClose: () => void;
+  onUpload: (bankId: string, file: File) => Promise<UploadResult>;
+  uploading: boolean;
+}) {
+  const [banks, setBanks] = useState<BankSummary[] | null>(null);
+  const [bankId, setBankId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<UploadResult>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const res = await apiFetch(`/quizzes/banks/`);
+      const list = res.ok ? asArray<BankSummary>(await res.json()) : [];
+      setBanks(list);
+      if (list[0]) setBankId(list[0].id);
+    })();
+  }, []);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape" && !uploading) onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; document.removeEventListener("keydown", onKey); };
+  }, [onClose, uploading]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!bankId) { setError("Pick a bank to import into."); return; }
+    if (!file) { setError("Choose a CSV file."); return; }
+    const r = await onUpload(bankId, file);
+    if (r !== null) setResult(r);
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onClick={() => { if (!uploading) onClose(); }}
+      role="dialog" aria-modal="true" aria-label="Bulk upload CSV"
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0, y: 8 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.3)] dark:bg-[var(--background)]"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-primary via-accent to-primary" />
+        <form onSubmit={submit} className="space-y-4 p-6">
+          <div>
+            <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">Bulk upload questions</h3>
+            <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+              UTF-8 CSV with columns: <code>text, type, difficulty, points</code>.<br />
+              MCQ rows add <code>option_a/b/c/d</code> + <code>correct=A/B/C/D</code>.<br />
+              TRUE_FALSE: <code>correct=True/False</code>. SHORT_ANSWER: <code>accepted_answers=a|b|c</code>.
+            </p>
+          </div>
+
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Target bank</span>
+            <select
+              value={bankId}
+              onChange={(e) => setBankId(e.target.value)}
+              disabled={banks === null || uploading}
+              className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+            >
+              {banks === null && <option>Loading…</option>}
+              {banks?.length === 0 && <option>No question banks yet — create one first.</option>}
+              {banks?.map((b) => <option key={b.id} value={b.id}>{b.name}{b.subject ? ` · ${b.subject}` : ""}</option>)}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">CSV file</span>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              disabled={uploading}
+              className="mt-1 block w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/15 dark:bg-[var(--background)]"
+            />
+          </label>
+
+          {error && (
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+          )}
+
+          {result && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-3 text-xs space-y-1">
+              <p className="font-semibold text-[var(--foreground)]">
+                Imported {result.created} of {result.total_rows} row{result.total_rows === 1 ? "" : "s"}.
+              </p>
+              {result.errors.length > 0 && (
+                <details className="text-[var(--muted-foreground)]">
+                  <summary className="cursor-pointer font-semibold text-red-600">
+                    {result.errors.length} row{result.errors.length === 1 ? "" : "s"} skipped — show details
+                  </summary>
+                  <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto pl-3">
+                    {result.errors.slice(0, 30).map((e) => (
+                      <li key={`${e.row}-${e.message}`} className="text-[11px]">
+                        <span className="font-mono text-[var(--foreground)]">row {e.row}</span> · {e.message}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={uploading}
+              className="h-9 rounded-full border border-[var(--border)] bg-white px-4 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)] disabled:opacity-60"
+            >
+              {result ? "Done" : "Cancel"}
+            </button>
+            <button
+              type="submit"
+              disabled={uploading || !file || !bankId}
+              className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
   );
 }
 

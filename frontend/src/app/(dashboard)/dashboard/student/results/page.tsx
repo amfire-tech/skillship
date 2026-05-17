@@ -9,25 +9,31 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { API_BASE, getToken } from "@/lib/auth";
+import { apiFetch } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 interface Attempt {
   id: string;
-  quiz_id?: string;
+  quiz?: string;
   quiz_title?: string;
   quiz_subject?: string;
+  quiz_total_questions?: number;
+  status?: string;
+  score_percent?: number | null;
   score?: number;
+  correct_count?: number;
   correct?: number;
+  wrong_count?: number;
   wrong?: number;
   skipped?: number;
   total?: number;
   rank?: number;
   total_in_class?: number;
+  submitted_at?: string;
   attempted_at?: string;
   created_at?: string;
-  passed?: boolean;
+  passed?: boolean | null;
 }
 
 function ordinal(n: number) { const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]); }
@@ -41,13 +47,14 @@ export default function MyResultsPage() {
 
   const load = useCallback(async () => {
     setError(null);
-    const token = await getToken();
-    if (!token) { setError("Session expired."); setAttempts([]); return; }
     try {
-      const res = await fetch(`${API_BASE}/quizzes/attempts/`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch(`/quizzes/attempts/`);
       if (!res.ok) { setError(`Failed (${res.status})`); setAttempts([]); return; }
       const list = asArray<Attempt>(await res.json());
-      list.sort((a, b) => new Date(b.attempted_at ?? b.created_at ?? "").getTime() - new Date(a.attempted_at ?? a.created_at ?? "").getTime());
+      list.sort((a, b) =>
+        new Date(b.submitted_at ?? b.attempted_at ?? b.created_at ?? "").getTime()
+        - new Date(a.submitted_at ?? a.attempted_at ?? a.created_at ?? "").getTime()
+      );
       setAttempts(list);
     } catch {
       setError("Network error.");
@@ -62,7 +69,8 @@ export default function MyResultsPage() {
     if (!attempts) return null;
     const q = search.trim().toLowerCase();
     return attempts.filter((a) => {
-      const passed = a.passed ?? (typeof a.score === "number" && a.score >= 50);
+      const score = a.score_percent ?? a.score;
+      const passed = a.passed ?? (typeof score === "number" && score >= 50);
       const okF = filter === "ALL" || (filter === "PASS" ? passed : !passed);
       const okS = !q || (a.quiz_title ?? "").toLowerCase().includes(q) || (a.quiz_subject ?? "").toLowerCase().includes(q);
       return okF && okS;
@@ -125,7 +133,10 @@ export default function MyResultsPage() {
                 </td></tr>
               ) : (
                 filtered.map((a) => {
-                  const passed = a.passed ?? (typeof a.score === "number" && a.score >= 50);
+                  const score = a.score_percent ?? a.score;
+                  const correct = a.correct_count ?? a.correct;
+                  const wrong = a.wrong_count ?? a.wrong;
+                  const passed = a.passed ?? (typeof score === "number" && score >= 50);
                   return (
                     <tr key={a.id} className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/30">
                       <td className="px-6 py-3.5">
@@ -135,19 +146,19 @@ export default function MyResultsPage() {
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className={`text-base font-bold ${passed ? "text-emerald-600" : "text-red-500"}`}>
-                            {typeof a.score === "number" ? `${Math.round(a.score)}%` : "—"}
+                            {typeof score === "number" ? `${Math.round(Number(score))}%` : "—"}
                           </span>
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${passed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"}`}>{passed ? "PASS" : "FAIL"}</span>
                         </div>
                       </td>
                       <td className="px-6 py-3.5 text-xs text-[var(--muted-foreground)]">
-                        <span className="font-semibold text-emerald-600">{a.correct ?? "—"}</span>
+                        <span className="font-semibold text-emerald-600">{correct ?? "—"}</span>
                         <span className="mx-1">·</span>
-                        <span className="font-semibold text-red-500">{a.wrong ?? "—"}</span>
+                        <span className="font-semibold text-red-500">{wrong ?? "—"}</span>
                         {typeof a.skipped === "number" && <><span className="mx-1">·</span><span className="font-semibold text-[var(--muted-foreground)]">{a.skipped} skipped</span></>}
                       </td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{a.rank ? `${ordinal(a.rank)}${a.total_in_class ? ` of ${a.total_in_class}` : ""}` : "—"}</td>
-                      <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{fmtDate(a.attempted_at ?? a.created_at)}</td>
+                      <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{fmtDate(a.submitted_at ?? a.attempted_at ?? a.created_at)}</td>
                       <td className="px-6 py-3.5 text-right">
                         <Link href={`/dashboard/student/results/${a.id}`} className="text-xs font-semibold text-primary hover:underline">View →</Link>
                       </td>

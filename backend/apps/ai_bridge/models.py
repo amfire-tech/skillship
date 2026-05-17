@@ -19,10 +19,13 @@ class AiJob(TenantModel):
 
     class Kind(models.TextChoices):
         # Plan 01 only. Do NOT add Plan 02 kinds (TUTOR, RISK, REPORT, TAG).
-        CAREER         = "CAREER",         "Career Pilot"
-        QUESTION_GEN   = "QUESTION_GEN",   "Question Generator"
-        ADAPTIVE_NEXT  = "ADAPTIVE_NEXT",  "Adaptive Next Question"
-        CONTENT_SEARCH = "CONTENT_SEARCH", "Content Search"
+        CAREER           = "CAREER",           "Career Pilot"
+        COLLEGE_FINDER   = "COLLEGE_FINDER",   "College Finder"
+        QUESTION_GEN     = "QUESTION_GEN",     "Question Generator"
+        QUESTION_GEN_PDF = "QUESTION_GEN_PDF", "Question Generator (PDF)"
+        ADAPTIVE_NEXT    = "ADAPTIVE_NEXT",    "Adaptive Next Question"
+        GRADE_SHORT      = "GRADE_SHORT",      "Short-Answer Grading"
+        CONTENT_SEARCH   = "CONTENT_SEARCH",   "Content Search"
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
