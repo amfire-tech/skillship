@@ -230,6 +230,53 @@ The four files the original audit flagged as ❌ Empty (`backend/Dockerfile`, `a
 
 ---
 
+### Phase 6.A — QA + handover deliverables · ✅ DONE 16 May
+
+The code-side of Phase 6: Sentry wiring, load test, QA matrix, admin guide, README polish, final test sweep. Everything that doesn't require touching live systems.
+
+#### What shipped
+
+| Deliverable | File | Notes |
+|---|---|---|
+| **Sentry init — Django** | [backend/config/settings/prod.py](backend/config/settings/prod.py) | Activated only when `SENTRY_DSN_BACKEND` is set; integrates Django + Celery; PII off; 5% traces sample. Silent in dev/CI. |
+| **Sentry init — AI service** | [ai-service/app/main.py](ai-service/app/main.py) | Same gating pattern (`SENTRY_DSN_AI_SERVICE`). Init runs before FastAPI app is built so startup errors get captured. |
+| **`sentry-sdk` in ai-service deps** | [ai-service/requirements.txt](ai-service/requirements.txt) | `sentry-sdk[fastapi]>=2.19.0` (was missing). |
+| **k6 load test** | [infra/load-test/k6_quiz_attempt.js](infra/load-test/k6_quiz_attempt.js) | Simulates the full quiz attempt path (login → start → answer×10 → submit) with thresholds matching the proposal's 200-500 concurrent commitment (p95 < 1500 ms, error rate < 1%). Default ramp 0→200 VUs over 90 s + 3-min hold + 30 s ramp-down. |
+| **QA matrix** | [QA_CHECKLIST.md](QA_CHECKLIST.md) | ~120 checkboxes across 7 sections: smoke, the 5 roles, cross-cutting (tenant isolation, performance, load, Plan 02 leak check, security). Bug template at the bottom. |
+| **Platform owner runbook** | [ADMIN_GUIDE.md](ADMIN_GUIDE.md) | School onboarding, CSV templates, AI cost SQL query, common ops (password reset, deactivate school, on-demand reports), explicit Plan 02 boundary. |
+| **Root README rewrite** | [Readme.md](Readme.md) | Replaced the build-team-focused content with a current state snapshot, doc map, local dev quick-start, demo accounts table, and Plan 01 scope summary. |
+
+#### Plan 02 leak check — clean
+
+Verified zero leaks per [CLAUDE.md §12](CLAUDE.md) before marking Phase 6.A done:
+- AI service mounts only `career`, `quiz`, `content` routers. `reports.py`, `risk.py`, `tutor.py` exist as files but are unmounted.
+- Django ai_bridge URLs: zero Plan 02 references.
+- Frontend has two explicit "Plan 02 ships later" disclaimer strings — intentional, not active features.
+
+#### Final pytest
+
+```
+================ 260 passed, 239 warnings in 4:42 ================
+```
+
+Tenant isolation contract `test_isolation.py`: still **7/7**.
+
+#### Phase 6.B — left to the human
+
+These cannot be one-shot from code. Documented in detail in the same trackers + the [handoff section below](#phase-6b--what-needs-your-hands):
+
+- Provision VPS + DNS
+- Enable `pgvector` on Supabase
+- Configure GitHub Environments + Variables + Workflow permissions
+- Issue first TLS cert
+- Run the QA walkthrough using `QA_CHECKLIST.md`
+- Run the k6 load test against staging
+- Approve production environment in GitHub Actions
+
+After QA passes, **Plan 01 is contractually complete** and Milestone 04 (25%) triggers.
+
+---
+
 #### Phase 4.8 — Frontend wiring for Phase 4 features · ✅ done 16 May
 
 Mindful, additive changes — every touched file kept its existing API and prior tests still pass. Each new piece uses `apiFetch` for auto-refresh-on-401.

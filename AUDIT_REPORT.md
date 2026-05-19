@@ -51,7 +51,7 @@ Refreshed audit performed after the Phase 1 backend gap-closure and Phase 2.1 PD
 - ~~21 dashboard sub-pages still render placeholder data~~ → audit showed only 2 were truly placeholder; both addressed in Phase 3.
 - `admin/settings` (platform-level org/branding/integrations) intentionally deferred — Plan 02 territory.
 - ~~`/users/bulk-upload/` endpoint missing~~ → built in Phase 4.5. Frontend pages that called it now work.
-- `Sentry` SDK is in `requirements.txt` but `sentry_sdk.init(...)` is not invoked in either Django or AI service. (Phase 5)
+- ~~`Sentry` SDK is in `requirements.txt` but `sentry_sdk.init(...)` is not invoked~~ → wired in Phase 6.A on 16 May. Django uses `SENTRY_DSN_BACKEND`; AI service uses `SENTRY_DSN_AI_SERVICE`; both silent unless the DSN env var is set.
 - AI service has no automated tests yet — `ai-service/tests/` directory exists but is empty.
 - ~~Teacher → Student quiz assignment model + endpoint + UI~~ → backend done (4.1–4.3). Frontend UI to surface assignments to students still pending.
 - ~~**Frontend integration for Phase 4 features**~~ → done in Phase 4.8 on 16 May. Teacher quiz-detail has Assign button + modal + assignments list with revoke. Student/quizzes page surfaces a dedicated "Assigned to you" section. Sub-admin/question-bank has a bank-picker CSV upload modal with per-row error reporting. Principal/students + principal/teachers bulk-upload buttons now wired to the real `/users/bulk-upload/` endpoint with proper partial-success UX.
