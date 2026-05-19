@@ -5,6 +5,7 @@ Owner:   Navanish
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import psycopg
@@ -19,6 +20,25 @@ from app.routers import career, quiz, content
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
+
+
+# ── Sentry (silent unless SENTRY_DSN_AI_SERVICE is set) ──────────────────────
+# Init BEFORE the FastAPI app is built so the Sentry middleware catches every
+# request, including the startup path. Errors-only by default; toggle traces
+# via SENTRY_TRACES_SAMPLE_RATE if you want performance traces (costs Sentry
+# quota — leave at 0.05 for a single-school production deployment).
+_sentry_dsn = os.environ.get("SENTRY_DSN_AI_SERVICE", "").strip()
+if _sentry_dsn:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+        profiles_sample_rate=0.0,
+        send_default_pii=False,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        release=os.environ.get("SENTRY_RELEASE") or None,
+    )
+    logger.info("Sentry initialised for ai-service")
 
 
 @asynccontextmanager

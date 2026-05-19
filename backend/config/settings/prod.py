@@ -104,15 +104,27 @@ LOGGING = {
     },
 }
 
-# ── Sentry (deferred — wired in Phase 6 / post-launch) ───────────────────────
-# import sentry_sdk
-# from sentry_sdk.integrations.django import DjangoIntegration
-# from sentry_sdk.integrations.celery import CeleryIntegration
-# if dsn := os.environ.get("SENTRY_DSN_BACKEND"):
-#     sentry_sdk.init(
-#         dsn=dsn,
-#         integrations=[DjangoIntegration(), CeleryIntegration()],
-#         traces_sample_rate=0.05,
-#         send_default_pii=False,
-#         environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
-#     )
+# ── Sentry ───────────────────────────────────────────────────────────────────
+#
+# Activated only when SENTRY_DSN_BACKEND is set in the env. Silent otherwise,
+# so dev and CI never accidentally page Sentry. Sample rates kept low —
+# error events still get 100%, but performance traces only 5% to stay inside
+# the free-tier quota for a single small school deployment.
+
+if _sentry_dsn := os.environ.get("SENTRY_DSN_BACKEND", "").strip():
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration
+
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+        ],
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+        profiles_sample_rate=0.0,
+        send_default_pii=False,  # no email / IP / username in events
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        release=os.environ.get("SENTRY_RELEASE") or None,
+    )
