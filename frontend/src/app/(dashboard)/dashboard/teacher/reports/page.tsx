@@ -1,16 +1,24 @@
 /*
  * File:    frontend/src/app/(dashboard)/dashboard/teacher/reports/page.tsx
- * Purpose: Teacher class reports — quiz summary per class, phase-3 export notice.
- * Owner:   Pranav
+ * Purpose: Teacher class reports — class picker, PDF/XLSX export, quiz summary table.
+ * Owner:   Navanish (Phase ship — replaces "Download — soon" placeholder)
+ *
+ * Wired to:
+ *   - GET /api/v1/academics/classes/                                   (class picker)
+ *   - GET /api/v1/quizzes/                                             (quiz summary table)
+ *   - GET /api/v1/analytics/reports/class/<id>/export/?fmt=pdf|xlsx    (download)
  */
 
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
 import { getToken, API_BASE } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+
+type Period = "7D" | "30D" | "90D" | "YTD";
+type Fmt = "pdf" | "xlsx";
 
 interface AcademicClass {
   id: string;
@@ -25,12 +33,25 @@ interface Quiz {
   created_at: string;
 }
 
+const PERIODS: Period[] = ["7D", "30D", "90D", "YTD"];
+
 const statusBadge: Record<string, string> = {
   DRAFT: "bg-amber-100 text-amber-700",
   REVIEW: "bg-blue-100 text-blue-700",
   PUBLISHED: "bg-green-100 text-green-700",
   ARCHIVED: "bg-gray-100 text-gray-500",
 };
+
+function periodToRange(p: Period): { from: string; to: string } {
+  const now = new Date();
+  const to = now.toISOString().slice(0, 10);
+  const from = new Date(now);
+  if (p === "7D") from.setDate(now.getDate() - 7);
+  else if (p === "30D") from.setDate(now.getDate() - 30);
+  else if (p === "90D") from.setDate(now.getDate() - 90);
+  else from.setMonth(0, 1);
+  return { from: from.toISOString().slice(0, 10), to };
+}
 
 function formatDate(iso: string): string {
   try {
@@ -41,10 +62,12 @@ function formatDate(iso: string): string {
 }
 
 export default function TeacherReportsPage() {
+  const toast = useToast();
   const [classes, setClasses] = useState<AcademicClass[] | null>(null);
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
-  const [selectedClass, setSelectedClass] = useState<string>("ALL");
-  const [exportNotice, setExportNotice] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [activePeriod, setActivePeriod] = useState<Period>("30D");
+  const [downloading, setDownloading] = useState<Fmt | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -52,8 +75,7 @@ export default function TeacherReportsPage() {
     const token = await getToken();
     if (!token) {
       setError("Session expired. Please log in again.");
-      setClasses([]);
-      setQuizzes([]);
+      setClasses([]); setQuizzes([]);
       return;
     }
     const headers = { Authorization: `Bearer ${token}` };
@@ -65,27 +87,60 @@ export default function TeacherReportsPage() {
       if (!classRes.ok) throw new Error(`Classes fetch failed: ${classRes.status}`);
       if (!quizRes.ok) throw new Error(`Quizzes fetch failed: ${quizRes.status}`);
 
-      const classData = await classRes.json();
-      const quizData = await quizRes.json();
-      setClasses(asArray<AcademicClass>(classData));
-      setQuizzes(asArray<Quiz>(quizData));
+      const classData = asArray<AcademicClass>(await classRes.json());
+      const quizData = asArray<Quiz>(await quizRes.json());
+      setClasses(classData);
+      setQuizzes(quizData);
+      if (classData[0] && !selectedClass) setSelectedClass(classData[0].id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report data.");
-      setClasses([]);
-      setQuizzes([]);
+      setClasses([]); setQuizzes([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     document.title = "Class Reports — Skillship";
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  function handleDownload() {
-    setExportNotice(true);
+  async function download(fmt: Fmt) {
+    if (!selectedClass) {
+      toast("Pick a class first.", "error");
+      return;
+    }
+    setDownloading(fmt);
+    try {
+      const token = await getToken();
+      if (!token) { toast("Session expired.", "error"); return; }
+      const { from, to } = periodToRange(activePeriod);
+      const res = await fetch(
+        `${API_BASE}/analytics/reports/class/${selectedClass}/export/?fmt=${fmt}&from=${from}&to=${to}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast(body?.detail ?? `Download failed (${res.status})`, "error");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const klass = classes?.find((c) => c.id === selectedClass);
+      const safeName = (klass?.class_name ?? "class").replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+      a.href = url;
+      a.download = `class-${safeName}-${from}-${to}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast(`Downloaded ${fmt.toUpperCase()} report.`, "success");
+    } catch {
+      toast("Network error.", "error");
+    } finally {
+      setDownloading(null);
+    }
   }
 
   return (
@@ -98,29 +153,32 @@ export default function TeacherReportsPage() {
         </p>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Class selector + download */}
+      {/* Class selector + period + download */}
       <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+            <label htmlFor="class-picker" className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
               Class
             </label>
             {classes === null ? (
               <div className="h-9 w-48 animate-pulse rounded-xl bg-[var(--muted)]" />
+            ) : classes.length === 0 ? (
+              <select id="class-picker" disabled className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+                <option>No classes assigned</option>
+              </select>
             ) : (
               <select
+                id="class-picker"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
-                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 dark:bg-[var(--background)]"
               >
-                <option value="ALL">All Classes</option>
                 {classes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.class_name} — {c.subject}
@@ -130,32 +188,51 @@ export default function TeacherReportsPage() {
             )}
           </div>
 
-          <button
-            type="button"
-            disabled
-            title="Download enables when /analytics/reports/ ships in Phase 03"
-            onClick={handleDownload}
-            className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--muted)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] opacity-80"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" />
-            </svg>
-            Download — soon
-          </button>
-        </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Period</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {PERIODS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setActivePeriod(p)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                    activePeriod === p
+                      ? "bg-primary text-white"
+                      : "bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]/70"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {exportNotice && (
-          <div className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-700">
-            <span>Report generation is not yet available. Export will be enabled in Phase 3.</span>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setExportNotice(false)}
-              className="shrink-0 font-semibold underline"
+              disabled={!selectedClass || downloading !== null}
+              onClick={() => download("pdf")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Dismiss
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
+              {downloading === "pdf" ? "Generating PDF…" : "Download PDF"}
+            </button>
+            <button
+              type="button"
+              disabled={!selectedClass || downloading !== null}
+              onClick={() => download("xlsx")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
+              {downloading === "xlsx" ? "Generating Excel…" : "Download Excel"}
             </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* No classes empty state */}
@@ -173,7 +250,7 @@ export default function TeacherReportsPage() {
           <div className="border-b border-[var(--border)] p-5">
             <h2 className="text-sm font-semibold text-[var(--foreground)]">Quiz Summary</h2>
             <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-              All quizzes — filter by class selector above
+              All quizzes in your school. Use the report download above for per-class metrics.
             </p>
           </div>
           <div className="overflow-x-auto">
