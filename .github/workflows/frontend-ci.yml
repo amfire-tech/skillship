@@ -14,6 +14,7 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/frontend-ci.yml"
+  workflow_dispatch:        # also lets you re-run by hand from the Actions tab
 
 concurrency:
   group: frontend-ci-${{ github.ref }}
