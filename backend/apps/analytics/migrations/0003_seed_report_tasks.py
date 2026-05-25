@@ -62,7 +62,10 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("analytics", "0002_seed_periodic_tasks"),
-        ("django_celery_beat", "0001_initial"),
+        # Same reason as 0002: this seed uses CrontabSchedule.timezone, which
+        # is only added by celery-beat's 0016. Depending on 0001_initial here
+        # is a latent bug that any fresh DB (CI, new prod) would trip over.
+        ("django_celery_beat", "0016_alter_crontabschedule_timezone"),
     ]
 
     operations = [

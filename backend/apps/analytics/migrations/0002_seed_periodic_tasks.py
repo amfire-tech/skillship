@@ -66,7 +66,10 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("analytics", "0001_initial"),
-        ("django_celery_beat", "0001_initial"),
+        # Depend on the migration that ADDS the `timezone` column to
+        # CrontabSchedule — get_or_create(timezone=...) below would otherwise
+        # explode on a fresh DB where celery-beat is still at 0001_initial.
+        ("django_celery_beat", "0016_alter_crontabschedule_timezone"),
     ]
 
     operations = [

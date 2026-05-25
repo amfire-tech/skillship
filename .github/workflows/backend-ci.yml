@@ -73,4 +73,6 @@ jobs:
 
       - name: pytest
         working-directory: backend
-        run: pytest -q --no-header
+        # --create-db overrides --reuse-db from pytest.ini; CI starts with an
+        # empty Postgres service so there is nothing to reuse on the first run.
+        run: pytest -q --no-header --create-db
