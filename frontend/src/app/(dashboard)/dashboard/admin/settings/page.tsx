@@ -56,8 +56,29 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader title="Settings" subtitle="Platform configuration, branding, security and integrations" />
 
+      {/* Read-only banner.
+       *
+       * Platform-level settings are deferred to a later release — per-school
+       * settings ARE wired and live at /dashboard/principal/* . The forms
+       * below are a visual preview; the entire panel area is wrapped in a
+       * native <fieldset disabled> further down so users cannot type into
+       * controls that would silently discard their input. */}
+      <div
+        role="status"
+        className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-500/30 dark:bg-amber-500/10"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300">
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <div className="text-[13px] leading-5 text-amber-800 dark:text-amber-200">
+          <strong>Configuration preview.</strong>{" "}
+          Platform-level settings are read-only in this release — saving is disabled to avoid losing changes. Per-school settings (branding, contact info, plan) are fully editable from{" "}
+          <span className="font-semibold">School Management → Settings</span>.
+        </div>
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-        {/* Sidebar tabs */}
+        {/* Sidebar tabs — kept interactive so users can browse the preview. */}
         <motion.nav
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -88,20 +109,32 @@ export default function SettingsPage() {
           </ul>
         </motion.nav>
 
-        {/* Panel */}
-        <motion.div
-          key={active}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-5"
+        {/* Panel.
+         *
+         * The native <fieldset disabled> element disables every nested form
+         * control (input/select/textarea/button) at the HTML layer, so the
+         * Save / Cancel handlers below cannot fire — no need to gut each
+         * panel's submit logic. cursor-not-allowed + reduced opacity gives
+         * a clear visual cue that interaction is intentionally inert. */}
+        <fieldset
+          disabled
+          aria-label="Settings preview (read-only)"
+          className="min-w-0 border-0 p-0 m-0 opacity-60"
         >
-          {active === "organization" && <OrgPanel />}
-          {active === "branding" && <BrandingPanel />}
-          {active === "security" && <SecurityPanel />}
-          {active === "integrations" && <IntegrationsPanel />}
-          {active === "notifications" && <NotificationsPanel />}
-        </motion.div>
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-5 cursor-not-allowed"
+          >
+            {active === "organization" && <OrgPanel />}
+            {active === "branding" && <BrandingPanel />}
+            {active === "security" && <SecurityPanel />}
+            {active === "integrations" && <IntegrationsPanel />}
+            {active === "notifications" && <NotificationsPanel />}
+          </motion.div>
+        </fieldset>
       </div>
     </div>
   );
