@@ -439,26 +439,51 @@ class Command(BaseCommand):
     def _seed_marketplace_listings(self, author_school):
         from apps.content.models import MarketplaceListing
 
+        # Field order: title, kind, price, featured, category, difficulty,
+        # duration_key, duration_label, class_range, cover_image_url.
         spec = [
-            ("[Demo] AI Bootcamp for Schools",       "INTERACTIVE", "2999.00", True),
-            ("[Demo] Robotics Starter Kit Workshop", "VIDEO",       "1499.00", True),
-            ("[Demo] Python Coding 101",             "COURSE",      "999.00",  False),
-            ("[Demo] STEM Career Pathways Guide",    "PDF",         "0.00",    False),
-            ("[Demo] IoT Build Tutorial",            "ARTICLE",     "0.00",    False),
+            ("[Demo] AI Vision Lab",
+             "INTERACTIVE", "18999.00", True,
+             "ai", "intermediate", "under-2-hours", "2 hours", "Class 6-8",
+             "/workshops/ai-workshop.svg"),
+            ("[Demo] Robotics Foundations Lab",
+             "VIDEO", "14999.00", True,
+             "robotics", "beginner", "under-2-hours", "90 minutes", "Class 3-5",
+             "/workshops/robotics-workshop.svg"),
+            ("[Demo] Creative Coding Lab",
+             "COURSE", "16999.00", True,
+             "coding", "beginner", "multi-session", "2 sessions", "Class 6-8",
+             "/workshops/coding-workshop.svg"),
+            ("[Demo] STEM Career Pathways Guide",
+             "PDF", "0.00", False,
+             "ai", "advanced", "multi-session", "3 sessions", "Class 9-12",
+             "/workshops/ai-workshop.svg"),
+            ("[Demo] IoT Systems Starter",
+             "ARTICLE", "22999.00", False,
+             "iot", "intermediate", "half-day", "Half day", "Class 8-10",
+             "/workshops/ai-workshop.svg"),
         ]
         out = []
-        for title, kind, price, featured in spec:
-            listing, created = MarketplaceListing.objects.get_or_create(
+        for (title, kind, price, featured, category, difficulty,
+             duration_key, duration_label, class_range, cover) in spec:
+            listing, created = MarketplaceListing.objects.update_or_create(
                 title=title,
                 defaults={
-                    "description": f"Demo workshop listing — {title}.",
+                    "description": (
+                        f"Skillship's {title.replace('[Demo] ', '')} — hands-on, classroom-tested workshop."
+                    ),
                     "author_school": author_school,
                     "kind": kind,
                     "price_inr": Decimal(price),
                     "file_url": "https://example.com/demo/workshop.html",
-                    "cover_image_url": "",
+                    "cover_image_url": cover,
                     "is_active": True,
                     "featured": featured,
+                    "category": category,
+                    "difficulty": difficulty,
+                    "duration_key": duration_key,
+                    "duration_label": duration_label,
+                    "class_range": class_range,
                 },
             )
             if created:

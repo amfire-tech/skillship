@@ -23,10 +23,10 @@ interface MarketplacePageProps {
   };
 }
 
-export default function MarketplacePage({
+export default async function MarketplacePage({
   searchParams = {},
 }: MarketplacePageProps) {
-  const catalog = getMarketplaceCatalog(searchParams);
+  const catalog = await getMarketplaceCatalog(searchParams);
 
   return (
     <>

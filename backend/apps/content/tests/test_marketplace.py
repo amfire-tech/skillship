@@ -109,3 +109,45 @@ class TestMarketplacePurchase:
         # No row is mis-stamped.
         assert not ContentItem.objects.filter(school=school_a, course=course_b).exists()
         assert not ContentItem.objects.filter(school=school_b, course=course_a).exists()
+
+
+@pytest.mark.django_db
+class TestMarketplacePublicBrowse:
+    """The marketing site at /marketplace fetches the catalog server-side
+    without a session, so list + retrieve MUST stay open to anonymous traffic.
+    purchase still requires auth — covered by TestMarketplacePurchase above."""
+
+    LIST_URL = "/api/v1/content/marketplace/"
+
+    def test_anonymous_can_list_active_listings(self, api_client, listing):
+        r = api_client.get(self.LIST_URL)
+        assert r.status_code == 200
+        # Paginator wraps in {results: [...]}; either shape is acceptable here.
+        results = r.data.get("results", r.data)
+        assert any(row["id"] == str(listing.id) for row in results)
+
+    def test_anonymous_can_retrieve_one(self, api_client, listing):
+        r = api_client.get(f"{self.LIST_URL}{listing.id}/")
+        assert r.status_code == 200
+        assert r.data["title"] == listing.title
+        # Marketing taxonomy fields are surfaced (may be blank, that's fine).
+        for k in ("category", "difficulty", "duration_key", "duration_label", "class_range"):
+            assert k in r.data
+
+    def test_anonymous_does_not_see_inactive_listings(self, api_client, school_a):
+        MarketplaceListing.objects.create(
+            title="Hidden draft",
+            author_school=school_a,
+            kind=MarketplaceListing.Kind.PDF,
+            file_url="https://cdn.test/hidden.pdf",
+            is_active=False,
+        )
+        r = api_client.get(self.LIST_URL)
+        assert r.status_code == 200
+        results = r.data.get("results", r.data)
+        assert not any(row["title"] == "Hidden draft" for row in results)
+
+    def test_anonymous_purchase_still_blocked(self, api_client, listing):
+        """Opening up the catalog must NOT open up the buy flow."""
+        r = api_client.post(_purchase_url(listing), {}, format="json")
+        assert r.status_code == 401

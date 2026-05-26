@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
@@ -37,10 +37,20 @@ class ContentItemViewSet(TenantScopedViewSet):
 
 
 class MarketplaceListingViewSet(ReadOnlyModelViewSet):
-    """Public catalog — visible to anyone authenticated, not tenant-scoped."""
+    """Public catalog.
+
+    list + retrieve are AllowAny so the marketing site at /marketplace can
+    render server-side without a session. The only mutating action — purchase —
+    explicitly re-asserts IsAuthenticated on its decorator below, so opening
+    up read access does not weaken the buy flow.
+    """
 
     serializer_class = MarketplaceListingSerializer
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in {"list", "retrieve"}:
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get_queryset(self):
         return MarketplaceListing.objects.filter(is_active=True).select_related("author_school")
