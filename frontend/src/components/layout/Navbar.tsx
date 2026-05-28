@@ -1,206 +1,199 @@
+/*
+ * File:    frontend/src/components/layout/Navbar.tsx
+ * Purpose: Public marketing nav. Sticky, transparent at top, blur+warm-tint on scroll.
+ *          Hosts the Skillship wordmark (orange SKILL + teal SHIP) and the
+ *          brand-gradient "Book a Demo" CTA. Light-only — no theme toggle here
+ *          because the public site has a single warm palette (skillship_homepage_brief.md §2).
+ * Owner:   Pranav (homepage rebuild)
+ */
+
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { siteConfig } from "@/config/site";
-import { Button } from "@/components/ui/Button";
-import { Container } from "@/components/ui/Container";
+import { useTheme } from "next-themes";
+import { Sun, Moon } from "lucide-react";
+import { SkillshipLockup } from "@/components/brand/SkillshipMark";
 
-const SunIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="5"/>
-    <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-    <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-  </svg>
-);
+const NAV_LINKS = [
+  { label: "Platform",    href: "/" },
+  { label: "For Schools", href: "/request-demo" },
+  { label: "Courses",     href: "/workshops" },
+  { label: "About",       href: "/about" },
+];
 
-const MoonIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-  </svg>
-);
+const CTA = { label: "Book a Demo", href: "/request-demo" } as const;
+
+function ThemeToggle({ compact = false }: { compact?: boolean }) {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Avoid hydration mismatch — render an inert placeholder until mounted.
+  if (!mounted) {
+    return <span aria-hidden className={compact ? "h-9 w-9" : "h-9 w-9 rounded-full border border-[color:var(--border-subtle)]"} />;
+  }
+  const isDark = (theme ?? resolvedTheme) === "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      className="grid h-9 w-9 place-items-center rounded-full border border-[color:var(--border-subtle)] bg-[var(--card)] text-[var(--ink-secondary)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--teal-500)]/40 hover:text-[var(--ink-primary)]"
+    >
+      {isDark ? <Sun size={15} strokeWidth={1.8}/> : <Moon size={15} strokeWidth={1.8}/>}
+    </button>
+  );
+}
 
 export function Navbar() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLElement>(null);
 
-  useEffect(() => setMounted(true), []);
-
-  // Close mobile menu on outside click
+  // Scroll-state for the transparent → blurred transition (brief §2.1).
   useEffect(() => {
-    if (!mobileOpen) return;
-    function handleOutsideClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMobileOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [mobileOpen]);
-
-  // Close mobile menu on Escape key
-  useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") setMobileOpen(false);
-    }
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
+    function onScroll() { setScrolled(window.scrollY > 40); }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
   useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+    if (!mobileOpen) return;
+    function onClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMobileOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setMobileOpen(false); }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [mobileOpen]);
 
   return (
-    <header ref={menuRef} className="sticky top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-md">
-      <Container>
-        <nav
-          className="flex h-16 items-center justify-between"
-          aria-label="Main navigation"
-        >
-          {/* Logo — official brand: badge + SKILLSHIP wordmark */}
-          <Link href="/" className="flex items-center gap-2.5" aria-label={`${siteConfig.name} home`}>
-            <Image
-              src="/logo-icon.png"
-              alt="Skillship Edutech"
-              width={40}
-              height={40}
-              priority
-              className="h-10 w-10 shrink-0 rounded-full bg-black object-contain p-0.5"
-            />
-            <span className="text-xl font-extrabold leading-none tracking-tight">
-              <span className="text-brand-orange">SKILL</span>
-              <span className="text-brand-teal">SHIP</span>
-            </span>
-          </Link>
+    <header
+      ref={menuRef}
+      className={`sticky top-0 z-50 w-full transition-[background-color,backdrop-filter,border-color,box-shadow] duration-300 ease-out-expo ${
+        scrolled
+          ? "border-b border-[color:var(--border-subtle)] bg-[var(--background)]/80 backdrop-blur-xl backdrop-saturate-150 shadow-soft"
+          : "border-b border-transparent bg-transparent"
+      }`}
+    >
+      <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-6 lg:px-12">
+        {/* Canonical brand lockup (badge + SKILLSHIP wordmark) */}
+        <Link href="/" aria-label="Skillship home">
+          <SkillshipLockup badgeSize={40} wordmarkSize="md" />
+        </Link>
 
-          {/* Desktop Links */}
-          <ul className="hidden items-center gap-8 md:flex" role="list">
-            {siteConfig.navLinks.map((link) => {
-              const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
-              return (
+        {/* Desktop links — centered */}
+        <ul className="hidden items-center gap-9 md:flex" role="list">
+          {NAV_LINKS.map((link) => {
+            const active = link.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(link.href);
+            return (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className={`text-[14px] font-medium tracking-[-0.005em] transition-colors duration-200 ${
+                    active
+                      ? "text-[var(--ink-primary)]"
+                      : "text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* CTA + Sign-in (desktop) */}
+        <div className="hidden items-center gap-4 md:flex">
+          <ThemeToggle />
+          <Link
+            href="/login"
+            className="text-[14px] font-medium text-[var(--ink-secondary)] transition-colors hover:text-[var(--ink-primary)]"
+          >
+            Sign in
+          </Link>
+          <Link
+            href={CTA.href}
+            className="group relative inline-flex items-center justify-center overflow-hidden rounded-full px-5 py-2.5 text-[14px] font-semibold text-white shadow-warm transition-all duration-300 ease-out-expo hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(243,156,50,0.28)]"
+            style={{ backgroundImage: "var(--gradient-brand)" }}
+          >
+            <span className="relative z-10">{CTA.label}</span>
+          </Link>
+        </div>
+
+        {/* Mobile hamburger */}
+        <button
+          type="button"
+          className="rounded-lg p-2 text-[var(--ink-primary)] md:hidden"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+        >
+          {mobileOpen ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="7"  x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+          )}
+        </button>
+      </div>
+
+      {/* Mobile drawer — full-width slide */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            key="mob"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden border-t border-[color:var(--border-subtle)] bg-[var(--background)]/96 backdrop-blur-xl md:hidden"
+          >
+            <ul className="mx-auto max-w-[1280px] space-y-1 px-6 py-4" role="list">
+              {NAV_LINKS.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={`text-sm font-medium transition-colors ${
-                      isActive
-                        ? "text-primary font-semibold"
-                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                    }`}
+                    className="block rounded-xl px-4 py-3 text-[15px] font-medium text-[var(--ink-primary)] transition-colors hover:bg-[var(--cream)]"
                   >
                     {link.label}
                   </Link>
                 </li>
-              );
-            })}
-          </ul>
-
-          {/* Right side */}
-          <div className="hidden items-center gap-4 md:flex">
-            {/* Dark Mode Toggle */}
-            {mounted && (
-              <button
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="rounded-lg p-2 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              >
-                {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-              </button>
-            )}
-
-            {/* Sign In Link */}
-            <Link
-              href="/login"
-              className="text-sm font-medium text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
-            >
-              Sign In
-            </Link>
-
-            <Link href={siteConfig.cta.href}>
-              <Button size="sm" className="rounded-lg px-5">
-                {siteConfig.cta.label}
-              </Button>
-            </Link>
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button
-            className="rounded-lg p-2 text-[var(--foreground)] md:hidden"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            )}
-          </button>
-        </nav>
-
-        {/* Mobile Menu — animated slide */}
-        <AnimatePresence>
-          {mobileOpen && (
-            <motion.div
-              key="mobile-menu"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden border-t border-[var(--border)] md:hidden"
-            >
-              <div className="pb-4">
-                <ul className="space-y-1 pt-2" role="list">
-                  {siteConfig.navLinks.map((link) => {
-                    const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
-                    return (
-                      <li key={link.href}>
-                        <Link
-                          href={link.href}
-                          className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--muted)] ${
-                            isActive
-                              ? "bg-primary/5 text-primary font-semibold"
-                              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                          }`}
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <div className="mt-3 flex items-center gap-3 px-3">
-                  {mounted && (
-                    <button
-                      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                      className="rounded-lg p-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-                    >
-                      {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-                    </button>
-                  )}
-                  <Link href="/login" className="text-sm font-medium text-[var(--muted-foreground)]">
-                    Sign In
-                  </Link>
-                  <Link href={siteConfig.cta.href} className="flex-1">
-                    <Button size="sm" className="w-full">{siteConfig.cta.label}</Button>
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Container>
+              ))}
+              <li className="flex items-center justify-between pt-2">
+                <Link
+                  href="/login"
+                  className="block rounded-xl px-4 py-3 text-[14px] font-medium text-[var(--ink-secondary)]"
+                >
+                  Sign in
+                </Link>
+                <ThemeToggle />
+              </li>
+              <li>
+                <Link
+                  href={CTA.href}
+                  className="block rounded-full px-5 py-3 text-center text-[15px] font-semibold text-white shadow-warm"
+                  style={{ backgroundImage: "var(--gradient-brand)" }}
+                >
+                  {CTA.label}
+                </Link>
+              </li>
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

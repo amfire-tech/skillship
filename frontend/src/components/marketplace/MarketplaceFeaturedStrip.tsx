@@ -43,9 +43,9 @@ export function MarketplaceFeaturedStrip({
               <CardContent className="p-5">
                 <div className="flex items-center justify-between gap-3">
                   <Badge variant="info">Featured</Badge>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">
-                    ₹{workshop.price.toLocaleString("en-IN")}
-                  </p>
+                  <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                    Included
+                  </span>
                 </div>
                 <h3 className="mt-4 text-xl font-bold tracking-tight text-[var(--foreground)]">
                   {workshop.title}

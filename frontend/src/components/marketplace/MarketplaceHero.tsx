@@ -11,9 +11,9 @@ interface MarketplaceHeroProps {
 }
 
 const catalogPreview = [
-  { tag: "AI", title: "AI Vision Lab", meta: "Class 8-12 · half-day", price: "₹ 1,200" },
-  { tag: "Robotics", title: "Sensor Studio", meta: "Class 6-10 · 2h", price: "₹ 950" },
-  { tag: "IoT", title: "Smart City Mini", meta: "Class 9-12 · multi-session", price: "₹ 2,400" },
+  { tag: "AI",       title: "AI Vision Lab",   meta: "Class 8-12 · half-day"        },
+  { tag: "Robotics", title: "Sensor Studio",   meta: "Class 6-10 · 2h"              },
+  { tag: "IoT",      title: "Smart City Mini", meta: "Class 9-12 · multi-session"   },
 ];
 
 export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
@@ -70,7 +70,7 @@ export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
               {[
                 `${totalCount} live programs`,
                 "Class 3 to 12 coverage",
-                "School-ready pricing",
+                "From ₹100 / student / month",
               ].map((chip) => (
                 <div
                   key={chip}
@@ -150,7 +150,9 @@ export function MarketplaceHero({ totalCount }: MarketplaceHeroProps) {
                           {item.meta}
                         </p>
                       </div>
-                      <span className="text-sm font-bold text-primary">{item.price}</span>
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                        Included
+                      </span>
                     </motion.div>
                   ))}
                 </div>

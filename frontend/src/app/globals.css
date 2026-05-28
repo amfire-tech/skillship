@@ -3,27 +3,139 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * ── Unified Skillship token system ──
+   * The same token names render in both light and dark modes. Light is the
+   * warm cream homepage palette; dark is a warm near-black ("ink") palette
+   * with the same orange-teal brand. Brand colour values themselves never
+   * change — only surfaces and text invert. Designed so every page
+   * (homepage, login, dashboard) shares one design language.
+   *
+   * Dashboard-era legacy tokens (--background, --foreground, --card,
+   * --muted, --primary, --accent, --brand, --nav) are preserved by name
+   * and re-pointed to the new palette so existing dashboard markup
+   * inherits the new look automatically.
+   */
   :root {
-    --background: #FAFFFE;
-    --foreground: #0C1220;
-    --card: #FFFFFF;
-    --card-foreground: #1A2332;
-    --border: #E2EDE8;
-    --muted: #F0FAF5;
-    --muted-foreground: #5A7068;
-    /* Brand color override point — can be set per-school from settings API */
-    --brand: #059669;
-    --nav: #059669;
+    /* ── BRAND (constant across both modes) ── */
+    --orange-400: #F8B660;
+    --orange-500: #F39C32;
+    --orange-600: #D8861F;
+    --teal-400:   #5CC9C8;
+    --teal-500:   #2EB6B5;
+    --teal-600:   #1F9594;
+    --cream:      #F4EAD3;
+    --cream-soft: #FAF4E6;
+    --green-accent: #4FB956;
+    --bg-warm:    #FAF7F0;
+    --bg-dark:    #0F1419;
+    --bg-dark-elev:#1A2128;
+    --gradient-brand:  linear-gradient(135deg,#F39C32 0%,#2EB6B5 100%);
+    --gradient-warmth: linear-gradient(135deg,#F39C32 0%,#F8B660 100%);
+    --gradient-cool:   linear-gradient(135deg,#2EB6B5 0%,#5CC9C8 100%);
+    --gradient-dawn:   linear-gradient(180deg,#FAF7F0 0%,#F4EAD3 100%);
+
+    /* ── LIGHT MODE (default for .light, also the un-themed default) ── */
+    --background:        #FAF7F0;
+    --foreground:        #0F1419;
+    --card:              #FFFFFF;
+    --card-foreground:   #0F1419;
+    --card-elevated:     #FFFFFF;
+    --border:            rgba(15,20,25,0.08);
+    --border-strong:     rgba(15,20,25,0.16);
+    --border-subtle:     rgba(15,20,25,0.08);
+    --border-dark:       rgba(255,255,255,0.10);
+    --muted:             #FAF4E6;
+    --muted-foreground:  #4A5560;
+    --ink-primary:       #0F1419;
+    --ink-secondary:     #4A5560;
+    --ink-tertiary:      #8A95A0;
+    --ink-inverse:       #FAF7F0;
+
+    /* Brand tokens (themable per-school later) */
+    --primary: #F39C32;    /* orange — primary action */
+    --accent:  #2EB6B5;    /* teal — secondary accent */
+    --brand:   #F39C32;
+    --nav:     #0F1419;    /* dashboard sidebar */
   }
 
+  /* Explicit .light selector for completeness (next-themes sets .light too) */
+  .light {
+    --background:        #FAF7F0;
+    --foreground:        #0F1419;
+    --card:              #FFFFFF;
+    --card-foreground:   #0F1419;
+    --card-elevated:     #FFFFFF;
+    --border:            rgba(15,20,25,0.08);
+    --border-strong:     rgba(15,20,25,0.16);
+    --border-subtle:     rgba(15,20,25,0.08);
+    --border-dark:       rgba(255,255,255,0.10);
+    --muted:             #FAF4E6;
+    --muted-foreground:  #4A5560;
+    --ink-primary:       #0F1419;
+    --ink-secondary:     #4A5560;
+    --ink-tertiary:      #8A95A0;
+    --ink-inverse:       #FAF7F0;
+    --cream:             #F4EAD3;
+    --cream-soft:        #FAF4E6;
+    --bg-warm:           #FAF7F0;
+    --primary: #F39C32;
+    --accent:  #2EB6B5;
+    --brand:   #F39C32;
+    --nav:     #0F1419;
+  }
+
+  /* ── DARK MODE — warm ink palette, NOT pure black ──
+     - Backgrounds: warm near-black (#0F1419) with slight lift (#1A2128) for cards.
+     - Text: cream-soft #FAF7F0 (not pure white), preserves warmth.
+     - Brand: orange + teal kept vivid; they read fine on warm dark.
+     - Surfaces previously referenced by name (bg-warm, cream-soft, cream)
+       become tinted dark surfaces so homepage sections like Marketplace
+       (cream-soft bg) get a properly elevated dark surface instead of
+       a glaring cream block. */
   .dark {
-    --background: #0C1220;
-    --foreground: #F0FDF4;
-    --card: #162032;
-    --card-foreground: #F0FDF4;
-    --border: #1E3A3A;
-    --muted: #162032;
-    --muted-foreground: #86AEAA;
+    --background:        #0F1419;
+    --foreground:        #FAF7F0;
+    --card:              #1A2128;
+    --card-foreground:   #FAF7F0;
+    --card-elevated:     #222B33;
+    --border:            rgba(255,255,255,0.10);
+    --border-strong:     rgba(255,255,255,0.18);
+    --border-subtle:     rgba(255,255,255,0.08);
+    --border-dark:       rgba(255,255,255,0.10);
+    --muted:             #1A2128;
+    --muted-foreground:  #B8C0CC;       /* WCAG AA on card: ~6:1 (was 4.8:1) */
+    --ink-primary:       #FAF7F0;
+    --ink-secondary:     #C0C8D2;       /* AA on bg/card: ~7.1:1 */
+    --ink-tertiary:      #9CA3AF;       /* AA on bg/card: ~4.9:1 — fixes ~20 caption violations */
+    /* --ink-inverse stays CONSTANT (#FAF7F0) — used on always-dark surfaces
+       (AdaptiveQuiz, FinalCTA) where it must always read light. Don't
+       override here or those headlines render dark-on-dark. */
+
+    /* Teal-600 eyebrow text was 4.48:1 on card in dark — failing AA.
+       Lift to teal-400 so every eyebrow callsite brightens automatically. */
+    --teal-600: #5CC9C8;
+
+    /* Re-tint the warm/cream surface tokens for dark mode so
+       homepage sections (Marketplace, TrustStrip, WhySkillship)
+       become elevated dark surfaces instead of bright cream. */
+    --bg-warm:    #0F1419;
+    --cream:      #222B33;
+    --cream-soft: #1A2128;
+
+    /* The dawn gradient is a SURFACE gradient used as the background of
+       the homepage Hero and the login brand panel. In light mode it's
+       cream-to-cream-deep; in dark mode it must flip to dark-to-elevated
+       or the cream-coloured text on top renders invisible. The other
+       gradients (brand/warmth/cool) are BRAND gradients and stay constant
+       — those colours read fine on either surface. */
+    --gradient-dawn: linear-gradient(180deg,#0F1419 0%,#1A2128 100%);
+
+    /* Brand stays vivid — orange/teal on warm dark reads fine */
+    --primary: #F39C32;
+    --accent:  #2EB6B5;
+    --brand:   #F39C32;
+    --nav:     #0F1419;
   }
 
   * {
@@ -70,12 +182,12 @@
      handled by Tailwind, plain bg-white is the common case. */
   .dark .bg-white { background-color: var(--card); }
   /* Translucent white variants (bg-white/60..95) — used heavily on hero cards.
-     Use rgba on the dark card colour so the glassy effect survives. */
-  .dark .bg-white\/60  { background-color: rgb(22 32 50 / 0.60); }
-  .dark .bg-white\/70  { background-color: rgb(22 32 50 / 0.70); }
-  .dark .bg-white\/80  { background-color: rgb(22 32 50 / 0.80); }
-  .dark .bg-white\/90  { background-color: rgb(22 32 50 / 0.90); }
-  .dark .bg-white\/95  { background-color: rgb(22 32 50 / 0.95); }
+     Use rgba on the new warm-dark card colour so the glassy effect survives. */
+  .dark .bg-white\/60  { background-color: rgb(26 33 40 / 0.60); }
+  .dark .bg-white\/70  { background-color: rgb(26 33 40 / 0.70); }
+  .dark .bg-white\/80  { background-color: rgb(26 33 40 / 0.80); }
+  .dark .bg-white\/90  { background-color: rgb(26 33 40 / 0.90); }
+  .dark .bg-white\/95  { background-color: rgb(26 33 40 / 0.95); }
   .dark .hover\:bg-white:hover { background-color: var(--card); }
   .dark .hover\:bg-gray-50:hover { background-color: var(--muted); }
   .dark .bg-gray-50,
@@ -113,19 +225,38 @@
   .dark .border-slate-100 { border-color: var(--border); }
 
   /* Higher-opacity translucent whites used on hero pills/cards. */
-  .dark .bg-white\/85  { background-color: rgb(22 32 50 / 0.85); }
-  .dark .bg-white\/\[0\.98\] { background-color: rgb(22 32 50 / 0.98); }
+  .dark .bg-white\/85  { background-color: rgb(26 33 40 / 0.85); }
+  .dark .bg-white\/\[0\.98\] { background-color: rgb(26 33 40 / 0.98); }
 
-  /* Brand-tinted ultra-light backgrounds (Tailwind 50 shades) — these
-     are pale tints in light mode but read as "white" in dark mode.
-     Remap to a translucent primary tint so the brand colour survives. */
-  .dark .bg-primary-50    { background-color: rgb(5 150 105 / 0.12); }
-  .dark .bg-accent-50     { background-color: rgb(13 148 136 / 0.12); }
-  .dark .bg-emerald-50    { background-color: rgb(5 150 105 / 0.12); }
-  .dark .bg-teal-50       { background-color: rgb(13 148 136 / 0.12); }
-  .dark .bg-green-50      { background-color: rgb(5 150 105 / 0.12); }
-  .dark .hover\:bg-green-100:hover { background-color: rgb(5 150 105 / 0.18); }
-  .dark .hover\:bg-red-50:hover    { background-color: rgb(220 38 38 / 0.15); }
+  /* Brand-tinted ultra-light backgrounds (Tailwind 50 shades).
+     Map them to translucent ORANGE/TEAL tints on dark — preserves the
+     brand-tinted feel without becoming a glaring solid colour. */
+  .dark .bg-primary-50    { background-color: rgb(243 156  50 / 0.12); }  /* orange */
+  .dark .bg-accent-50     { background-color: rgb( 46 182 181 / 0.12); }  /* teal */
+  .dark .bg-emerald-50    { background-color: rgb( 79 185  86 / 0.14); }  /* green-accent — for status pills */
+  .dark .bg-teal-50       { background-color: rgb( 46 182 181 / 0.12); }
+  .dark .bg-green-50      { background-color: rgb( 79 185  86 / 0.14); }
+  .dark .hover\:bg-green-100:hover { background-color: rgb( 79 185  86 / 0.22); }
+  .dark .hover\:bg-red-50:hover    { background-color: rgb(233  79  55 / 0.16); }
+
+  /* ── Status-pill foregrounds on dark ──
+     Tailwind's *-700 variants are intentionally dim for readability on
+     LIGHT *-50 backgrounds. On dark mode those backgrounds become
+     translucent tints of the same hue, which makes *-700 text fail AA.
+     Bump them to the *-400 lighter siblings so "Active"/"Pending"/etc.
+     remain crisp without per-component edits. */
+  .dark .text-primary-700,
+  .dark .text-primary-800 { color: #F8B660; }   /* orange-400 */
+  .dark .text-accent-700,
+  .dark .text-accent-800  { color: #5CC9C8; }   /* teal-400 */
+  .dark .text-emerald-700,
+  .dark .text-emerald-800,
+  .dark .text-green-700,
+  .dark .text-green-800   { color: #7BD685; }   /* light green */
+  .dark .text-red-700,
+  .dark .text-red-800     { color: #F08877; }   /* light red */
+  .dark .text-amber-700,
+  .dark .text-yellow-700  { color: #F8B660; }   /* warm amber → orange-400 */
 
   /* Gradient stops — light neutral / brand 50 shades remapped to dark tokens. */
   .dark .from-white {
@@ -140,17 +271,21 @@
     --tw-gradient-to: rgb(22 32 50 / 0) var(--tw-gradient-to-position);
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
   }
-  .dark .from-primary-50,
+  .dark .from-primary-50 {
+    --tw-gradient-from: rgb(243 156  50 / 0.18) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(243 156  50 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
   .dark .from-emerald-50,
   .dark .from-green-50 {
-    --tw-gradient-from: rgb(5 150 105 / 0.18) var(--tw-gradient-from-position);
-    --tw-gradient-to: rgb(5 150 105 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-from: rgb( 79 185  86 / 0.18) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb( 79 185  86 / 0) var(--tw-gradient-to-position);
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
   }
   .dark .from-accent-50,
   .dark .from-teal-50 {
-    --tw-gradient-from: rgb(13 148 136 / 0.18) var(--tw-gradient-from-position);
-    --tw-gradient-to: rgb(13 148 136 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-from: rgb( 46 182 181 / 0.18) var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb( 46 182 181 / 0) var(--tw-gradient-to-position);
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
   }
   .dark .to-white          { --tw-gradient-to: var(--card) var(--tw-gradient-to-position); }
@@ -176,6 +311,213 @@
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.16); }
   50%       { box-shadow: 0 0 0 14px rgba(5, 150, 105, 0); }
+}
+
+/* ── Public homepage motion (brief §1.4) ── */
+@keyframes brand-shift {
+  /* Slow rotation of the orange→teal gradient so the headline 2nd line breathes */
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@keyframes hero-drift {
+  /* Subtle parallax for the floating decorative shapes behind the hero */
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(8px, -10px); }
+}
+@keyframes scroll-cue {
+  0%, 100% { transform: translateY(0);  opacity: 0.55; }
+  50%      { transform: translateY(6px); opacity: 1;   }
+}
+
+/* ── QuestionGenerator demo animations (pure CSS to avoid FM12 WAAPI quirks
+   with keyframe-array + infinite-repeat shapes) ── */
+@keyframes qg-arrow-nudge {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(4px); }
+}
+@keyframes qg-dot-bounce {
+  0%, 100% { transform: translateY(0);   opacity: 0.4; }
+  50%      { transform: translateY(-3px); opacity: 1;   }
+}
+@keyframes qg-scan-sweep {
+  0%   { transform: translateY(0);    opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(156px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-brand-shift,
+  .animate-hero-drift,
+  .animate-scroll-cue,
+  .qg-arrow-nudge,
+  .qg-dot-bounce,
+  .qg-scan-sweep { animation: none !important; }
+}
+
+/* ── Career Pilot fallback animations ──
+   The CSS keyframes below drive the continuously-looping ambient motion
+   inside CareerPilot's four stage visuals (Listens / Maps / Guides /
+   Grows). Each animation is referenced via inline `style={{ animation }}`
+   on the elements that need it — so all four fallbacks stay alive
+   regardless of which stage is currently in the scroll crossfade. */
+@keyframes cp-sonar {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(4.5); opacity: 0;   }
+}
+@keyframes cp-flow {
+  to { stroke-dashoffset: -10; }
+}
+@keyframes cp-dot-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  50%      { transform: scale(1.6); opacity: 0.55; }
+}
+@keyframes cp-twinkle {
+  0%, 100% { opacity: 0;    transform: scale(1);   }
+  50%      { opacity: 0.85; transform: scale(1.7); }
+}
+@keyframes cp-horizon-breathe {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1;    }
+}
+@keyframes cp-rise {
+  0%   { transform: translateY(0);      opacity: 0;   }
+  10%  { opacity: 0.55; }
+  90%  { opacity: 0.55; }
+  100% { transform: translateY(-110%);  opacity: 0;   }
+}
+@keyframes cp-milestone-glow {
+  0%, 100% { opacity: 0.18; transform: scale(1);    }
+  50%      { opacity: 0.45; transform: scale(1.28); }
+}
+@keyframes cp-unlock-fill {
+  0%,  30% { fill: #FFFFFF; }
+  50%, 70% { fill: #F39C32; }
+  100%     { fill: #FFFFFF; }
+}
+@keyframes cp-unlock-halo {
+  0%, 30% { opacity: 0;    transform: scale(0.8); }
+  50%     { opacity: 0.5;  transform: scale(1.4); }
+  70%     { opacity: 0;    transform: scale(2);   }
+  100%    { opacity: 0;    transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="cp-sonar"],
+  [style*="cp-flow"],
+  [style*="cp-dot-pulse"],
+  [style*="cp-twinkle"],
+  [style*="cp-horizon-breathe"],
+  [style*="cp-rise"],
+  [style*="cp-milestone-glow"],
+  [style*="cp-unlock"] { animation: none !important; }
+}
+
+/* ── Career Roadmap (cr-*) animations ──
+   Drives the three-stage pipeline inside <CareerRoadmap />. Every
+   animation loops infinitely, so the visual is alive whether or not
+   the user is actively focused on the section. */
+@keyframes cr-detect-ring {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0;   }
+}
+@keyframes cr-pill-tag {
+  /* Pill appears → glows → relaxes — runs continuously per-pill with
+     staggered delay so the eye follows a wave around the avatar. */
+  0%, 100% { transform: scale(0.92); opacity: 0.55; }
+  20%      { transform: scale(1.05); opacity: 1;    }
+  45%      { transform: scale(1);    opacity: 1;    }
+  70%      { transform: scale(0.96); opacity: 0.85; }
+}
+@keyframes cr-arrow-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(4px); }
+}
+@keyframes cr-pct-pulse {
+  0%, 100% { transform: scale(1);   filter: brightness(1);   }
+  50%      { transform: scale(1.08); filter: brightness(1.15); }
+}
+@keyframes cr-career-cycle {
+  /* 10s loop. Each of the 3 stacked career cards uses the same
+     keyframe with a -3.33s and -6.66s delay respectively, so they
+     hand off visibility in turn: card 1 → card 2 → card 3 → card 1. */
+  0%, 30%        { opacity: 1; transform: scale(1);    pointer-events: auto; }
+  33.33%, 96.66% { opacity: 0; transform: scale(0.96); pointer-events: none; }
+  100%           { opacity: 1; transform: scale(1);    pointer-events: auto; }
+}
+@keyframes cr-bar-fill {
+  /* Synced to cr-career-cycle (same 10s duration + delay). The bar
+     fills from 0 to its --target width while its parent card is
+     visible, then resets while the next card takes over. */
+  0%      { width: 0%;            }
+  18%     { width: var(--target, 92%); }
+  30%     { width: var(--target, 92%); }
+  33.33%  { width: 0%;            }
+  100%    { width: 0%;            }
+}
+@keyframes cr-pct-pop {
+  /* Small pop on the % chip each time its card is brought back. */
+  0%, 30%        { transform: scale(1);   filter: brightness(1);   }
+  10%            { transform: scale(1.12); filter: brightness(1.15); }
+  33.33%, 100%   { transform: scale(1);   filter: brightness(1);   }
+}
+@keyframes cr-card-fade {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1;    }
+}
+@keyframes cr-milestone-light {
+  /* Each milestone card runs this cycle on its own offset. Uses
+     theme tokens so cards stay readable in BOTH light and dark mode
+     (previously hardcoded #FFFFFF/#FAF4E6, which made the title
+     text — also a theme token — invisible against cream in dark
+     mode). */
+  0%, 75%, 100% {
+    background-color: var(--card);
+    box-shadow: 0 1px 2px rgba(15,20,25,0.04), 0 4px 12px rgba(15,20,25,0.04);
+    transform: translateY(0);
+  }
+  20%, 55% {
+    background-color: var(--cream);
+    box-shadow: 0 8px 24px rgba(243,156,50,0.22);
+    transform: translateY(-1px);
+  }
+}
+/* The check/dot inside each milestone node — fade between the
+   completed-check icon and the upcoming-dot. Same 8s cycle. */
+.cr-node-check {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  opacity: 0;
+  animation: cr-node-check 8s ease-in-out infinite;
+}
+.cr-node-dot {
+  position: absolute; inset: 0;
+  margin: auto;
+  animation: cr-node-dot 8s ease-in-out infinite;
+}
+.cr-node { animation: none; }                /* parent is just for delay propagation */
+.cr-node .cr-node-check,
+.cr-node .cr-node-dot { animation-delay: inherit; }
+@keyframes cr-node-check {
+  0%, 75%, 100% { opacity: 0; transform: scale(0.6); }
+  20%, 55%      { opacity: 1; transform: scale(1);   }
+}
+@keyframes cr-node-dot {
+  0%, 75%, 100% { opacity: 1; }
+  20%, 55%      { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [style*="cr-detect-ring"],
+  [style*="cr-pill-tag"],
+  [style*="cr-arrow-bounce"],
+  [style*="cr-pct-pop"],
+  [style*="cr-career-cycle"],
+  [style*="cr-bar-fill"],
+  [style*="cr-card-fade"],
+  [style*="cr-milestone-light"],
+  .cr-node-check,
+  .cr-node-dot { animation: none !important; }
 }
 
 @layer components {

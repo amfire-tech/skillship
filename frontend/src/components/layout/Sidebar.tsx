@@ -8,9 +8,9 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { SkillshipLockup } from "@/components/brand/SkillshipMark";
 
 export interface SidebarNavItem {
   label: string;
@@ -50,15 +50,8 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
   return (
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-white dark:bg-[var(--background)]">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-5">
-        <Image src="/logo-icon.png" alt="Skillship Edutech" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full bg-black object-contain p-0.5" />
-        <div className="leading-tight">
-          <p className="text-base font-extrabold leading-none tracking-tight">
-            <span className="text-brand-orange">SKILL</span>
-            <span className="text-brand-teal">SHIP</span>
-          </p>
-          <p className="mt-1 text-xs font-medium text-[var(--muted-foreground)]">{roleLabel}</p>
-        </div>
+      <div className="px-5 py-5">
+        <SkillshipLockup badgeSize={40} wordmarkSize="md" tagline={roleLabel} />
       </div>
 
       {/* Nav */}

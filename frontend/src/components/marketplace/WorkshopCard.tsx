@@ -52,24 +52,13 @@ export function WorkshopCard({ workshop }: WorkshopCardProps) {
           <Badge className="bg-[var(--muted)] text-[var(--card-foreground)]">Skillship</Badge>
         </div>
 
-        <div className="mt-4 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
-              {workshop.title}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              {workshop.description}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-primary-50 px-3 py-2 text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-600">
-              Price
-            </p>
-            <p className="mt-1 text-lg font-bold text-[var(--foreground)]">
-              ₹{workshop.price.toLocaleString("en-IN")}
-            </p>
-          </div>
+        <div className="mt-4">
+          <h3 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
+            {workshop.title}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
+            {workshop.description}
+          </p>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl bg-[var(--muted)] p-4">

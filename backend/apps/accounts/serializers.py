@@ -59,27 +59,47 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    """Email + password → validated user + issued token pair.
+    """Email + password (+ optional role) → validated user + issued token pair.
 
     We do the lookup + password check ourselves (rather than subclassing
     SimpleJWT's TokenObtainPairSerializer) because:
       - SimpleJWT keys on USERNAME_FIELD, which is "username" here.
       - We want email-based login without flipping USERNAME_FIELD globally
         (that would cascade into admin, management commands, and fixtures).
+
+    Optional role gate:
+      When the client sends a `role`, the authenticated user's actual role
+      MUST match. Mismatch returns the same generic error as a bad password
+      so we don't leak that the email + password were otherwise valid (a
+      common auth-design rule — specific errors are an oracle for guessing).
+      Clients that omit `role` get the original email/password-only flow.
     """
 
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+    role = serializers.ChoiceField(
+        choices=User.Role.choices,
+        required=False,
+        allow_blank=True,
+    )
 
     def validate(self, attrs):
         email = attrs["email"].strip().lower()
         password = attrs["password"]
+        requested_role = (attrs.get("role") or "").strip() or None
 
         user = User.objects.filter(email__iexact=email).first()
         if user is None or not user.check_password(password):
             raise AuthenticationFailed("Invalid email or password", code="invalid_credentials")
         if not user.is_active:
             raise AuthenticationFailed("Account is disabled", code="account_disabled")
+
+        # Role gate — only applied when the client supplied one.
+        if requested_role and user.role != requested_role:
+            raise AuthenticationFailed(
+                "Invalid email, password, or role",
+                code="invalid_credentials",
+            )
 
         refresh = RefreshToken.for_user(user)
         attrs["user"] = user
