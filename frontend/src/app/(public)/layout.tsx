@@ -17,6 +17,10 @@ export default function PublicLayout({
 }) {
   return (
     <>
+      {/* Animated site background — slow orange-gradient grid living behind
+          every public page. Shows through wherever a section isn't fully
+          opaque (section seams, translucent dark surfaces, the hero). */}
+      <div className="site-bg" aria-hidden />
       <Navbar />
       <main id="main-content">{children}</main>
       <Footer />

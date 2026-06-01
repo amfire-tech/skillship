@@ -74,6 +74,41 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False  # CSRF token must be readable by JS for DRF POSTs
 
+# ── Email — owner notifications on new demo requests ─────────────────────────
+#
+# We use Django's stock SMTP backend so the cheapest option (a free Gmail
+# account with an app password) works without extra packages. Set these env
+# vars in Railway / Render:
+#
+#   EMAIL_HOST              smtp.gmail.com           (or your provider)
+#   EMAIL_PORT              587
+#   EMAIL_USE_TLS           true
+#   EMAIL_HOST_USER         alerts@skillship.in      (the sender mailbox)
+#   EMAIL_HOST_PASSWORD     <gmail app-password>     (NOT the account password)
+#   DEFAULT_FROM_EMAIL      "Skillship <alerts@skillship.in>"
+#   LEADS_NOTIFY_EMAIL      owner@skillship.in       (where the alert lands)
+#
+# If EMAIL_HOST is unset, we fall back to the console backend so nothing
+# crashes — useful for first-boot before the SMTP credentials are wired.
+
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+    EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() == "true"
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+    EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL", "Skillship <noreply@skillship.in>"
+)
+# Where the "new demo request" notification lands. Read by apps/leads/views.py.
+LEADS_NOTIFY_EMAIL = os.environ.get("LEADS_NOTIFY_EMAIL", "")
+
 # ── Logging ──────────────────────────────────────────────────────────────────
 
 # One-line-per-event format that journald / Loki / CloudWatch can ingest.

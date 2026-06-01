@@ -5,9 +5,11 @@ Owner:   Navanish
 
 Design:
   - One row → one User. Failures reported per-row; valid rows still commit.
-  - Role gate: PRINCIPAL can only create STUDENT / TEACHER in their school.
-                MAIN_ADMIN can create STUDENT / TEACHER / SUB_ADMIN in any school.
-                PRINCIPAL / MAIN_ADMIN rows are never accepted via this surface.
+  - Surface: MAIN_ADMIN only (enforced at the view layer by CanManageUsers).
+              No other role can bulk-upload users.
+  - Allowed row roles: STUDENT / TEACHER / SUB_ADMIN. PRINCIPAL and
+              MAIN_ADMIN rows are NEVER accepted via this surface — they
+              must be created individually so a human reviews each one.
   - Each created row pegs `is_active=True`. Passwords are hashed via set_password.
 
 Returns: {total_rows, created, errors: [{row, message}]}
@@ -79,16 +81,18 @@ def _create_user_from_row(*, actor: User, row: dict) -> User:
             f"`role` must be one of STUDENT / TEACHER / SUB_ADMIN (got {role_raw!r})."
         )
 
-    # Resolve target school per actor role.
-    if actor.role == Role.MAIN_ADMIN:
-        if not school_raw:
-            raise ValueError("MAIN_ADMIN must provide `school` (slug or UUID) in each row.")
-        school = _resolve_school(school_raw)
-    else:
-        # PRINCIPAL — ignore any school cell, lock to actor's school.
-        if actor.school_id is None:
-            raise ValueError("Caller has no school — cannot create scoped users.")
-        school = School.objects.get(pk=actor.school_id)
+    # Per the locked-down policy in apps/accounts/permissions.py, only
+    # MAIN_ADMIN may reach this code path. Any other role is rejected at
+    # the surface gate (CanManageUsers) before we even get here — the
+    # defensive check below is the second line.
+    if actor.role != Role.MAIN_ADMIN:
+        raise ValueError(
+            "Only the platform super admin can bulk-upload users. "
+            "Ask the super admin to upload the CSV for your school."
+        )
+    if not school_raw:
+        raise ValueError("MAIN_ADMIN must provide `school` (slug or UUID) in each row.")
+    school = _resolve_school(school_raw)
 
     with transaction.atomic():
         u = User(

@@ -19,12 +19,13 @@ export function ThePromise() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.4 });
 
-  // "rebuilt" gets the teal recolor 600ms AFTER line 2 has fully landed,
-  // creating the deliberate punchline beat the brief calls for.
-  const [teal, setTeal] = useState(false);
+  // "rebuilt" gets the orange recolor 600ms AFTER line 2 has fully landed,
+  // creating the deliberate punchline beat — orange to match every other
+  // headline accent on the site.
+  const [accent, setAccent] = useState(false);
   useEffect(() => {
     if (!inView) return;
-    const t = setTimeout(() => setTeal(true), 1100); // ~ line2 reveal (500ms) + 600ms beat
+    const t = setTimeout(() => setAccent(true), 1100); // ~ line2 reveal (500ms) + 600ms beat
     return () => clearTimeout(t);
   }, [inView]);
 
@@ -51,7 +52,7 @@ export function ThePromise() {
           We{" "}
           <span
             className="transition-colors duration-[600ms] ease-out-expo"
-            style={{ color: teal ? "var(--teal-500)" : "var(--ink-primary)" }}
+            style={{ color: accent ? "var(--orange-500)" : "var(--ink-primary)" }}
           >
             rebuilt
           </span>{" "}
@@ -64,7 +65,7 @@ export function ThePromise() {
           animate={inView ? { scaleX: 1, opacity: 1 } : {}}
           transition={{ duration: 0.6, delay: 1.2, ease: EASE }}
           aria-hidden
-          className="mx-auto mt-10 h-px w-16 origin-center bg-[var(--teal-500)]"
+          className="mx-auto mt-10 h-px w-16 origin-center bg-[var(--orange-500)]"
         />
 
         <motion.p

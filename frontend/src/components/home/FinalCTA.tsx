@@ -104,15 +104,15 @@ export function FinalCTA() {
         >
           <Link
             href="/request-demo"
-            className="group inline-flex items-center justify-center gap-2 rounded-full px-8 py-3.5 text-[15px] font-semibold text-white shadow-warm transition-all duration-300 ease-out-expo hover:-translate-y-1 hover:shadow-[0_16px_44px_rgba(243,156,50,0.36)]"
+            className="cta-sun group inline-flex items-center justify-center gap-2 rounded-full px-8 py-3.5 text-[15px] font-semibold text-white shadow-warm transition-transform duration-300 ease-out-expo hover:-translate-y-1"
             style={{ backgroundImage: "var(--gradient-brand)" }}
           >
-            Book a school visit
-            <ArrowRight size={15} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
+            <span className="relative z-10">Book a school visit</span>
+            <ArrowRight size={15} strokeWidth={2.2} className="relative z-10 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
             href="#pillars"
-            className="group inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-8 py-3.5 text-[15px] font-semibold text-white backdrop-blur-sm transition-all duration-300 ease-out-expo hover:-translate-y-1 hover:bg-white/[0.08]"
+            className="btn-pop group inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-8 py-3.5 text-[15px] font-semibold text-white backdrop-blur-sm hover:bg-white/[0.10]"
           >
             Explore the program
             <ArrowRight size={15} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />

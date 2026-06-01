@@ -1,6 +1,13 @@
 /*
  * File:    frontend/src/components/request-demo/FormCard.tsx
  * Purpose: Demo request form that submits to /api/v1/demo-requests/ with mailto fallback.
+ *
+ *          The selectedDate + selectedSlot props come from <BookingFlow />
+ *          which owns the booking-calendar state. When both are set we show
+ *          a "you're booking …" banner at the top of the card and include
+ *          preferredDate + preferredTimeSlot in the POST body. When either
+ *          is missing the form is still submittable — sales follows up to
+ *          pick a time manually (the backend fields are nullable).
  * Owner:   Pranav
  */
 "use client";
@@ -8,9 +15,37 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { CalendarCheck2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { InputField } from "@/components/request-demo/InputField";
 import { SelectField } from "@/components/request-demo/SelectField";
+
+interface FormCardProps {
+  selectedDate: string | null;          // ISO YYYY-MM-DD or null
+  selectedSlot: string | null;          // e.g. "11:30" matching backend TimeSlot
+  onClearSelection: () => void;
+}
+
+// Mirrors BookingCalendar's TIME_SLOTS labels so the banner renders the
+// human-readable time without re-importing the array.
+const SLOT_LABEL: Record<string, string> = {
+  "10:30": "10:30 AM",
+  "11:30": "11:30 AM",
+  "12:30": "12:30 PM",
+  "15:00": "3:00 PM",
+  "16:00": "4:00 PM",
+};
+
+function formatDateForBanner(iso: string): string {
+  // iso is YYYY-MM-DD. Parse as a local date by appending T00:00 so the
+  // resulting Date doesn't get UTC-shifted across the dateline.
+  const d = new Date(`${iso}T00:00:00`);
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(d);
+}
 
 interface RequestDemoFormState {
   schoolName: string;
@@ -66,7 +101,11 @@ function validate(state: RequestDemoFormState): FieldErrors {
   return errors;
 }
 
-export function FormCard() {
+export function FormCard({
+  selectedDate,
+  selectedSlot,
+  onClearSelection,
+}: FormCardProps) {
   const [formState, setFormState] = useState<RequestDemoFormState>(initialState);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -94,10 +133,16 @@ export function FormCard() {
     setSubmitError(null);
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+      // Only include the calendar fields if the user actually picked them;
+      // backend treats both as optional so omitting is cleaner than null.
+      const payload: Record<string, unknown> = { ...formState };
+      if (selectedDate) payload.preferredDate = selectedDate;
+      if (selectedSlot) payload.preferredTimeSlot = selectedSlot;
+
       const res = await fetch(`${API_BASE}/demo-requests/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formState),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         throw new Error(`Server responded with ${res.status}`);
@@ -106,8 +151,11 @@ export function FormCard() {
     } catch {
       // Fallback: open mailto so the user can still reach us
       const subject = encodeURIComponent(`Demo request — ${formState.schoolName}`);
+      const slotLine = selectedSlot && selectedDate
+        ? `\nPreferred slot: ${formatDateForBanner(selectedDate)} at ${SLOT_LABEL[selectedSlot] ?? selectedSlot}`
+        : "";
       const body = encodeURIComponent(
-        `School: ${formState.schoolName}\nPrincipal: ${formState.principalName}\nCity: ${formState.city}\nStudents: ${formState.studentRange}\nPhone: ${formState.phoneNumber}\nEmail: ${formState.emailAddress}\nBoard: ${formState.schoolBoard}`
+        `School: ${formState.schoolName}\nPrincipal: ${formState.principalName}\nCity: ${formState.city}\nStudents: ${formState.studentRange}\nPhone: ${formState.phoneNumber}\nEmail: ${formState.emailAddress}\nBoard: ${formState.schoolBoard}${slotLine}`
       );
       window.location.href = `mailto:hello@skillship.in?subject=${subject}&body=${body}`;
       setSubmitError("Our server could not be reached. Your email client has been opened so you can send the request directly.");
@@ -162,16 +210,51 @@ export function FormCard() {
       <div>
         <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          Demo request
+          Step 3 · Tell us about your school
         </div>
         <h2 className="mt-3 text-[26px] font-bold tracking-[-0.02em] text-[var(--foreground)] md:text-[28px]">
           Tell us about your school
         </h2>
         <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
           A specialist from your region will reach out within one business day
-          to confirm a time that works.
+          to confirm your slot.
         </p>
       </div>
+
+      {/* Selected date/slot banner — shown only when the calendar above
+         has both selections. "Change" clears state so the user goes back
+         up to the calendar to repick. */}
+      {selectedDate && selectedSlot && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/8 to-accent/8 px-4 py-3"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-sm">
+              <CalendarCheck2 size={17} strokeWidth={2} />
+            </span>
+            <div>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-primary">
+                You&apos;re booking
+              </p>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                {formatDateForBanner(selectedDate)} at{" "}
+                {SLOT_LABEL[selectedSlot] ?? selectedSlot}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--muted-foreground)] transition hover:border-primary/30 hover:text-[var(--foreground)]"
+          >
+            <X size={12} strokeWidth={2.4} />
+            Change
+          </button>
+        </motion.div>
+      )}
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
         <div className="grid gap-5 md:grid-cols-2">

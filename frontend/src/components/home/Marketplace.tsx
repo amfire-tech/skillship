@@ -102,7 +102,7 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.55, delay: index * 0.08, ease: EASE }}
-      className={`group relative flex w-[320px] shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-[color:var(--border-subtle)] bg-white shadow-soft transition-all duration-300 ease-out-expo hover:-translate-y-1 hover:shadow-medium ${
+      className={`card-pop group relative flex w-[320px] shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-[color:var(--border-subtle)] bg-white shadow-soft ${
         course.featured ? "ring-1 ring-[var(--orange-500)]/30" : ""
       }`}
       style={{ height: 420 }}

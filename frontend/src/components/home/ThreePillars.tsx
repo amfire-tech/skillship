@@ -18,7 +18,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useScroll, useTransform, type MotionValue } from "framer-motion";
 import { useRef } from "react";
 import {
   Building2, GraduationCap, Cpu, ArrowRight,
@@ -96,8 +96,21 @@ const PILLARS: Pillar[] = [
   },
 ];
 
-function PillarCard({ p, index }: { p: Pillar; index: number }) {
+function PillarCard({
+  p,
+  index,
+  scrollYProgress,
+}: {
+  p: Pillar;
+  index: number;
+  scrollYProgress: MotionValue<number>;
+}) {
   const Icon = p.icon;
+  const num = String(index + 1).padStart(2, "0");
+  // Each card's watermark number drifts vertically at a slightly different
+  // rate as the section scrolls — gives a living, layered parallax feel.
+  const y = useTransform(scrollYProgress, [0, 1], [34 + index * 8, -34 - index * 8]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 28 }}
@@ -110,8 +123,24 @@ function PillarCard({ p, index }: { p: Pillar; index: number }) {
         href={p.href}
         className="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-[color:var(--border-subtle)] bg-white shadow-soft transition-all duration-300 ease-out-expo hover:-translate-y-2 hover:shadow-strong"
       >
+        {/* Giant parallax number watermark — orange light + faint, sits behind
+           the card content (bottom-right), drifts on scroll. */}
+        <motion.span
+          aria-hidden
+          style={{ y }}
+          className="pointer-events-none absolute -bottom-8 -right-3 z-0 select-none font-semibold leading-none text-[var(--orange-500)] opacity-[0.10] transition-opacity duration-300 group-hover:opacity-[0.18]"
+        >
+          <span style={{ fontSize: "11rem" }}>{num}</span>
+        </motion.span>
+        {/* warm glow that follows the number */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -bottom-10 -right-6 z-0 h-44 w-44 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-40"
+          style={{ background: "var(--orange-500)" }}
+        />
+
         {/* Colored band at the top */}
-        <div className={`relative h-[112px] ${p.band}`}>
+        <div className={`relative z-10 h-[112px] ${p.band}`}>
           <div className="absolute inset-0 opacity-25 mix-blend-overlay bg-grid-pattern" aria-hidden />
           <div className="absolute -bottom-7 left-7 grid h-16 w-16 place-items-center rounded-2xl bg-white shadow-soft">
             <Icon size={28} strokeWidth={1.7} className="text-[var(--ink-primary)]" />
@@ -124,7 +153,7 @@ function PillarCard({ p, index }: { p: Pillar; index: number }) {
         </div>
 
         {/* Body */}
-        <div className="flex flex-1 flex-col px-7 pb-7 pt-12">
+        <div className="relative z-10 flex flex-1 flex-col px-7 pb-7 pt-12">
           <p
             className="text-[11px] font-semibold uppercase tracking-[0.22em]"
             style={{ color: p.accentVar }}
@@ -168,6 +197,10 @@ function PillarCard({ p, index }: { p: Pillar; index: number }) {
 export function ThreePillars() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.2 });
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
 
   return (
     <section
@@ -175,7 +208,20 @@ export function ThreePillars() {
       ref={ref}
       className="relative overflow-hidden bg-white"
     >
-      <div className="mx-auto max-w-[1280px] px-6 py-28 md:py-36 lg:px-12">
+      {/* Orange-lit textured backdrop — a warm wash + fine dotted grid that
+         gives the section depth behind the parallax pillar numbers. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
+        <div
+          className="absolute inset-0 opacity-[0.5]"
+          style={{
+            backgroundImage:
+              "radial-gradient(closest-side at 20% 25%, rgba(255,138,0,0.10), transparent), radial-gradient(closest-side at 85% 70%, rgba(255,138,0,0.08), transparent)",
+          }}
+        />
+        <div className="absolute inset-0 bg-grid-pattern opacity-[0.4]" />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-[1280px] px-6 py-28 md:py-36 lg:px-12">
         {/* Header */}
         <div className="mx-auto max-w-[760px] text-center">
           <motion.p
@@ -217,7 +263,7 @@ export function ThreePillars() {
         {/* Three pillar cards */}
         <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-7 lg:mt-20 lg:grid-cols-3 lg:gap-8">
           {PILLARS.map((p, i) => (
-            <PillarCard key={p.id} p={p} index={i} />
+            <PillarCard key={p.id} p={p} index={i} scrollYProgress={scrollYProgress} />
           ))}
         </div>
 

@@ -187,22 +187,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        actor = self.context["request"].user
+        # As of 2026-05-28 the only actor who reaches this serializer is
+        # MAIN_ADMIN (see apps/accounts/permissions.py:CanManageUsers).
+        # The earlier PRINCIPAL-as-creator branch was removed when user
+        # creation was locked down to the platform super admin only.
+        # MAIN_ADMIN may freely set role + school subject to the
+        # role/school invariant below (which the DB also enforces).
         target_role = attrs.get("role")
         target_school = attrs.get("school")
-
-        if actor.role == Role.PRINCIPAL:
-            # Principals create only TEACHER / STUDENT, only in their own school —
-            # we override school here so a stray body field can't break tenancy.
-            if target_role not in {User.Role.TEACHER, User.Role.STUDENT}:
-                raise serializers.ValidationError(
-                    {"role": f"PRINCIPAL may only create TEACHER or STUDENT, not {target_role}."}
-                )
-            attrs["school"] = actor.school
-            target_school = actor.school
-
-        # Final invariant — applies to every actor (defence in depth alongside
-        # the DB CheckConstraint).
         _validate_role_school_invariant(target_role, target_school)
         return attrs
 

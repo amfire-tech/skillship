@@ -18,6 +18,7 @@
 import Image from "next/image";
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
+import { PillarNumberBackdrop } from "@/components/home/PillarNumberBackdrop";
 import {
   Presentation, MonitorPlay, MessageSquare, LifeBuoy,
   TrendingUp, Award, Users, FileText, ArrowRight,
@@ -52,7 +53,7 @@ function ServiceCard({ s, index }: { s: Service; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.5, delay: index * 0.05, ease: EASE }}
-      className="group relative flex h-full flex-col rounded-2xl border border-[color:var(--border-subtle)] bg-white p-6 shadow-soft transition-all duration-300 ease-out-expo hover:-translate-y-1 hover:shadow-medium"
+      className="card-pop group relative flex h-full flex-col rounded-2xl border border-[color:var(--border-subtle)] bg-white p-6 shadow-soft"
     >
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--cream-soft)] text-[var(--orange-500)] transition-colors duration-300 group-hover:bg-[var(--orange-500)] group-hover:text-white">
@@ -77,8 +78,9 @@ export function TAASTraining() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section id="taas-training" ref={ref} className="bg-white">
-      <div className="mx-auto max-w-[1280px] px-6 py-28 md:py-36 lg:px-12">
+    <section id="taas-training" ref={ref} className="relative bg-white">
+      <PillarNumberBackdrop number="02" align="right" />
+      <div className="relative z-10 mx-auto max-w-[1280px] px-6 py-28 md:py-36 lg:px-12">
         {/* Header */}
         <div className="grid grid-cols-1 items-end gap-10 md:grid-cols-12">
           <div className="md:col-span-7">

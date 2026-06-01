@@ -32,6 +32,17 @@ class DemoRequestCreateSerializer(serializers.ModelSerializer):
     schoolBoard = serializers.CharField(
         source="school_board", max_length=40, required=False, allow_blank=True
     )
+    # Booking calendar — both optional so the existing form still works
+    # if the user skips the date/slot picker.
+    preferredDate = serializers.DateField(
+        source="preferred_date", required=False, allow_null=True
+    )
+    preferredTimeSlot = serializers.ChoiceField(
+        source="preferred_time_slot",
+        choices=DemoRequest.TimeSlot.choices,
+        required=False,
+        allow_blank=True,
+    )
 
     class Meta:
         model = DemoRequest
@@ -43,6 +54,8 @@ class DemoRequestCreateSerializer(serializers.ModelSerializer):
             "phoneNumber",
             "emailAddress",
             "schoolBoard",
+            "preferredDate",
+            "preferredTimeSlot",
         ]
 
 
@@ -60,6 +73,8 @@ class DemoRequestReadSerializer(serializers.ModelSerializer):
             "phone_number",
             "email_address",
             "school_board",
+            "preferred_date",
+            "preferred_time_slot",
             "status",
             "triage_notes",
             "created_at",
@@ -74,6 +89,8 @@ class DemoRequestReadSerializer(serializers.ModelSerializer):
             "phone_number",
             "email_address",
             "school_board",
+            "preferred_date",
+            "preferred_time_slot",
             "created_at",
             "updated_at",
         ]

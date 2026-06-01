@@ -54,6 +54,12 @@ export function Navbar() {
   const pathname = usePathname();
   const menuRef = useRef<HTMLElement>(null);
 
+  // The homepage hero is an always-dark premium surface. While the navbar is
+  // transparent over it (i.e. at the very top of the homepage, before scroll),
+  // nav text must be light or it disappears into the dark hero. Once scrolled,
+  // the navbar gains its light blurred background, so ink colours apply again.
+  const overDark = pathname === "/" && !scrolled;
+
   // Scroll-state for the transparent → blurred transition (brief §2.1).
   useEffect(() => {
     function onScroll() { setScrolled(window.scrollY > 40); }
@@ -84,7 +90,13 @@ export function Navbar() {
       className={`sticky top-0 z-50 w-full transition-[background-color,backdrop-filter,border-color,box-shadow] duration-300 ease-out-expo ${
         scrolled
           ? "border-b border-[color:var(--border-subtle)] bg-[var(--background)]/80 backdrop-blur-xl backdrop-saturate-150 shadow-soft"
-          : "border-b border-transparent bg-transparent"
+          : overDark
+            ? // Homepage top: sit on the hero's dark surface so the white nav
+              // text is legible in BOTH light and dark mode (the sticky navbar
+              // is above the hero in flow, so a transparent bar would otherwise
+              // show the cream page background in light mode).
+              "border-b border-transparent bg-[#0A0F1E]"
+            : "border-b border-transparent bg-transparent"
       }`}
     >
       <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between px-6 lg:px-12">
@@ -104,9 +116,13 @@ export function Navbar() {
                 <Link
                   href={link.href}
                   className={`text-[14px] font-medium tracking-[-0.005em] transition-colors duration-200 ${
-                    active
-                      ? "text-[var(--ink-primary)]"
-                      : "text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]"
+                    overDark
+                      ? active
+                        ? "text-white"
+                        : "text-white/75 hover:text-white"
+                      : active
+                        ? "text-[var(--ink-primary)]"
+                        : "text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]"
                   }`}
                 >
                   {link.label}
@@ -121,13 +137,17 @@ export function Navbar() {
           <ThemeToggle />
           <Link
             href="/login"
-            className="text-[14px] font-medium text-[var(--ink-secondary)] transition-colors hover:text-[var(--ink-primary)]"
+            className={`text-[14px] font-medium transition-colors ${
+              overDark
+                ? "text-white/80 hover:text-white"
+                : "text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]"
+            }`}
           >
             Sign in
           </Link>
           <Link
             href={CTA.href}
-            className="group relative inline-flex items-center justify-center overflow-hidden rounded-full px-5 py-2.5 text-[14px] font-semibold text-white shadow-warm transition-all duration-300 ease-out-expo hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(243,156,50,0.28)]"
+            className="cta-sun group relative inline-flex items-center justify-center rounded-full px-5 py-2.5 text-[14px] font-semibold text-white transition-transform duration-300 ease-out-expo hover:-translate-y-0.5"
             style={{ backgroundImage: "var(--gradient-brand)" }}
           >
             <span className="relative z-10">{CTA.label}</span>
@@ -137,7 +157,7 @@ export function Navbar() {
         {/* Mobile hamburger */}
         <button
           type="button"
-          className="rounded-lg p-2 text-[var(--ink-primary)] md:hidden"
+          className={`rounded-lg p-2 md:hidden ${overDark ? "text-white" : "text-[var(--ink-primary)]"}`}
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
           aria-expanded={mobileOpen}
@@ -184,10 +204,10 @@ export function Navbar() {
               <li>
                 <Link
                   href={CTA.href}
-                  className="block rounded-full px-5 py-3 text-center text-[15px] font-semibold text-white shadow-warm"
+                  className="cta-sun block rounded-full px-5 py-3 text-center text-[15px] font-semibold text-white shadow-warm"
                   style={{ backgroundImage: "var(--gradient-brand)" }}
                 >
-                  {CTA.label}
+                  <span className="relative z-10">{CTA.label}</span>
                 </Link>
               </li>
             </ul>

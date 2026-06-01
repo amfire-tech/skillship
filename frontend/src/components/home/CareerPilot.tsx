@@ -21,6 +21,7 @@
 import { useRef } from "react";
 import Image from "next/image";
 import { motion, useScroll, useTransform, type MotionValue } from "framer-motion";
+import { PillarNumberBackdrop } from "@/components/home/PillarNumberBackdrop";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -536,7 +537,7 @@ function StickyVisual({ scrollYProgress }: { scrollYProgress: MotionValue<number
   ];
 
   return (
-    <div className="relative aspect-square w-full max-w-[560px]">
+    <div className="relative aspect-square w-full max-w-[420px]">
       {STEPS.map((step, i) => {
         const Fallback = FALLBACKS[i];
         return (
@@ -639,10 +640,14 @@ export function CareerPilot() {
 
   return (
     <section ref={sectionRef} className="relative bg-white">
-      {/* Header — sits above the sticky area */}
-      <div className="mx-auto max-w-[1280px] px-6 pt-28 md:pt-36 lg:px-12">
+      {/* Giant pillar 03 — holds for the whole Career Pilot (Pillar 3 / SaaS)
+          section. Sits behind content (z-0); everything else is z-10. */}
+      <PillarNumberBackdrop number="03" align="right" />
+
+      {/* Header — marks the entry into Pillar 3 (SaaS). */}
+      <div className="relative z-10 mx-auto max-w-[1280px] px-6 pt-28 md:pt-36 lg:px-12">
         <p className="text-[11.5px] font-semibold uppercase tracking-[0.22em] text-[var(--teal-600)]">
-          Every student, every plan
+          Pillar 3 · Software as a Service
         </p>
         <h2
           className="mt-4 max-w-[760px] font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ink-primary)]"
@@ -658,7 +663,7 @@ export function CareerPilot() {
       </div>
 
       {/* ── Desktop: two-column sticky scroll ── */}
-      <div className="mx-auto hidden max-w-[1280px] px-6 pb-20 pt-16 lg:block lg:px-12">
+      <div className="relative z-10 mx-auto hidden max-w-[1280px] px-6 pb-20 pt-16 lg:block lg:px-12">
         <div className="grid grid-cols-12 gap-10">
           {/* Sticky visual */}
           <div className="col-span-6">
@@ -682,7 +687,7 @@ export function CareerPilot() {
       </div>
 
       {/* ── Mobile / tablet: stacked, each step gets its own image ── */}
-      <div className="mx-auto max-w-[720px] px-6 pb-24 pt-12 lg:hidden">
+      <div className="relative z-10 mx-auto max-w-[720px] px-6 pb-24 pt-12 lg:hidden">
         <div className="space-y-20">
           {STEPS.map((step, i) => {
             const Fallback = FALLBACKS[i];

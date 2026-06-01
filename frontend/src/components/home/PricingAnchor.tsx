@@ -156,11 +156,11 @@ export function PricingAnchor() {
         >
           <Link
             href="/request-demo"
-            className="inline-flex items-center gap-2 rounded-full px-8 py-4 text-[15px] font-semibold text-white shadow-warm transition-all duration-300 ease-out-expo hover:-translate-y-0.5 hover:shadow-[0_16px_44px_rgba(243,156,50,0.34)]"
+            className="cta-sun inline-flex items-center gap-2 rounded-full px-8 py-4 text-[15px] font-semibold text-white shadow-warm transition-transform duration-300 ease-out-expo hover:-translate-y-0.5"
             style={{ backgroundImage: "var(--gradient-brand)" }}
           >
-            Book a school visit
-            <ArrowRight size={15} strokeWidth={2.2} />
+            <span className="relative z-10">Book a school visit</span>
+            <ArrowRight size={15} strokeWidth={2.2} className="relative z-10" />
           </Link>
           <p className="text-[12.5px] text-[var(--ink-tertiary)]">
             No setup fee · No per-lab pricing · No surprise add-ons

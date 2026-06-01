@@ -3,16 +3,16 @@
  * Purpose: Public marketing homepage. Rebuilt to tell the AI School Program
  *          story from the Skillship catalogue:
  *
- *            Hero            — Build an AI School (the category claim)
- *            TrustStrip      — Real impact numbers from the catalogue
+ *            Hero            — Build an AI School (the category claim) +
+ *                              real impact numbers folded into the footer bar
  *            ThePromise      — "We rebuilt the foundation." (tension)
  *            ThreePillars    — IAAS · TAAS · SAAS (the spine)
  *            IAASLabs        — Pillar 1: 8 advanced labs
  *            TAASTraining    — Pillar 2: 8 training services
- *            HardwareShowcase— Award-winning products (Neobot, 3D, Kit)
  *            CareerPilot     ┐
  *            AdaptiveQuiz    ├ Pillar 3: SaaS in action
  *            QuestionGenerator┘
+ *            HardwareShowcase— Award-winning products (after the 3 pillars)
  *            Marketplace     — The course catalogue (Code4AI lives here)
  *            RoleCards       — Five stakeholders, one login surface
  *            BenefitsForAll  — Schools · Students · Parents
@@ -25,7 +25,6 @@
  */
 
 import { Hero } from "@/components/home/Hero";
-import { TrustStrip } from "@/components/home/TrustStrip";
 import { ThePromise } from "@/components/home/ThePromise";
 import { ThreePillars } from "@/components/home/ThreePillars";
 import { IAASLabs } from "@/components/home/IAASLabs";
@@ -47,18 +46,21 @@ export default function HomePage() {
   return (
     <>
       <Hero />
-      <TrustStrip />
       <ThePromise />
       <ThreePillars />
+      {/* The three pillars run consecutively so the reader walks 1 → 2 → 3
+          without losing the thread; the giant pillar number on each marks
+          where they are. The award-winning hardware showcase follows AFTER
+          all three pillars. */}
       <IAASLabs />
       <TAASTraining />
-      <HardwareShowcase />
       <div id="saas-software">
         <CareerPilot />
         <AdaptiveQuiz />
         <QuestionGenerator />
         <CareerRoadmap />
       </div>
+      <HardwareShowcase />
       <Marketplace />
       <RoleCards />
       <BenefitsForAll />

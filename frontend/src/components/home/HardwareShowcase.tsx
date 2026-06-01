@@ -140,7 +140,7 @@ function ProductCard({ p, index }: { p: Product; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.7, delay: index * 0.1, ease: EASE }}
-      className="group relative flex flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[var(--bg-dark-elev)] shadow-strong transition-all duration-500 ease-out-expo hover:-translate-y-2"
+      className="card-pop group relative flex flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[var(--bg-dark-elev)] shadow-strong"
     >
       {/* Product tile — gradient + stylised geometry */}
       <div className={`relative aspect-[4/3] ${p.tile} overflow-hidden`}>

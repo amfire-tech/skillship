@@ -76,11 +76,14 @@ function icon(d: string) {
   );
 }
 
+// User-creation links removed (2026-05-28): per the locked-down policy in
+// apps/accounts/permissions.py, only MAIN_ADMIN may create / update / delete
+// users now. Showing "Create Principal" or "Create Teachers" to a sub-admin
+// would lead to a 403 toast — strip the entry instead of dangling a broken
+// path. Sub-admins who need new users now ask the platform super admin.
 const SUB_ADMIN_NAV: SidebarNavItem[] = [
   { label: "Assigned Tasks",    href: "/dashboard/sub-admin",                     icon: icon("dashboard") },
   { label: "School Management", href: "/dashboard/sub-admin/schools",             icon: icon("schools")   },
-  { label: "Create Principal",  href: "/dashboard/sub-admin/users/new/principal", icon: icon("users")     },
-  { label: "Create Teachers",   href: "/dashboard/sub-admin/users/new/teacher",   icon: icon("users")     },
   { label: "Question Bank",     href: "/dashboard/sub-admin/question-bank",       icon: icon("content")   },
   { label: "Quiz Creation",     href: "/dashboard/sub-admin/quizzes/new",         icon: icon("quizzes")   },
   { label: "Quiz Approval",     href: "/dashboard/sub-admin/quizzes",             icon: icon("quizzes")   },
