@@ -2,16 +2,15 @@
  * File:    frontend/src/app/(auth)/login/page.tsx
  * Purpose: Public-side login. Two-panel layout matching the homepage's
  *          cream / orange-teal aesthetic — left panel carries brand + value
- *          props, right panel carries the form. Role gate is enforced
- *          server-side (see backend/apps/accounts/serializers.py::LoginSerializer)
- *          so picking the wrong role with the right email + password fails
- *          with a generic "Invalid email, password, or role" message.
+ *          props, right panel carries the form.
  *
- *          Demo-account helper: a collapsible row of 5 buttons that
- *          pre-fills the form for each seeded demo role. The seed defaults
- *          live alongside the DEMO_PASSWORD in backend/apps/common/
- *          management/commands/seed_demo.py — if those change, update the
- *          DEMO_ACCOUNTS constant below.
+ *          Role is OPTIONAL. Only school-facing roles (Principal / Teacher /
+ *          Student) are shown as cards. Platform staff (Super Admin / Sub Admin)
+ *          sign in with email + password alone and are never surfaced in the UI,
+ *          so school users can't see those roles exist. When a role IS picked it
+ *          is enforced server-side (see accounts/serializers.py::LoginSerializer);
+ *          when omitted, the backend authenticates by credentials and returns
+ *          the account's real role.
  * Owner:   Pranav
  */
 
@@ -22,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ShieldCheck, Layers, LineChart, Users, Sparkles,
+  LineChart, Users, Sparkles,
   Eye, EyeOff, ArrowRight, Loader2, Mail, Lock, Check, type LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
@@ -42,25 +41,15 @@ interface RoleOption {
   gradient: string;
 }
 
+// Only school-facing roles are shown. Platform staff (Super Admin / Sub Admin)
+// sign in with email + password alone — they don't pick a role, so school users
+// (e.g. principals) never see those roles exist. The backend authenticates them
+// by credentials and returns their real role (role is optional server-side).
 const ROLES: RoleOption[] = [
-  { value: "MAIN_ADMIN", label: "Super Admin", hint: "Platform-level",  icon: ShieldCheck, gradient: "bg-warmth-gradient" },
-  { value: "SUB_ADMIN",  label: "Sub Admin",   hint: "Operations",      icon: Layers,      gradient: "bg-brand-gradient"  },
   { value: "PRINCIPAL",  label: "Principal",   hint: "School leader",   icon: LineChart,   gradient: "bg-cool-gradient"   },
   { value: "TEACHER",    label: "Teacher",     hint: "Class management",icon: Users,       gradient: "bg-[linear-gradient(135deg,#2EB6B5_0%,#4FB956_100%)]" },
   { value: "STUDENT",    label: "Student",     hint: "Learning",        icon: Sparkles,    gradient: "bg-[linear-gradient(135deg,#4FB956_0%,#F39C32_100%)]" },
 ];
-
-// Seeded demo credentials. Must stay in sync with backend seed_demo.py.
-// Different schools intentionally — seeded users live under the DPS demo school
-// (except MAIN_ADMIN which is platform-level).
-const DEMO_PASSWORD = "Skillship#Test-2026";
-const DEMO_ACCOUNTS: Record<UserRole, string> = {
-  MAIN_ADMIN: "platform@demo.skillship.test",
-  SUB_ADMIN:  "demo_dps_demo_sub_admin@demo.skillship.test",
-  PRINCIPAL:  "demo_dps_demo_principal@demo.skillship.test",
-  TEACHER:    "demo_dps_demo_teacher_1@demo.skillship.test",
-  STUDENT:    "demo_dps_demo_student_1@demo.skillship.test",
-};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -149,28 +138,22 @@ function BrandPanel() {
 
 /* ──────────────── Form panel ──────────────── */
 
-interface FormPanelProps { onLogin: (role: UserRole, email: string, password: string) => Promise<void>; error: string | null; submitting: boolean; }
+interface FormPanelProps { onLogin: (role: UserRole | "", email: string, password: string) => Promise<void>; error: string | null; submitting: boolean; }
 
 function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
+  // Role is OPTIONAL: school users may pick their card, platform staff just
+  // leave it unselected and sign in with credentials only.
   const [role, setRole] = useState<UserRole | "">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showDemoHelper, setShowDemoHelper] = useState(false);
 
   const canSubmit =
-    role !== "" && EMAIL_RE.test(email.trim()) && password.length >= 1 && !submitting;
-
-  function fillDemo(r: UserRole) {
-    setRole(r);
-    setEmail(DEMO_ACCOUNTS[r]);
-    setPassword(DEMO_PASSWORD);
-    setShowDemoHelper(false);
-  }
+    EMAIL_RE.test(email.trim()) && password.length >= 1 && !submitting;
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!canSubmit || !role) return;
+    if (!canSubmit) return;
     onLogin(role, email.trim(), password);
   }
 
@@ -221,7 +204,7 @@ function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
                 </span>
               )}
             </legend>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {ROLES.map((r) => {
                 const Icon = r.icon;
                 const active = role === r.value;
@@ -371,58 +354,6 @@ function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
               </>
             )}
           </motion.button>
-
-          {/* Demo helper */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.55, delay: 0.75, ease: EASE }}
-            className="rounded-2xl border border-dashed border-[color:var(--border-subtle)] bg-[var(--cream-soft)] p-4"
-          >
-            <button
-              type="button"
-              onClick={() => setShowDemoHelper((v) => !v)}
-              className="flex w-full items-center justify-between text-left"
-            >
-              <span className="flex items-center gap-2 text-[13px] font-semibold text-[var(--ink-primary)]">
-                <Sparkles size={14} strokeWidth={2} className="text-[var(--orange-500)]" />
-                Try a demo account
-              </span>
-              <span className="text-[12px] text-[var(--ink-tertiary)]">
-                {showDemoHelper ? "Hide" : "Show"}
-              </span>
-            </button>
-
-            {showDemoHelper && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                transition={{ duration: 0.35, ease: EASE }}
-                className="mt-4 overflow-hidden"
-              >
-                <p className="text-[12px] leading-[1.5] text-[var(--ink-secondary)]">
-                  One click to fill the form with a seeded role. All demo accounts
-                  share the password{" "}
-                  <code className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-[var(--ink-primary)]">
-                    {DEMO_PASSWORD}
-                  </code>
-                  .
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {ROLES.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => fillDemo(r.value)}
-                      className="rounded-xl border border-[color:var(--border-subtle)] bg-white px-3 py-2 text-left text-[12px] font-medium text-[var(--ink-primary)] transition-all hover:-translate-y-0.5 hover:border-[var(--teal-500)]/40 hover:shadow-soft"
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </motion.div>
         </form>
 
         <p className="mt-10 text-center text-[12px] text-[var(--ink-tertiary)]">
@@ -447,7 +378,7 @@ export default function LoginPage() {
 
   useEffect(() => { document.title = "Sign in — Skillship"; }, []);
 
-  async function handleLogin(role: UserRole, email: string, password: string) {
+  async function handleLogin(role: UserRole | "", email: string, password: string) {
     if (submitting) return;
     setError(null);
     setSubmitting(true);
