@@ -41,14 +41,14 @@ function LayerCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.6, delay: index * 0.15, ease: [0.22, 1, 0.36, 1] }}
-      className={`group relative rounded-[24px] border p-6 transition-all md:p-8 ${
+      className={`group relative rounded-2xl border p-6 transition-all md:p-8 ${
         layer.highlight
-          ? "border-primary/30 bg-gradient-to-br from-primary-50 via-white to-accent/5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.35)]"
-          : "border-[var(--border)] bg-white hover:border-primary/20"
+          ? "border-primary/30 bg-gradient-to-br from-primary/10 via-[var(--card)] to-accent/5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.35)]"
+          : "border-[var(--border)] bg-[var(--card)] hover:border-primary/20"
       }`}
     >
       {layer.highlight && (
-        <span className="absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.6)]">
+        <span className="absolute -top-3 left-6 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-3 py-1 text-xs font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.6)]">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />

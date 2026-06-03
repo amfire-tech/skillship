@@ -1,16 +1,78 @@
 # File:    .github/workflows/backend-ci.yml
-# Purpose: Run lint (ruff) + type check (mypy) + tests (pytest) on every PR that touches backend/.
-# Why:     Catch bugs before merge — cheaper than fixing in prod.
+# Purpose: Lint + test the Django backend on every PR / push that touches backend/.
 # Owner:   Navanish
-# TODO:
-#   on: pull_request  paths: ['backend/**']
-#   jobs:
-#     test:
-#       services: [postgres:16, redis:7]
-#       steps:
-#         - checkout
-#         - setup-python@v5 with python-version: 3.12
-#         - pip install -r backend/requirements-dev.txt
-#         - ruff check backend
-#         - mypy backend
-#         - pytest backend --cov --cov-fail-under=70
+
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches: [main, staging]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:        # also lets you re-run by hand from the Actions tab
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ruff + pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: skillship
+          POSTGRES_PASSWORD: skillship
+          POSTGRES_DB: skillship
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U skillship"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://skillship:skillship@localhost:5432/skillship
+      REDIS_URL: redis://localhost:6379/0
+      DJANGO_SECRET_KEY: ci-only-secret-not-for-production
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      AI_SERVICE_INTERNAL_KEY: ci-only-internal-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: pytest
+        working-directory: backend
+        # --create-db overrides --reuse-db from pytest.ini; CI starts with an
+        # empty Postgres service so there is nothing to reuse on the first run.
+        run: pytest -q --no-header --create-db

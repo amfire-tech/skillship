@@ -1,3 +1,8 @@
+/*
+ * File:    frontend/src/app/(public)/error.tsx
+ * Purpose: Public route error boundary — shown when an unhandled error occurs.
+ * Owner:   Pranav
+ */
 "use client";
 
 import { useEffect } from "react";
@@ -10,7 +15,7 @@ interface PublicErrorProps {
 
 export default function PublicError({ error, reset }: PublicErrorProps) {
   useEffect(() => {
-    console.error("[Public Error]", error);
+    if (process.env.NODE_ENV !== "production") console.error("[Public Error]", error);
   }, [error]);
 
   return (

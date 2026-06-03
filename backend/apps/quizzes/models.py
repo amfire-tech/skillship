@@ -326,3 +326,74 @@ class Answer(TenantModel):
 
     def __str__(self) -> str:
         return f"{self.attempt_id} → q={self.question_id} correct={self.is_correct}"
+
+
+# ── QuizAssignment ──────────────────────────────────────────────────────────
+
+
+class QuizAssignment(TenantModel):
+    """A teacher assigning a PUBLISHED quiz to a student or to an entire class.
+
+    Exactly one of `student` / `klass` must be set. Enforced by a DB-level
+    check constraint so a misbehaving client cannot create a row with both
+    (or neither) populated.
+
+    `due_at` is optional — without it the assignment is open-ended.
+    """
+
+    quiz = models.ForeignKey(
+        Quiz, on_delete=models.CASCADE, related_name="assignments",
+    )
+    assigned_by = models.ForeignKey(
+        "accounts.User", on_delete=models.PROTECT, related_name="quizzes_assigned",
+    )
+
+    # Exactly one of these two is set.
+    student = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="quiz_assignments",
+    )
+    klass = models.ForeignKey(
+        "academics.Class",
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="quiz_assignments",
+    )
+
+    due_at = models.DateTimeField(null=True, blank=True)
+    notes  = models.CharField(max_length=500, blank=True)
+
+    class Meta(TenantModel.Meta):
+        constraints = [
+            models.CheckConstraint(
+                name="assignment_exactly_one_target",
+                condition=(
+                    models.Q(student__isnull=False, klass__isnull=True)
+                    | models.Q(student__isnull=True, klass__isnull=False)
+                ),
+            ),
+            # Same (quiz, student) is idempotent — re-assigning is a no-op
+            # rather than a duplicate row. Class assignments are unique per (quiz, class).
+            models.UniqueConstraint(
+                fields=["quiz", "student"],
+                name="assignment_unique_per_student",
+                condition=models.Q(student__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=["quiz", "klass"],
+                name="assignment_unique_per_class",
+                condition=models.Q(klass__isnull=False),
+            ),
+        ]
+        indexes = TenantModel.Meta.indexes + [
+            models.Index(fields=["school", "student"], name="qa_school_student_idx"),
+            models.Index(fields=["school", "klass"], name="qa_school_klass_idx"),
+            models.Index(fields=["school", "quiz"], name="qa_school_quiz_idx"),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        target = f"student={self.student_id}" if self.student_id else f"class={self.klass_id}"
+        return f"QuizAssignment(quiz={self.quiz_id}, {target})"

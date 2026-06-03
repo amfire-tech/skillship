@@ -14,7 +14,7 @@ function CareerPilotMock() {
     { label: "Robotics Research", match: 74 },
   ];
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[var(--border)] bg-white p-6 shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)]">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-white">
@@ -25,10 +25,10 @@ function CareerPilotMock() {
           </div>
           <div>
             <p className="text-xs font-semibold text-[var(--foreground)]">Career Pilot</p>
-            <p className="text-[10px] text-[var(--muted-foreground)]">Student: Aarav · Class 10</p>
+            <p className="text-xs text-[var(--muted-foreground)]">Student: Aarav · Class 10</p>
           </div>
         </div>
-        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Live</span>
+        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Live</span>
       </div>
 
       <div className="mt-5 space-y-2.5">
@@ -58,8 +58,8 @@ function CareerPilotMock() {
         ))}
       </div>
 
-      <div className="mt-4 rounded-xl bg-gradient-to-br from-primary-50 to-accent/10 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">AI recommendation</p>
+      <div className="mt-4 rounded-xl border border-[var(--border)] bg-gradient-to-r from-primary/10 via-[var(--card)] to-[var(--card)] p-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary">AI recommendation</p>
         <p className="mt-1 text-xs text-[var(--foreground)]">
           Strong logical reasoning + interest in problem-solving → Engineering path
         </p>
@@ -73,15 +73,15 @@ function AnalyticsMock() {
   const bars = [42, 65, 48, 78, 62, 85, 92];
   const days = ["M", "T", "W", "T", "F", "S", "S"];
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[var(--border)] bg-white p-6 shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)]">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)]">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold text-[var(--foreground)]">Class 9-A Performance</p>
-          <p className="text-[10px] text-[var(--muted-foreground)]">Last 7 days · avg accuracy</p>
+          <p className="text-xs text-[var(--muted-foreground)]">Last 7 days · avg accuracy</p>
         </div>
         <div className="flex items-baseline gap-1">
           <span className="text-2xl font-bold text-[var(--foreground)]">82%</span>
-          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">+12%</span>
+          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">+12%</span>
         </div>
       </div>
 
@@ -117,7 +117,7 @@ function AnalyticsMock() {
                   <div style={{ height: `${h * 0.96}px` }} />
                 </motion.div>
               </div>
-              <span className="text-[10px] font-medium text-[var(--muted-foreground)]">{days[i]}</span>
+              <span className="text-xs font-medium text-[var(--muted-foreground)]">{days[i]}</span>
             </div>
           ))}
         </div>
@@ -138,13 +138,13 @@ function AnalyticsMock() {
 /* Quiz mock — question card */
 function QuizMock() {
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-[var(--border)] bg-white p-6 shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)]">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent-600">AI · Class 8</span>
-          <span className="text-[10px] text-[var(--muted-foreground)]">Q 3 of 10</span>
+          <span className="rounded-md bg-accent/10 px-2 py-0.5 text-xs font-bold text-accent-600">AI · Class 8</span>
+          <span className="text-xs text-[var(--muted-foreground)]">Q 3 of 10</span>
         </div>
-        <div className="flex items-center gap-1 text-[10px] font-medium text-primary">
+        <div className="flex items-center gap-1 text-xs font-medium text-primary">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
           </svg>
@@ -172,11 +172,11 @@ function QuizMock() {
             className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-xs transition ${
               opt.state === "correct"
                 ? "border-primary bg-primary/5"
-                : "border-[var(--border)] bg-white"
+                : "border-[var(--border)] bg-[var(--card)]"
             }`}
           >
             <div
-              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold ${
+              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-xs font-bold ${
                 opt.state === "correct"
                   ? "border-primary bg-primary text-white"
                   : "border-[var(--border)] text-[var(--muted-foreground)]"
@@ -197,7 +197,7 @@ function QuizMock() {
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+      <div className="mt-4 flex items-center justify-between text-xs text-[var(--muted-foreground)]">
         <span>Auto-graded · instant feedback</span>
         <span className="font-semibold text-primary">Next question →</span>
       </div>

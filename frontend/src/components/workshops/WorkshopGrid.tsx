@@ -194,13 +194,18 @@ export function WorkshopGrid({ workshops }: WorkshopGridProps) {
                     key={index}
                     type="button"
                     onClick={() => setActiveIndex(index)}
-                    className={`h-2.5 rounded-full transition-all duration-300 ${
-                      index === activeIndex
-                        ? "w-8 bg-primary"
-                        : "w-2.5 bg-[var(--border)] hover:bg-primary/40"
-                    }`}
                     aria-label={`Go to workshop slide ${index + 1}`}
-                  />
+                    className="group inline-flex h-8 min-w-8 items-center justify-center px-3 focus:outline-none"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-2.5 rounded-full transition-all duration-300 ${
+                        index === activeIndex
+                          ? "w-8 bg-primary"
+                          : "w-2.5 bg-[var(--border)] group-hover:bg-primary/40 group-focus-visible:bg-primary/40"
+                      }`}
+                    />
+                  </button>
                 ))}
               </div>
 

@@ -5,11 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
-
-// Backend team: POST /api/workshops with this payload:
-// { title, category, duration, grade, price, description, image_url, published: false }
-// Returns: { id, ...workshop }
-// Then redirect to /admin/marketplace
+import { API_BASE, getToken } from "@/lib/auth";
 
 type Category = "AI & ML" | "Robotics" | "Coding" | "Electronics" | "IoT";
 const categories: Category[] = ["AI & ML", "Robotics", "Coding", "Electronics", "IoT"];
@@ -63,6 +59,7 @@ export default function AddWorkshopPage() {
   const [errors, setErrors] = useState<MarketplaceErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   function set(key: keyof FormValues, val: string) {
     setValues((p) => ({ ...p, [key]: val }));
@@ -70,16 +67,45 @@ export default function AddWorkshopPage() {
     if (key === "gradeMin" || key === "gradeMax") setErrors((e) => ({ ...e, gradeRange: undefined }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateWorkshop(values);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
-    // TODO (backend): replace with POST /api/workshops
     setIsLoading(true);
-    setTimeout(() => { setIsLoading(false); setSubmitted(true); }, 600);
+    setApiError(null);
+    try {
+      const token = await getToken();
+      if (!token) { setApiError("Session expired — please log in again."); setIsLoading(false); return; }
+      const res = await fetch(`${API_BASE}/content/workshops/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: values.title.trim(),
+          category: values.category,
+          duration: values.duration,
+          grade_min: Number(values.gradeMin),
+          grade_max: Number(values.gradeMax),
+          price: Number(values.price),
+          description: values.description.trim(),
+          image_url: values.imageUrl.trim() || null,
+          published: false,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setApiError(err?.detail ?? err?.title?.[0] ?? "Failed to add workshop. Try again.");
+        setIsLoading(false);
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setApiError("Network error — check server connection.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   if (submitted) {
@@ -89,7 +115,7 @@ export default function AddWorkshopPage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col items-center rounded-[28px] border border-[var(--border)] bg-white p-10 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
+          className="flex flex-col items-center rounded-3xl border border-[var(--border)] bg-white p-6 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -144,10 +170,10 @@ export default function AddWorkshopPage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto max-w-2xl"
       >
-        <div className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
           <div className="h-1.5 w-full bg-gradient-to-r from-primary to-accent" />
 
-          <div className="p-7 md:p-9">
+          <div className="p-6 md:p-9">
             <div className="mb-7 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -165,7 +191,7 @@ export default function AddWorkshopPage() {
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid gap-1.5 md:col-span-2">
                 <label className="text-xs font-semibold text-[var(--muted-foreground)]">Workshop Title</label>
                 <input type="text" placeholder="e.g. AI Vision Lab" value={values.title} onChange={(e) => set("title", e.target.value)} aria-describedby={errors.title ? "mkt-title-err" : undefined} aria-invalid={!!errors.title} className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.title ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`} />
-                {errors.title && <p id="mkt-title-err" role="alert" className="text-[11px] font-medium text-red-500">{errors.title}</p>}
+                {errors.title && <p id="mkt-title-err" role="alert" className="text-xs font-medium text-red-500">{errors.title}</p>}
               </motion.div>
 
               {/* Category */}
@@ -177,7 +203,7 @@ export default function AddWorkshopPage() {
                       key={c}
                       type="button"
                       onClick={() => set("category", c)}
-                      className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-all ${
+                      className={`inline-flex min-h-8 items-center rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
                         values.category === c
                           ? categoryTint[c] + " ring-2 ring-offset-1"
                           : "border-[var(--border)] bg-white text-[var(--muted-foreground)] hover:border-primary/30"
@@ -201,7 +227,7 @@ export default function AddWorkshopPage() {
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }} className="grid gap-1.5">
                 <label className="text-xs font-semibold text-[var(--muted-foreground)]">Price (₹)</label>
                 <input type="number" placeholder="e.g. 2499" value={values.price} onChange={(e) => set("price", e.target.value)} min="0" aria-describedby={errors.price ? "mkt-price-err" : undefined} aria-invalid={!!errors.price} className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.price ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`} />
-                {errors.price && <p id="mkt-price-err" role="alert" className="text-[11px] font-medium text-red-500">{errors.price}</p>}
+                {errors.price && <p id="mkt-price-err" role="alert" className="text-xs font-medium text-red-500">{errors.price}</p>}
               </motion.div>
 
               {/* Grade range */}
@@ -212,7 +238,7 @@ export default function AddWorkshopPage() {
                   <span className="text-xs text-[var(--muted-foreground)]">to</span>
                   <input type="number" placeholder="To" min="1" max="12" value={values.gradeMax} onChange={(e) => set("gradeMax", e.target.value)} className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.gradeRange ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`} />
                 </div>
-                {errors.gradeRange && <p className="text-[11px] font-medium text-red-500">{errors.gradeRange}</p>}
+                {errors.gradeRange && <p className="text-xs font-medium text-red-500">{errors.gradeRange}</p>}
               </motion.div>
 
               {/* Image URL */}
@@ -225,7 +251,7 @@ export default function AddWorkshopPage() {
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.34 }} className="grid gap-1.5 md:col-span-2">
                 <label className="text-xs font-semibold text-[var(--muted-foreground)]">Description</label>
                 <textarea rows={4} placeholder="What will students learn? What materials are included?" value={values.description} onChange={(e) => set("description", e.target.value)} aria-describedby={errors.description ? "mkt-desc-err" : undefined} aria-invalid={!!errors.description} className={`w-full rounded-lg border bg-white px-3 py-2 text-sm resize-none outline-none focus:ring-4 ${errors.description ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`} />
-                {errors.description && <p id="mkt-desc-err" role="alert" className="text-[11px] font-medium text-red-500">{errors.description}</p>}
+                {errors.description && <p id="mkt-desc-err" role="alert" className="text-xs font-medium text-red-500">{errors.description}</p>}
               </motion.div>
             </div>
 
@@ -235,12 +261,14 @@ export default function AddWorkshopPage() {
                 <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
               </svg>
               <p className="text-xs text-[var(--muted-foreground)]">
-                Backend: connect <code className="rounded bg-[var(--muted)] px-1 text-[10px]">POST /api/workshops</code>. Image upload needs <code className="rounded bg-[var(--muted)] px-1 text-[10px]">POST /api/uploads</code> returning a CDN URL.
+                Backend: connect <code className="rounded bg-[var(--muted)] px-1 text-xs">POST /api/workshops</code>. Image upload needs <code className="rounded bg-[var(--muted)] px-1 text-xs">POST /api/uploads</code> returning a CDN URL.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] px-7 py-4 md:px-9">
+          <div className="border-t border-[var(--border)] px-7 py-4 md:px-9">
+            {apiError && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{apiError}</p>}
+            <div className="flex items-center justify-end gap-3">
             <Link href="/dashboard/admin/marketplace" className="h-10 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">
               Cancel
             </Link>
@@ -256,6 +284,7 @@ export default function AddWorkshopPage() {
               )}
               {isLoading ? "Saving…" : "Add Workshop"}
             </button>
+            </div>
           </div>
         </div>
       </motion.form>

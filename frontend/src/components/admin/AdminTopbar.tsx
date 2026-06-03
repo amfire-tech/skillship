@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useAuthStore } from "@/store/authStore";
 import { displayName } from "@/types";
-import { useToast } from "@/components/ui/Toast";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 
 const crumbMap: Record<string, string> = {
   dashboard: "Dashboard",
@@ -62,27 +62,54 @@ function buildCrumbs(pathname: string) {
   return crumbs;
 }
 
-export function AdminTopbar() {
+export function AdminTopbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const toast = useToast();
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const crumbs = buildCrumbs(pathname);
   const { theme, setTheme } = useTheme();
-  const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    toast(`Searching for "${q}"`, "info");
-    setQuery("");
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setMenuOpen(false); }
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  async function handleLogout() {
+    setMenuOpen(false);
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    logout();
+    router.replace("/login");
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-[var(--border)] bg-white/80 px-6 backdrop-blur-lg">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-[var(--border)] bg-white/95 px-3 backdrop-blur-lg sm:px-4 md:gap-4 md:px-6 dark:bg-[var(--background)]/95">
+      {/* Hamburger — mobile only */}
+      {onMenuClick && (
+        <button
+          type="button"
+          aria-label="Open menu"
+          onClick={onMenuClick}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary md:hidden"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" x2="21" y1="6" y2="6" /><line x1="3" x2="21" y1="12" y2="12" /><line x1="3" x2="21" y1="18" y2="18" />
+          </svg>
+        </button>
+      )}
       {/* Breadcrumbs */}
-      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-sm">
         {crumbs.map((c, i) => (
           <div key={c.href + i} className="flex items-center gap-2">
             {i > 0 && (
@@ -101,21 +128,19 @@ export function AdminTopbar() {
         ))}
       </nav>
 
-      <div className="flex-1" />
-
-      {/* Search */}
-      <form onSubmit={handleSearch} className="relative hidden min-w-[280px] max-w-sm md:block">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+      {/* ⌘K palette trigger */}
+      <button
+        type="button"
+        aria-label="Open command palette"
+        onClick={() => window.dispatchEvent(new CustomEvent("skillship:open-palette"))}
+        className="hidden h-9 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 px-3 text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:border-primary/30 hover:text-primary md:inline-flex"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search schools, students, quizzes…"
-          className="h-9 w-full rounded-full border border-[var(--border)] bg-[var(--muted)]/40 pl-9 pr-3 text-xs text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
-        />
-      </form>
+        <span>Quick jump</span>
+        <kbd className="rounded border border-[var(--border)] bg-white px-1 py-0.5 text-[10px] font-bold text-[var(--muted-foreground)] dark:bg-[var(--background)]">⌘K</kbd>
+      </button>
 
       {/* Theme toggle */}
       <button
@@ -136,24 +161,53 @@ export function AdminTopbar() {
       </button>
 
       {/* Notifications */}
-      <button
-        type="button"
-        aria-label="Notifications"
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-      </button>
+      <NotificationsBell />
 
-      {/* Profile */}
-      <div className="flex items-center gap-2.5 rounded-full border border-[var(--border)] bg-white px-1 py-1 pr-3 shadow-sm">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
-          {(user ? displayName(user) : "A").charAt(0).toUpperCase()}
-        </div>
-        <span className="text-xs font-semibold text-[var(--foreground)]">
-          {user ? displayName(user) : "Admin"}
-        </span>
+      {/* Profile menu */}
+      <div className="relative" ref={menuRef}>
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          className="flex shrink-0 items-center gap-2.5 rounded-full border border-[var(--border)] bg-white px-1 py-1 pr-2 shadow-sm transition-colors hover:border-primary/30 sm:pr-3 dark:bg-[var(--background)]"
+        >
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
+            {(user ? displayName(user) : "A").charAt(0).toUpperCase()}
+          </div>
+          <span className="hidden max-w-[140px] truncate whitespace-nowrap text-xs font-semibold text-[var(--foreground)] sm:inline">
+            {user ? displayName(user) : "Admin"}
+          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-[var(--muted-foreground)] transition-transform ${menuOpen ? "rotate-180" : ""}`}>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {menuOpen && (
+          <div role="menu" className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[0_24px_60px_-20px_rgba(5,150,105,0.25)] dark:bg-[var(--card)]">
+            <div className="border-b border-[var(--border)] px-4 py-3">
+              <p className="truncate text-sm font-semibold text-[var(--foreground)]">{user ? displayName(user) : "Admin"}</p>
+              <p className="truncate text-xs text-[var(--muted-foreground)]">{user?.email ?? ""}</p>
+            </div>
+            <Link
+              href="/dashboard/admin/settings"
+              role="menuitem"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-primary/5 hover:text-primary"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+              Settings
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

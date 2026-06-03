@@ -56,6 +56,8 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
             "id", "title", "description", "author_school",
             "kind", "price_inr", "file_url", "cover_image_url",
             "is_active", "featured",
+            # Marketing taxonomy — surfaced for the public /marketplace page.
+            "category", "difficulty", "duration_key", "duration_label", "class_range",
             "created_at", "updated_at",
         ]
         read_only_fields = ["id", "author_school", "created_at", "updated_at"]

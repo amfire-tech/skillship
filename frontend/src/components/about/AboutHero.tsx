@@ -62,7 +62,7 @@ export function AboutHero() {
           <MotionSection delay={2}>
             <div className="relative">
               <div className="absolute -inset-4 -z-10 rounded-[32px] bg-gradient-to-br from-primary/15 to-accent/10 blur-2xl" />
-              <div className="space-y-3 rounded-[28px] border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] backdrop-blur md:p-6">
+              <div className="space-y-3 rounded-3xl border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] backdrop-blur md:p-6">
                 {[
                   { value: "50+", label: "schools connected", delay: 0 },
                   { value: "10,000+", label: "students on platform", delay: 0.15 },
@@ -73,7 +73,7 @@ export function AboutHero() {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.6, delay: 0.5 + s.delay, ease: [0.22, 1, 0.36, 1] }}
-                    className="flex items-baseline gap-4 rounded-2xl bg-gradient-to-br from-[var(--muted)] to-white px-5 py-4 transition-colors hover:from-primary-50"
+                    className="flex items-baseline gap-4 rounded-2xl bg-gradient-to-br from-[var(--muted)] to-[var(--card)] px-5 py-4 transition-colors hover:from-primary/10"
                   >
                     <span className="text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-4xl">
                       {s.value}

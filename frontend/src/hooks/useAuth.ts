@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { displayName, type User, type LoginPayload, type AuthResponse } from "@/types";
 
@@ -9,6 +10,7 @@ import { displayName, type User, type LoginPayload, type AuthResponse } from "@/
 // ============================================================
 
 export function useAuth() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -39,7 +41,7 @@ export function useAuth() {
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     useAuthStore.getState().clearAuth();
-    if (typeof window !== "undefined") window.location.href = "/login";
+    router.replace("/login");
   };
 
   const hasRole = (role: User["role"]) => user?.role === role;

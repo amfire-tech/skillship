@@ -13,6 +13,10 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # ── Email — print to console instead of sending ──────────────────────────────
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "Skillship Dev <dev@skillship.local>"
+# In dev, owner notifications also print to the console so devs can verify
+# the email body without configuring SMTP. Override per-developer via env.
+LEADS_NOTIFY_EMAIL = "owner-dev@skillship.local"
 
 # ── Throttle — disable in dev so we don't hit limits while testing ───────────
 REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []  # noqa: F405

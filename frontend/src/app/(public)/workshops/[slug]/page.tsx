@@ -122,7 +122,7 @@ export default function WorkshopDetailPage({
 
       <SectionWrapper background="muted" className="py-16 md:py-20">
         <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-card">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-card">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary/75">
               Workshop outcomes
             </p>
@@ -156,7 +156,7 @@ export default function WorkshopDetailPage({
             </ul>
           </div>
 
-          <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)] p-8 shadow-card">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-card">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary/75">
               Delivery fit
             </p>

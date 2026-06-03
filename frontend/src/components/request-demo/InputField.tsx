@@ -12,7 +12,7 @@ const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       <div className="space-y-2">
         <label
           htmlFor={id}
-          className="block text-[15px] font-medium leading-6 text-[var(--foreground)]"
+          className="block text-sm font-medium leading-6 text-[var(--foreground)]"
         >
           {label}
         </label>
@@ -20,7 +20,7 @@ const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
           ref={ref}
           id={id}
           className={cn(
-            "h-[52px] w-full rounded-[16px] border border-[var(--border)] bg-white px-4 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]",
+            "h-[52px] w-full rounded-[16px] border border-[var(--border)] bg-white px-4 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]",
             "outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10",
             error && "border-danger focus:border-danger focus:ring-danger/10",
             className

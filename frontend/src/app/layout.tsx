@@ -14,16 +14,21 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: `${siteConfig.name} — AI-Powered Learning for Every School`,
-    template: `%s | ${siteConfig.name}`,
+    default: "Skillship — AI-Powered Learning",
+    template: "%s | Skillship",
   },
-  description: siteConfig.description,
+  description: "AI-powered school LMS for Indian schools",
   metadataBase: new URL(siteConfig.url),
   openGraph: {
     title: siteConfig.name,
     description: siteConfig.description,
     siteName: siteConfig.name,
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.name,
+    description: siteConfig.description,
   },
 };
 
@@ -35,6 +40,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans`}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-full focus:bg-[var(--foreground)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--background)] focus:shadow-lg"
+        >
+          Skip to content
+        </a>
         <QueryProvider>
           <ThemeProvider>
             <ToastProvider>{children}</ToastProvider>

@@ -14,7 +14,7 @@ export function WorkshopFeatured({ workshop }: WorkshopFeaturedProps) {
     <SectionWrapper background="muted" className="py-12 md:py-14">
       <div className="grid gap-6 rounded-[32px] border border-[var(--border)] bg-[var(--card)] p-6 shadow-card lg:grid-cols-[1.1fr_1fr] lg:items-center lg:p-8">
         <div>
-          <Badge variant="warning" className="px-3 py-1 text-[11px] uppercase tracking-[0.16em]">
+          <Badge variant="warning" className="px-3 py-1 text-xs uppercase tracking-[0.16em]">
             Featured workshop
           </Badge>
           <h2 className="mt-5 text-2xl font-bold tracking-tight text-[var(--foreground)] md:text-3xl">
@@ -63,7 +63,7 @@ export function WorkshopFeatured({ workshop }: WorkshopFeaturedProps) {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--muted)]">
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--muted)]">
           <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-accent/10" />
           <Image
             src={workshop.image}

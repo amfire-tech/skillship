@@ -17,6 +17,7 @@ urlpatterns = [
     path("api/v1/analytics/", include("apps.analytics.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/ai/", include("apps.ai_bridge.urls")),
+    path("api/v1/demo-requests/", include("apps.leads.urls")),
     # Health check
     path("", include("apps.common.urls")),
     # OpenAPI schema + docs

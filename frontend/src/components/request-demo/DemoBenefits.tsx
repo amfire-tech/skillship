@@ -39,8 +39,8 @@ export function DemoBenefits() {
       className="flex flex-col gap-4"
     >
       {/* Benefits block */}
-      <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-40px_rgba(5,150,105,0.2)] md:p-7">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-40px_rgba(5,150,105,0.2)] md:p-7">
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           What you get
         </div>
@@ -52,7 +52,7 @@ export function DemoBenefits() {
         <div className="mt-6 space-y-6">
           {benefitGroups.map((group, gi) => (
             <div key={group.title}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                 {group.title}
               </p>
               <ul className="mt-3 space-y-2.5">
@@ -80,9 +80,9 @@ export function DemoBenefits() {
       </div>
 
       {/* Trust block */}
-      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-primary-700 via-primary to-primary-500 p-6 text-white shadow-[0_20px_50px_-25px_rgba(5,150,105,0.5)]">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-700 via-primary to-primary-500 p-6 text-white shadow-[0_20px_50px_-25px_rgba(5,150,105,0.5)]">
         <div className="relative z-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
             50+ schools already onboard
           </p>
           <h3 className="mt-2 text-xl font-bold tracking-tight">
@@ -104,7 +104,7 @@ export function DemoBenefits() {
                 className="rounded-2xl bg-white/10 px-3 py-3 backdrop-blur-sm"
               >
                 <p className="text-xl font-bold tracking-tight">{stat.value}</p>
-                <p className="mt-0.5 text-[11px] text-white/80">{stat.label}</p>
+                <p className="mt-0.5 text-xs text-white/80">{stat.label}</p>
               </motion.div>
             ))}
           </div>

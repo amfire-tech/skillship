@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -48,12 +48,37 @@ const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 export default function SettingsPage() {
   const [active, setActive] = useState<TabKey>("organization");
 
+  useEffect(() => {
+    document.title = "Settings — Skillship";
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" subtitle="Platform configuration, branding, security and integrations" />
 
+      {/* Read-only banner.
+       *
+       * Platform-level settings are deferred to a later release — per-school
+       * settings ARE wired and live at /dashboard/principal/* . The forms
+       * below are a visual preview; the entire panel area is wrapped in a
+       * native <fieldset disabled> further down so users cannot type into
+       * controls that would silently discard their input. */}
+      <div
+        role="status"
+        className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-500/30 dark:bg-amber-500/10"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300">
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <div className="text-[13px] leading-5 text-amber-800 dark:text-amber-200">
+          <strong>Configuration preview.</strong>{" "}
+          Platform-level settings are read-only in this release — saving is disabled to avoid losing changes. Per-school settings (branding, contact info, plan) are fully editable from{" "}
+          <span className="font-semibold">School Management → Settings</span>.
+        </div>
+      </div>
+
       <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-        {/* Sidebar tabs */}
+        {/* Sidebar tabs — kept interactive so users can browse the preview. */}
         <motion.nav
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -84,20 +109,32 @@ export default function SettingsPage() {
           </ul>
         </motion.nav>
 
-        {/* Panel */}
-        <motion.div
-          key={active}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-5"
+        {/* Panel.
+         *
+         * The native <fieldset disabled> element disables every nested form
+         * control (input/select/textarea/button) at the HTML layer, so the
+         * Save / Cancel handlers below cannot fire — no need to gut each
+         * panel's submit logic. cursor-not-allowed + reduced opacity gives
+         * a clear visual cue that interaction is intentionally inert. */}
+        <fieldset
+          disabled
+          aria-label="Settings preview (read-only)"
+          className="min-w-0 border-0 p-0 m-0 opacity-60"
         >
-          {active === "organization" && <OrgPanel />}
-          {active === "branding" && <BrandingPanel />}
-          {active === "security" && <SecurityPanel />}
-          {active === "integrations" && <IntegrationsPanel />}
-          {active === "notifications" && <NotificationsPanel />}
-        </motion.div>
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-5 cursor-not-allowed"
+          >
+            {active === "organization" && <OrgPanel />}
+            {active === "branding" && <BrandingPanel />}
+            {active === "security" && <SecurityPanel />}
+            {active === "integrations" && <IntegrationsPanel />}
+            {active === "notifications" && <NotificationsPanel />}
+          </motion.div>
+        </fieldset>
       </div>
     </div>
   );
@@ -221,7 +258,7 @@ function OrgPanel() {
               aria-describedby={errors.name ? "org-name-err" : undefined}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.name ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
             />
-            {errors.name && <p id="org-name-err" className="text-[11px] font-medium text-red-500">{errors.name}</p>}
+            {errors.name && <p id="org-name-err" className="text-xs font-medium text-red-500">{errors.name}</p>}
           </Field>
           <Field label="Primary domain"><Input value={form.domain} onChange={set("domain")} /></Field>
           <Field label="Support email">
@@ -232,7 +269,7 @@ function OrgPanel() {
               aria-describedby={errors.email ? "org-email-err" : undefined}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.email ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
             />
-            {errors.email && <p id="org-email-err" className="text-[11px] font-medium text-red-500">{errors.email}</p>}
+            {errors.email && <p id="org-email-err" className="text-xs font-medium text-red-500">{errors.email}</p>}
           </Field>
           <Field label="Support phone">
             <input
@@ -242,7 +279,7 @@ function OrgPanel() {
               aria-describedby={errors.phone ? "org-phone-err" : undefined}
               className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition-colors focus:ring-4 ${errors.phone ? "border-red-400 focus:border-red-400 focus:ring-red-100" : "border-[var(--border)] focus:border-primary focus:ring-primary/10"}`}
             />
-            {errors.phone && <p id="org-phone-err" className="text-[11px] font-medium text-red-500">{errors.phone}</p>}
+            {errors.phone && <p id="org-phone-err" className="text-xs font-medium text-red-500">{errors.phone}</p>}
           </Field>
           <Field label="Registered address">
             <Input value={form.address} onChange={set("address")} />
@@ -300,7 +337,7 @@ function FileUploadField({ label, id, onFile, file }: { label: string; id: strin
         <input id={id} type="file" accept=".png,.jpg,.jpeg,.svg" className="sr-only" onChange={handleChange} />
       </label>
       {file && (
-        <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-1.5 text-[11px]">
+        <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-1.5 text-xs">
           <span className="font-medium text-[var(--foreground)] truncate max-w-[180px]">{file.name}</span>
           <span className="text-[var(--muted-foreground)] shrink-0 ml-2">{file.size}</span>
           <button type="button" onClick={() => onFile(null)} className="ml-3 text-[var(--muted-foreground)] hover:text-red-500 shrink-0">✕</button>

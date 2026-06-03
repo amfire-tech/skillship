@@ -99,7 +99,7 @@ function CenterBrain() {
       <div className="absolute inset-3 rounded-full bg-primary/10 animate-[ping_3s_ease-in-out_infinite_0.5s]" />
 
       {/* Main circle */}
-      <div className="relative z-10 flex h-36 w-36 flex-col items-center justify-center rounded-full border-2 border-primary/20 bg-white shadow-[0_0_60px_-15px_rgba(5,150,105,0.3)] md:h-48 md:w-48">
+      <div className="relative z-10 flex h-36 w-36 flex-col items-center justify-center rounded-full border-2 border-primary/20 bg-[var(--card)] shadow-[0_0_60px_-15px_rgba(5,150,105,0.3)] md:h-48 md:w-48">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white md:h-16 md:w-16">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z" />
@@ -110,7 +110,7 @@ function CenterBrain() {
         <p className="mt-2 text-xs font-bold tracking-wide text-primary md:text-sm">
           AI Engine
         </p>
-        <p className="text-[10px] text-[var(--muted-foreground)] md:text-xs">
+        <p className="text-xs text-[var(--muted-foreground)] md:text-xs">
           Skillship Core
         </p>
       </div>
@@ -180,7 +180,7 @@ function SystemNode({
           initial={{ opacity: 0, scale: 0.6 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.5 + delay, ease: [0.22, 1, 0.36, 1] }}
-          className="flex items-center gap-2.5 rounded-2xl border border-primary/15 bg-white/90 px-4 py-2.5 shadow-glass backdrop-blur-sm transition-shadow hover:shadow-glow"
+          className="flex items-center gap-2.5 rounded-2xl border border-primary/15 bg-[var(--card)]/90 px-4 py-2.5 shadow-glass backdrop-blur-sm transition-shadow hover:shadow-glow"
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
             {icon}
@@ -197,7 +197,7 @@ function SystemNode({
 /* ── Stat pill ── */
 function StatPill({ value, label }: { value: string; label: string }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-primary/10 bg-white/80 px-5 py-3 backdrop-blur-sm">
+    <div className="flex flex-col items-center rounded-2xl border border-primary/10 bg-[var(--card)]/80 px-5 py-3 backdrop-blur-sm">
       <span className="text-xl font-bold text-[var(--foreground)] md:text-2xl">{value}</span>
       <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
     </div>
@@ -218,29 +218,30 @@ export function SystemHero() {
       <Container>
         {/* Eyebrow */}
         <MotionSection className="text-center">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/80 px-4 py-1.5 text-sm font-medium text-primary shadow-sm backdrop-blur-sm">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/15 bg-[var(--card)]/80 px-4 py-1.5 text-sm font-medium text-primary shadow-sm backdrop-blur-sm">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
-            AI-Powered School Operating System
+            School Operating System · AI &amp; Robotics Workshops
           </div>
         </MotionSection>
 
         {/* Headline */}
         <MotionSection className="mx-auto mt-6 max-w-4xl text-center" delay={1}>
           <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl lg:text-[58px] lg:leading-[1.08]">
-            The operating system for{" "}
+            One platform to run your school —{" "}
             <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              AI-ready schools
+              and raise smarter students.
             </span>
           </h1>
         </MotionSection>
 
         <MotionSection className="mx-auto mt-5 max-w-2xl text-center" delay={2}>
           <p className="text-base leading-relaxed text-[var(--muted-foreground)] md:text-lg">
-            One platform connecting students, teachers, and principals through AI-powered
-            quizzes, career guidance, and real-time performance analytics.
+            Skillship is the operating system Indian schools use to manage teachers, students,
+            and courses — paired with hands-on AI &amp; robotics workshops that make every
+            classroom future-ready.
           </p>
         </MotionSection>
 
@@ -255,7 +256,7 @@ export function SystemHero() {
             </Button>
           </Link>
           <Link href="/marketplace">
-            <Button variant="secondary" size="lg" className="rounded-full border-primary/20 bg-white/80 px-8 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white">
+            <Button variant="secondary" size="lg" className="rounded-full border-primary/20 bg-[var(--card)]/80 px-8 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white">
               Explore Platform
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2">
                 <path d="m9 18 6-6-6-6" />

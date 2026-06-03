@@ -66,6 +66,23 @@ class MarketplaceListing(TimeStampedModel):
         INTERACTIVE = "INTERACTIVE", "Interactive"
         COURSE = "COURSE", "Course"
 
+    class Category(models.TextChoices):
+        AI = "ai", "AI"
+        ROBOTICS = "robotics", "Robotics"
+        CODING = "coding", "Coding"
+        ELECTRONICS = "electronics", "Electronics"
+        IOT = "iot", "IoT"
+
+    class Difficulty(models.TextChoices):
+        BEGINNER = "beginner", "Beginner"
+        INTERMEDIATE = "intermediate", "Intermediate"
+        ADVANCED = "advanced", "Advanced"
+
+    class DurationKey(models.TextChoices):
+        UNDER_2H = "under-2-hours", "Under 2 hours"
+        HALF_DAY = "half-day", "Half day"
+        MULTI_SESSION = "multi-session", "Multi-session"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -81,11 +98,36 @@ class MarketplaceListing(TimeStampedModel):
     is_active = models.BooleanField(default=True)
     featured = models.BooleanField(default=False)
 
+    # Marketing taxonomy — used by the public catalog page. Blank-allowed so
+    # legacy rows seeded before this migration still validate; the public
+    # serializer falls back to sensible defaults when these are empty.
+    category = models.CharField(
+        max_length=20, choices=Category.choices, blank=True,
+        help_text="AI / Robotics / Coding / Electronics / IoT. Drives category badges on the marketing site.",
+    )
+    difficulty = models.CharField(
+        max_length=15, choices=Difficulty.choices, blank=True,
+        help_text="Beginner / Intermediate / Advanced. Drives the difficulty filter chips.",
+    )
+    duration_key = models.CharField(
+        max_length=20, choices=DurationKey.choices, blank=True,
+        help_text="Bucket used by the duration filter chips.",
+    )
+    duration_label = models.CharField(
+        max_length=40, blank=True,
+        help_text='Human-readable label, e.g. "90 minutes" or "3 sessions".',
+    )
+    class_range = models.CharField(
+        max_length=40, blank=True,
+        help_text='Target grade band as displayed, e.g. "Class 6-8".',
+    )
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["is_active", "featured"], name="mktpl_active_featured_idx"),
             models.Index(fields=["kind", "is_active"], name="marketplace_kind_active_idx"),
+            models.Index(fields=["is_active", "category"], name="mktpl_active_category_idx"),
         ]
 
     def __str__(self):

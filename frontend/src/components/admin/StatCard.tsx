@@ -29,13 +29,13 @@ export function StatCard({ label, value, delta, icon, tint = "primary", delay = 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-[var(--muted-foreground)]">{label}</p>
-          <p className="mt-2 text-[26px] font-bold tracking-tight text-[var(--foreground)]">{value}</p>
+          <p className="mt-2 break-words text-lg font-bold tracking-tight text-[var(--foreground)] md:text-xl lg:text-[26px]">{value}</p>
         </div>
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tintMap[tint]}`}>
           {icon}
         </div>
       </div>
-      <p className={`mt-3 flex items-center gap-1 text-[11px] font-medium ${delta.positive === false ? "text-red-500" : "text-primary"}`}>
+      <p className={`mt-3 flex items-center gap-1 text-xs font-medium ${delta.positive === false ? "text-red-500" : "text-primary"}`}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={delta.positive === false ? "rotate-180" : ""}>
           <path d="m6 17 6-6 4 4 6-6" /><path d="M14 7h8v8" />
         </svg>

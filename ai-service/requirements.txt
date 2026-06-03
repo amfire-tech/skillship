@@ -33,3 +33,6 @@ pytest-asyncio>=0.23.0
 
 # Auth
 python-jose[cryptography]>=3.3.0
+
+# Error tracking (silent unless SENTRY_DSN_AI_SERVICE is set in env)
+sentry-sdk[fastapi]>=2.19.0

@@ -65,7 +65,7 @@ export function WhatHappensNext() {
       <Container>
         <div className="mx-auto max-w-2xl text-center">
           <MotionSection>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               What happens next
             </p>
           </MotionSection>
@@ -102,13 +102,13 @@ export function WhatHappensNext() {
             >
               <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border)] bg-white text-primary shadow-[0_10px_30px_-15px_rgba(5,150,105,0.35)] transition-all hover:-translate-y-1 hover:border-primary/30">
                 {step.icon}
-                <span className="absolute -right-2 -top-2 rounded-full bg-gradient-to-br from-primary to-accent px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="absolute -right-2 -top-2 rounded-full bg-gradient-to-br from-primary to-accent px-2 py-0.5 text-xs font-bold text-white">
                   {step.number}
                 </span>
               </div>
 
               <div className="mt-5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
                   {step.duration}
                 </p>
                 <h3 className="mt-1.5 text-lg font-bold tracking-tight text-[var(--foreground)]">

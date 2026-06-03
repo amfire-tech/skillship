@@ -88,6 +88,31 @@ apiClient.interceptors.response.use(
   }
 );
 
+// --- Response shape helpers ---
+/**
+ * Normalise an arbitrary fetch/API response into a typed array.
+ *
+ * Accepts:
+ *   - a bare array        → returned as-is
+ *   - DRF paginated `{ results: [...] }` → returns `results`
+ *   - anything else       → returns `[]`
+ *
+ * Prevents `.map is not a function` runtime errors when an endpoint
+ * returns a router index object (e.g. `{years: url, classes: url}`)
+ * instead of a list.
+ */
+export function asArray<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as { results?: unknown }).results)
+  ) {
+    return (data as { results: T[] }).results;
+  }
+  return [];
+}
+
 // --- Typed convenience helpers ---
 export const api = {
   get: <T>(url: string, params?: Record<string, unknown>) =>

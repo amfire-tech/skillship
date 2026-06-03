@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -55,13 +56,17 @@ const roles = [
 ];
 
 export default function CreateUserPage() {
+  useEffect(() => {
+    document.title = "New User — Skillship";
+  }, []);
+
   return (
     <div className="mx-auto max-w-2xl">
       <motion.div
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-7 shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)] md:p-10"
+        className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
       >
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
 
@@ -105,7 +110,7 @@ export default function CreateUserPage() {
                   {r.icon}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-bold text-[var(--foreground)]">{r.label}</p>
+                  <p className="text-sm font-bold text-[var(--foreground)]">{r.label}</p>
                   <p className="mt-0.5 truncate text-xs text-[var(--muted-foreground)]">{r.description}</p>
                 </div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--muted-foreground)] transition-all group-hover:translate-x-0.5 group-hover:text-primary">

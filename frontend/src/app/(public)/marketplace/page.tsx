@@ -23,10 +23,10 @@ interface MarketplacePageProps {
   };
 }
 
-export default function MarketplacePage({
+export default async function MarketplacePage({
   searchParams = {},
 }: MarketplacePageProps) {
-  const catalog = getMarketplaceCatalog(searchParams);
+  const catalog = await getMarketplaceCatalog(searchParams);
 
   return (
     <>
@@ -36,7 +36,7 @@ export default function MarketplacePage({
 
       <section className="pb-10 pt-2">
         <PageContainer className="px-6 lg:px-8">
-          <Suspense fallback={<div className="h-48 rounded-[28px] border border-[var(--border)] bg-white animate-pulse" />}>
+          <Suspense fallback={<div className="h-48 rounded-3xl border border-[var(--border)] bg-white animate-pulse" />}>
             <MarketplaceFilters
               filters={catalog.filters}
               filterOptions={catalog.filterOptions}

@@ -37,21 +37,37 @@ def create_content_item(
 
 
 @transaction.atomic
-def purchase_listing(listing: MarketplaceListing, buyer_school_id, buyer_user) -> ContentItem:
+def purchase_listing(
+    listing: MarketplaceListing,
+    buyer_school_id,
+    buyer_user,
+    course_id=None,
+) -> ContentItem:
     """Copy a marketplace listing into the buyer's tenant as a ContentItem.
 
-    The buyer's school must have an active course to attach the item to.
-    For now we attach it to any course in the buyer's school — caller should
-    pass a specific course via a future `course_id` arg once the UI supports it.
+    If `course_id` is provided it must belong to the buyer's school. If omitted,
+    the first course in the school is used as a fallback so the UI can still
+    work before course-pickers are wired everywhere.
     """
     from apps.academics.models import Course
+    from rest_framework.exceptions import ValidationError
 
-    course = Course.objects.filter(school_id=buyer_school_id).first()
-    if course is None:
-        from rest_framework.exceptions import ValidationError
+    if buyer_school_id is None:
         raise ValidationError(
-            "No courses exist in this school yet. Create a course before purchasing content."
+            "Marketplace purchase requires a school-scoped account. "
+            "Platform admins (MAIN_ADMIN) cannot buy content."
         )
+
+    if course_id is not None:
+        course = Course.objects.filter(school_id=buyer_school_id, id=course_id).first()
+        if course is None:
+            raise ValidationError("course_id is not a course in your school.")
+    else:
+        course = Course.objects.filter(school_id=buyer_school_id).first()
+        if course is None:
+            raise ValidationError(
+                "No courses exist in this school yet. Create a course before purchasing content."
+            )
 
     return ContentItem.objects.create(
         school_id=buyer_school_id,

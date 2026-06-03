@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { PageHeader } from "@/components/admin/PageHeader";
-import { useAuthStore } from "@/store/authStore";
+import { API_BASE, getToken } from "@/lib/auth";
 
 const roleMeta: Record<string, { label: string; color: string; fields: string[] }> = {
   SUB_ADMIN: {
@@ -62,18 +62,6 @@ function validateFields(
     }
   }
   return errors;
-}
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-async function getToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (!token) {
-    const ok = await useAuthStore.getState().refreshAuth();
-    if (!ok) return null;
-    token = useAuthStore.getState().accessToken;
-  }
-  return token;
 }
 
 export default function CreateUserRolePage() {
@@ -199,7 +187,7 @@ export default function CreateUserRolePage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col items-center rounded-[28px] border border-[var(--border)] bg-white p-10 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
+          className="flex flex-col items-center rounded-3xl border border-[var(--border)] bg-white p-6 text-center shadow-[0_30px_80px_-50px_rgba(5,150,105,0.3)]"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_16px_30px_-12px_rgba(5,150,105,0.5)]">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -255,7 +243,7 @@ export default function CreateUserRolePage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto max-w-2xl"
       >
-        <div className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-30px_rgba(5,150,105,0.2)]">
           <div className={`h-1.5 w-full bg-gradient-to-r ${meta.color}`} />
 
           <div className="p-7 md:p-9">
@@ -331,7 +319,7 @@ export default function CreateUserRolePage() {
                     )}
 
                     {errors[key] && (
-                      <p id={errorId} role="alert" className="text-[11px] font-medium text-red-500">
+                      <p id={errorId} role="alert" className="text-xs font-medium text-red-500">
                         {errors[key]}
                       </p>
                     )}

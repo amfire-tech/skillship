@@ -21,10 +21,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.academics.models import Course
+from apps.academics.models import Class, Course
+from apps.accounts.models import User
 from apps.common.permissions import Role
 
-from .models import Answer, Question, QuestionBank, Quiz, QuizAttempt
+from .models import Answer, Question, QuestionBank, Quiz, QuizAssignment, QuizAttempt
 
 
 # ── Shared helpers (mirrors academics/serializers.py) ──────────────────────
@@ -237,6 +238,42 @@ class QuizSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class _AuthoringQuestionSerializer(serializers.Serializer):
+    """One inline question as the wizard sends it (options are plain strings)."""
+
+    text = serializers.CharField()
+    options = serializers.ListField(
+        child=serializers.CharField(allow_blank=True), required=False, default=list,
+    )
+    correct_answer_index = serializers.IntegerField(required=False, default=0)
+    difficulty = serializers.CharField(required=False, allow_blank=True, default="")
+    explanation = serializers.CharField(required=False, allow_blank=True, default="")
+    points = serializers.IntegerField(required=False, default=1, min_value=1)
+
+
+class QuizAuthoringSerializer(serializers.Serializer):
+    """Accepts the teacher/sub-admin wizard payload. The view hands the validated
+    data to services.author_quiz, which provisions course + bank + questions +
+    quiz and runs the DRAFT→REVIEW transition. Write-only — reads use QuizSerializer."""
+
+    title = serializers.CharField(max_length=200)
+    subject = serializers.CharField(max_length=120, required=False, allow_blank=True, default="General")
+    grade = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    instructions = serializers.CharField(required=False, allow_blank=True, default="")
+    difficulty = serializers.CharField(max_length=10, required=False, allow_blank=True, default="MEDIUM")
+    duration_minutes = serializers.IntegerField(required=False, default=30, min_value=1, max_value=600)
+    passing_score = serializers.IntegerField(required=False, default=50, min_value=0, max_value=100)
+    attempts_allowed = serializers.IntegerField(required=False, default=1, min_value=1, max_value=20)
+    shuffle_questions = serializers.BooleanField(required=False, default=True)
+    status = serializers.ChoiceField(choices=["DRAFT", "REVIEW"], required=False, default="DRAFT")
+    questions = _AuthoringQuestionSerializer(many=True)
+
+    def validate_questions(self, value):
+        if not value:
+            raise serializers.ValidationError("Add at least one question.")
+        return value
+
+
 class QuizStudentSerializer(serializers.ModelSerializer):
     """Lightweight, read-only quiz shape for STUDENT listings."""
 
@@ -290,14 +327,115 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
     quiz = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
     student = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
 
+    # Denormalised display fields for dashboards.
+    quiz_title  = serializers.CharField(source="quiz.title", read_only=True)
+    quiz_subject = serializers.CharField(source="quiz.course.code", read_only=True)
+    quiz_total_questions = serializers.IntegerField(source="quiz.total_questions", read_only=True)
+    wrong_count = serializers.SerializerMethodField()
+    passed = serializers.SerializerMethodField()
+
     class Meta:
         model = QuizAttempt
         fields = [
             "id", "school", "quiz", "student",
+            "quiz_title", "quiz_subject", "quiz_total_questions",
             "status", "attempt_number",
             "started_at", "expires_at", "submitted_at",
-            "score_percent", "points_earned", "points_total", "correct_count",
+            "score_percent", "points_earned", "points_total",
+            "correct_count", "wrong_count", "passed",
             "question_order", "last_difficulty",
             "created_at", "updated_at",
         ]
         read_only_fields = fields
+
+    def get_wrong_count(self, obj: QuizAttempt) -> int:
+        # Only meaningful for submitted attempts; answered ≠ correct → wrong.
+        if obj.status != QuizAttempt.Status.SUBMITTED:
+            return 0
+        # `question_order` is the canonical sequence the student saw.
+        served = len(obj.question_order or [])
+        return max(served - (obj.correct_count or 0), 0)
+
+    def get_passed(self, obj: QuizAttempt) -> bool | None:
+        if obj.score_percent is None:
+            return None
+        pass_pct = getattr(obj.quiz, "pass_percentage", 50)
+        return float(obj.score_percent) >= float(pass_pct)
+
+
+# ── QuizAssignment ──────────────────────────────────────────────────────────
+
+
+class QuizAssignmentSerializer(serializers.ModelSerializer):
+    """Teacher assigns a published quiz to a student OR a class.
+
+    Cross-FK same-school enforcement: the quiz, the target student, and the
+    target class must all belong to the same school as the caller.
+    """
+
+    school      = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    assigned_by = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    quiz        = serializers.PrimaryKeyRelatedField(queryset=Quiz.objects.all(), pk_field=serializers.UUIDField())
+    student     = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=User.Role.STUDENT),
+        required=False, allow_null=True, pk_field=serializers.UUIDField(),
+    )
+    klass       = serializers.PrimaryKeyRelatedField(
+        queryset=Class.objects.all(),
+        required=False, allow_null=True, pk_field=serializers.UUIDField(),
+    )
+
+    # Denormalised display fields for staff dashboards.
+    quiz_title  = serializers.CharField(source="quiz.title", read_only=True)
+    student_name = serializers.SerializerMethodField()
+    class_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = QuizAssignment
+        fields = [
+            "id", "school",
+            "quiz", "quiz_title",
+            "student", "student_name",
+            "klass", "class_label",
+            "assigned_by",
+            "due_at", "notes",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "school", "assigned_by", "created_at", "updated_at"]
+        # The model's conditional UniqueConstraints (quiz+student / quiz+klass)
+        # cannot be expressed as DRF UniqueTogetherValidator because those
+        # validators require BOTH fields to be present — which conflicts with
+        # the "exactly one target" rule. Trust the DB-level constraints to
+        # surface IntegrityError, which the view translates to 400.
+        validators = []
+
+    def get_student_name(self, obj):
+        return obj.student.get_full_name() if obj.student_id else None
+
+    def get_class_label(self, obj):
+        return f"Grade {obj.klass.grade}-{obj.klass.section}" if obj.klass_id else None
+
+    def validate(self, attrs):
+        student = attrs.get("student")
+        klass = attrs.get("klass")
+        if (student is None) == (klass is None):
+            raise serializers.ValidationError(
+                "Provide exactly one of `student` or `klass` (not both, not neither)."
+            )
+
+        quiz: Quiz = attrs["quiz"]
+        target_school_id = _resolve_target_school_id(self)
+
+        # Quiz must belong to the same school as the caller (or to the school
+        # MAIN_ADMIN explicitly chose).
+        _validate_same_school(target_school_id, quiz, "quiz")
+        if student:
+            _validate_same_school(target_school_id, student, "student")
+        if klass:
+            _validate_same_school(target_school_id, klass, "klass")
+
+        # Only PUBLISHED quizzes can be assigned — assigning a draft is nonsense.
+        if quiz.status != Quiz.Status.PUBLISHED:
+            raise serializers.ValidationError({"quiz": "Only PUBLISHED quizzes can be assigned."})
+
+        return attrs

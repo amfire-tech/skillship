@@ -1,3 +1,24 @@
+/*
+ * File:    frontend/src/services/marketplace.ts
+ * Purpose: Server-side fetcher for the public /marketplace catalog.
+ * Owner:   Navanish (Phase ship — was a 241-line hardcoded array)
+ *
+ * The Next.js public marketplace page (RSC, no session) calls this with the
+ * page's searchParams. We hit the Django backend's public catalog endpoint
+ * (AllowAny — see backend/apps/content/views.py::MarketplaceListingViewSet)
+ * and map each row to the MarketplaceWorkshopItem shape the existing
+ * components (WorkshopCard, MarketplaceGrid, FeaturedStrip) already expect.
+ *
+ * Filtering is applied client-side after the fetch. With ~5–100 listings
+ * that is comfortably fast; if the catalog ever grows past a few hundred,
+ * we will push category/difficulty/duration into a server-side filterset.
+ *
+ * Listings without a `category` value are intentionally omitted from the
+ * public catalog: the WorkshopCard hard-depends on category → label / variant
+ * lookup tables, and showing a row with no badge would render broken UI.
+ * Admins fill the marketing taxonomy fields before flipping `is_active=True`.
+ */
+
 import type {
   MarketplaceCatalogFilters,
   MarketplaceCatalogResponse,
@@ -29,154 +50,32 @@ const durationOptions: WorkshopFilterOption<MarketplaceDuration>[] = [
   { label: "Multi-session", value: "multi-session" },
 ];
 
-const marketplaceWorkshops: MarketplaceWorkshopItem[] = [
-  {
-    id: "market-robotics-foundations",
-    slug: "robotics-foundations-lab",
-    title: "Robotics Foundations Lab",
-    category: "robotics",
-    difficulty: "beginner",
-    durationKey: "under-2-hours",
-    duration: "90 minutes",
-    classRange: "Class 3-5",
-    description:
-      "A guided starter workshop introducing motors, movement, and simple robotics logic through tactile classroom kits.",
-    image: "/workshops/robotics-workshop.svg",
-    imageAlt: "Robotics workshop card artwork",
-    price: 14999,
-    featured: true,
-  },
-  {
-    id: "market-ai-vision",
-    slug: "ai-vision-lab-marketplace",
-    title: "AI Vision Lab",
-    category: "ai",
-    difficulty: "intermediate",
-    durationKey: "under-2-hours",
-    duration: "2 hours",
-    classRange: "Class 6-8",
-    description:
-      "Students explore classroom-safe image recognition, model behavior, and practical AI use cases with guided demos.",
-    image: "/workshops/ai-workshop.svg",
-    imageAlt: "AI workshop card artwork",
-    price: 18999,
-    featured: true,
-  },
-  {
-    id: "market-creative-coding",
-    slug: "creative-coding-lab-marketplace",
-    title: "Creative Coding Lab",
-    category: "coding",
-    difficulty: "beginner",
-    durationKey: "multi-session",
-    duration: "2 sessions",
-    classRange: "Class 6-8",
-    description:
-      "Project-led coding for interactive stories, game logic, and animation basics with high classroom completion rates.",
-    image: "/workshops/coding-workshop.svg",
-    imageAlt: "Coding workshop card artwork",
-    price: 16999,
-    subscribed: true,
-    featured: true,
-  },
-  {
-    id: "market-circuit-builders",
-    slug: "circuit-builders-studio",
-    title: "Circuit Builders Studio",
-    category: "electronics",
-    difficulty: "beginner",
-    durationKey: "under-2-hours",
-    duration: "100 minutes",
-    classRange: "Class 5-8",
-    description:
-      "Students build safe paper and breadboard circuits while learning current flow, switches, and output components.",
-    image: "/workshops/robotics-workshop.svg",
-    imageAlt: "Electronics workshop artwork",
-    price: 15999,
-  },
-  {
-    id: "market-iot-systems",
-    slug: "iot-systems-starter",
-    title: "IoT Systems Starter",
-    category: "iot",
-    difficulty: "intermediate",
-    durationKey: "half-day",
-    duration: "Half day",
-    classRange: "Class 8-10",
-    description:
-      "A practical IoT session on sensors, connected devices, dashboards, and real-world school automation examples.",
-    image: "/workshops/ai-workshop.svg",
-    imageAlt: "IoT workshop artwork",
-    price: 22999,
-  },
-  {
-    id: "market-advanced-autonomy",
-    slug: "advanced-autonomy-lab",
-    title: "Advanced Autonomy Lab",
-    category: "robotics",
-    difficulty: "advanced",
-    durationKey: "half-day",
-    duration: "Half day",
-    classRange: "Class 9-12",
-    description:
-      "Senior students work through autonomy, control systems, and decision-making tradeoffs in a structured lab format.",
-    image: "/workshops/robotics-workshop.svg",
-    imageAlt: "Advanced robotics workshop artwork",
-    price: 27999,
-  },
-  {
-    id: "market-python-automation",
-    slug: "python-automation-sprint-marketplace",
-    title: "Python Automation Sprint",
-    category: "coding",
-    difficulty: "intermediate",
-    durationKey: "under-2-hours",
-    duration: "2 hours",
-    classRange: "Class 9-12",
-    description:
-      "Hands-on Python scripting for automation workflows, data handling, and practical software thinking for senior learners.",
-    image: "/workshops/coding-workshop.svg",
-    imageAlt: "Python workshop artwork",
-    price: 19999,
-    subscribed: true,
-  },
-  {
-    id: "market-ai-careers",
-    slug: "ai-career-foundations-marketplace",
-    title: "AI Career Foundations",
-    category: "ai",
-    difficulty: "advanced",
-    durationKey: "multi-session",
-    duration: "3 sessions",
-    classRange: "Class 9-12",
-    description:
-      "A career-focused series connecting AI fundamentals to college pathways, job roles, and future-ready skill planning.",
-    image: "/workshops/ai-workshop.svg",
-    imageAlt: "AI careers workshop artwork",
-    price: 24999,
-  },
-  {
-    id: "market-smart-home",
-    slug: "smart-home-iot-lab",
-    title: "Smart Home IoT Lab",
-    category: "iot",
-    difficulty: "advanced",
-    durationKey: "multi-session",
-    duration: "4 sessions",
-    classRange: "Class 9-12",
-    description:
-      "Students prototype connected automation ideas with sensors, logic flows, and dashboard-based monitoring concepts.",
-    image: "/workshops/coding-workshop.svg",
-    imageAlt: "Smart home IoT workshop artwork",
-    price: 29999,
-  },
-];
-
 const categorySet = new Set(
-  categoryOptions.filter((option) => option.value !== "all").map((option) => option.value)
+  categoryOptions.filter((o) => o.value !== "all").map((o) => o.value)
 );
-const difficultySet = new Set(difficultyOptions.map((option) => option.value));
-const durationSet = new Set(durationOptions.map((option) => option.value));
+const difficultySet = new Set(difficultyOptions.map((o) => o.value));
+const durationSet = new Set(durationOptions.map((o) => o.value));
+
+// Raw shape returned by Django's MarketplaceListingSerializer. Fields are
+// blank-allowed strings on the backend — we treat "" as missing.
+interface BackendListing {
+  id: string;
+  title: string;
+  description: string;
+  kind: string;
+  price_inr: string;       // DRF DecimalField → string in JSON
+  file_url: string;
+  cover_image_url: string;
+  is_active: boolean;
+  featured: boolean;
+  category: string;
+  difficulty: string;
+  duration_key: string;
+  duration_label: string;
+  class_range: string;
+}
+
+const FALLBACK_IMAGE = "/workshops/ai-workshop.svg";
 
 function firstValue(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
@@ -188,46 +87,85 @@ function sanitizeFilters(
   const category = firstValue(filters.category);
   const difficulty = firstValue(filters.difficulty);
   const duration = firstValue(filters.duration);
-
   return {
-    category:
-      category && categorySet.has(category as MarketplaceCategory)
-        ? (category as MarketplaceCategory)
-        : undefined,
-    difficulty:
-      difficulty && difficultySet.has(difficulty as MarketplaceDifficulty)
-        ? (difficulty as MarketplaceDifficulty)
-        : undefined,
-    duration:
-      duration && durationSet.has(duration as MarketplaceDuration)
-        ? (duration as MarketplaceDuration)
-        : undefined,
+    category: category && categorySet.has(category as MarketplaceCategory)
+      ? (category as MarketplaceCategory) : undefined,
+    difficulty: difficulty && difficultySet.has(difficulty as MarketplaceDifficulty)
+      ? (difficulty as MarketplaceDifficulty) : undefined,
+    duration: duration && durationSet.has(duration as MarketplaceDuration)
+      ? (duration as MarketplaceDuration) : undefined,
   };
 }
 
-export function getMarketplaceCatalog(
+function toWorkshop(row: BackendListing): MarketplaceWorkshopItem | null {
+  // The card hard-depends on category for badge styling. Skip listings that
+  // have not been fully tagged for the public catalog yet.
+  if (!row.category || !categorySet.has(row.category as MarketplaceCategory)) {
+    return null;
+  }
+  // Difficulty / duration are not load-bearing for render — fall back to safe defaults.
+  const difficulty = (difficultySet.has(row.difficulty as MarketplaceDifficulty)
+    ? row.difficulty : "beginner") as MarketplaceDifficulty;
+  const durationKey = (durationSet.has(row.duration_key as MarketplaceDuration)
+    ? row.duration_key : "under-2-hours") as MarketplaceDuration;
+
+  return {
+    id: row.id,
+    slug: row.id,  // backend has no slug field; UUID is unique + stable.
+    title: row.title,
+    category: row.category as MarketplaceCategory,
+    difficulty,
+    durationKey,
+    duration: row.duration_label || "—",
+    classRange: row.class_range || "—",
+    description: row.description,
+    image: row.cover_image_url || FALLBACK_IMAGE,
+    imageAlt: `${row.title} workshop artwork`,
+    price: Number(row.price_inr) || 0,
+    featured: row.featured,
+  };
+}
+
+async function fetchCatalog(): Promise<BackendListing[]> {
+  // Server-side fetch — happens on each request. Next caches with a short
+  // revalidate window so admins editing a listing see updates within a minute,
+  // without hammering the backend on every visit.
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+  // Backend pagination caps at 20 by default; bump up via ?page_size=. If the
+  // catalog ever grows past that, swap to server-side filtering at the same time.
+  const url = `${base}/content/marketplace/?page_size=100`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    // DRF returns {count, next, previous, results: [...]} when paginated.
+    return Array.isArray(data) ? data : (data.results ?? []);
+  } catch {
+    // Backend unreachable (build time, network blip) — render an empty
+    // catalog rather than 500. Marketing page should always load.
+    return [];
+  }
+}
+
+export async function getMarketplaceCatalog(
   rawFilters: Record<string, string | string[] | undefined> = {}
-): MarketplaceCatalogResponse {
+): Promise<MarketplaceCatalogResponse> {
   const filters = sanitizeFilters(rawFilters);
+  const raw = await fetchCatalog();
 
-  const workshops = marketplaceWorkshops.filter((workshop) => {
-    if (filters.category && workshop.category !== filters.category) {
-      return false;
-    }
+  const all: MarketplaceWorkshopItem[] = raw
+    .map(toWorkshop)
+    .filter((w): w is MarketplaceWorkshopItem => w !== null);
 
-    if (filters.difficulty && workshop.difficulty !== filters.difficulty) {
-      return false;
-    }
-
-    if (filters.duration && workshop.durationKey !== filters.duration) {
-      return false;
-    }
-
+  const workshops = all.filter((w) => {
+    if (filters.category && w.category !== filters.category) return false;
+    if (filters.difficulty && w.difficulty !== filters.difficulty) return false;
+    if (filters.duration && w.durationKey !== filters.duration) return false;
     return true;
   });
 
   return {
-    featuredWorkshops: marketplaceWorkshops.filter((workshop) => workshop.featured).slice(0, 3),
+    featuredWorkshops: all.filter((w) => w.featured).slice(0, 3),
     workshops,
     filters,
     filterOptions: {
@@ -235,7 +173,7 @@ export function getMarketplaceCatalog(
       difficulties: difficultyOptions,
       durations: durationOptions,
     },
-    totalCount: marketplaceWorkshops.length,
+    totalCount: all.length,
     filteredCount: workshops.length,
   };
 }

@@ -1,30 +1,25 @@
+/*
+ * File:    frontend/src/app/(public)/request-demo/page.tsx
+ * Purpose: /request-demo entry. Stays a Server Component so we keep the
+ *          `metadata` export for SEO; the interactive booking flow
+ *          (calendar + form + shared state) lives in <BookingFlow />.
+ */
+
 import type { Metadata } from "next";
-import { DemoBenefits } from "@/components/request-demo/DemoBenefits";
-import { FormCard } from "@/components/request-demo/FormCard";
-import { RequestDemoHero } from "@/components/request-demo/RequestDemoHero";
+import { BookingFlow } from "@/components/request-demo/BookingFlow";
 import { WhatHappensNext } from "@/components/request-demo/WhatHappensNext";
-import { PageContainer } from "@/components/layout/PageContainer";
 
 export const metadata: Metadata = {
-  title: "Request Demo",
+  title: "Book a School Visit · Skillship",
   description:
-    "Request a personalized Skillship demo for your school and explore AI-powered learning, analytics, and workshop delivery.",
+    "Book a 30-minute walkthrough of the Skillship AI School Program — labs, training, software. We'll show you exactly what the first 90 days of rollout look like for a school like yours.",
 };
 
 export default function RequestDemoPage() {
   return (
     <>
-      <RequestDemoHero />
+      <BookingFlow />
       <WhatHappensNext />
-
-      <section className="py-16 md:py-20">
-        <PageContainer className="px-6 lg:px-8">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-            <FormCard />
-            <DemoBenefits />
-          </div>
-        </PageContainer>
-      </section>
     </>
   );
 }

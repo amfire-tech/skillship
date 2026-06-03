@@ -3,19 +3,32 @@ File:    backend/apps/accounts/permissions.py
 Purpose: Permission classes specific to /api/v1/users/ user-management endpoints.
 Owner:   Prashant
 
+Policy decision (2026-05-28):
+    Only MAIN_ADMIN (platform "super admin") may create, update, list, or
+    delete user accounts. Principals, sub-admins, teachers, and students
+    have NO write access to the user-management surface — they can only
+    log in and edit their own profile through their dashboard, not other
+    people's. This is enforced server-side here AND mirrored in the
+    frontend admin/users UI (which is only routed under /dashboard/admin/).
+
+Why locked to MAIN_ADMIN only:
+    The product brief calls for a single platform owner controlling
+    onboarding. Letting a principal create more principals / sub-admins
+    inside their school is a privilege-escalation footgun (a principal
+    could create another MAIN_ADMIN-shaped row through any future hole
+    in the serializer). Locking it to MAIN_ADMIN gives us one auditable
+    person who creates every account, end of story.
+
 Two layers in one class because they always travel together:
 
   Surface (`has_permission`)
-      Only MAIN_ADMIN and PRINCIPAL can even reach this surface — students
-      and teachers don't manage users through this API. (TEACHER reading
-      their own roster is a Class-scoped concern, not a User-scoped one.)
+      The actor must be MAIN_ADMIN. Anyone else gets 403 before any
+      view code runs.
 
   Object (`has_object_permission`)
-      MAIN_ADMIN may act on any user. PRINCIPAL may only act on users in
-      their own school — never another school's. The check is on the
-      *target* user's school_id, not the actor's, because a PRINCIPAL of
-      School A passing a UUID belonging to a School B user must be 403,
-      not 404 (404 would leak that the id exists).
+      MAIN_ADMIN may act on any user. (Other roles never reach here
+      because `has_permission` already returned False — kept as a
+      defensive line in case the surface gate is ever loosened.)
 """
 
 from __future__ import annotations
@@ -26,9 +39,9 @@ from apps.common.permissions import Role
 
 
 class CanManageUsers(BasePermission):
-    """Two-layer guard for the /api/v1/users/ surface."""
+    """Hard gate: only MAIN_ADMIN may touch the /api/v1/users/ surface."""
 
-    SURFACE_ROLES = {Role.MAIN_ADMIN, Role.PRINCIPAL}
+    SURFACE_ROLES = {Role.MAIN_ADMIN}
 
     def has_permission(self, request, view):
         user = request.user
@@ -36,7 +49,7 @@ class CanManageUsers(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         actor = request.user
-        if actor.role == Role.MAIN_ADMIN:
-            return True
-        # PRINCIPAL: must share a school with the target.
-        return actor.school_id is not None and obj.school_id == actor.school_id
+        # Only MAIN_ADMIN ever reaches an object-level check thanks to
+        # has_permission(), but we still spell it out so anyone reading
+        # this class sees the policy in one place.
+        return actor.role == Role.MAIN_ADMIN

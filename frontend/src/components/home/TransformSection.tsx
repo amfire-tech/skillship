@@ -6,24 +6,28 @@ import { MotionSection } from "@/components/ui/MotionWrapper";
 
 const changes = [
   {
+    before: "Students learn from textbooks only — AI & robotics stay theory",
+    after: "Hands-on AI & robotics workshops every term — students build, not memorise",
+  },
+  {
     before: "Teachers grade quizzes manually for hours",
-    after: "Auto-graded quizzes with instant student feedback",
+    after: "Auto-graded AI quizzes with instant student feedback",
   },
   {
     before: "Principals wait for end-of-term reports",
-    after: "Live dashboards with weekly AI summaries",
+    after: "Live dashboards with weekly AI summaries across every class",
   },
   {
-    before: "Students guess their career path",
-    after: "Personalised AI guidance with match scores",
+    before: "Students guess their career path after Class 12",
+    after: "Personalised AI Career Pilot from Class 8 onwards",
   },
   {
-    before: "AI learning is one-off workshop events",
-    after: "A continuous, measurable learning journey",
+    before: "School data lives in 6 different Excel sheets",
+    after: "One operating system for teachers, students, courses, fees",
   },
   {
-    before: "Parent updates are generic report cards",
-    after: "Clear progress with subject-level insights",
+    before: "Parents see one report card per term",
+    after: "Real-time subject-level progress, every week",
   },
 ];
 
@@ -33,13 +37,15 @@ export function TransformSection() {
       <Container>
         <MotionSection className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            What changes
+            Normal school vs Skillship-integrated school
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--foreground)] md:text-4xl">
-            The shift schools feel in the first term.
+            Same students. Smarter outcomes.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[var(--muted-foreground)] md:text-lg">
-            Not a list of features. The real operational change Skillship brings.
+            Side by side: how a Skillship-integrated school operates differently —
+            and why students inside it leave more confident, more curious, and
+            future-ready.
           </p>
         </MotionSection>
 
@@ -51,7 +57,7 @@ export function TransformSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.5, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="group grid items-center gap-3 rounded-2xl border border-[var(--border)] bg-white p-4 transition-all hover:border-primary/30 hover:shadow-[0_16px_40px_-20px_rgba(5,150,105,0.2)] md:grid-cols-[1fr_auto_1fr] md:gap-6 md:p-5"
+              className="group grid items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 transition-all hover:border-primary/30 hover:shadow-[0_16px_40px_-20px_rgba(5,150,105,0.2)] md:grid-cols-[1fr_auto_1fr] md:gap-6 md:p-5"
             >
               {/* Before */}
               <div className="flex items-center gap-3">

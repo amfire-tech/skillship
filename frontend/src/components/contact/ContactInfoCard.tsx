@@ -55,8 +55,8 @@ export function ContactInfoCard() {
       className="flex flex-col gap-4"
     >
       {/* Main info block */}
-      <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-40px_rgba(5,150,105,0.25)] md:p-7">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-white p-6 shadow-[0_24px_60px_-40px_rgba(5,150,105,0.25)] md:p-7">
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           Reach us
         </div>
@@ -79,7 +79,7 @@ export function ContactInfoCard() {
                 {item.icon}
               </div>
               <div className="flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   {item.label}
                 </p>
                 <p className="mt-0.5 text-sm font-semibold text-[var(--foreground)]">
@@ -93,9 +93,9 @@ export function ContactInfoCard() {
       </div>
 
       {/* Location band */}
-      <div className="relative overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary-50 via-white to-accent/10 p-6">
+      <div className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-[var(--card)] to-accent/10 p-6">
         <div className="relative z-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
             Serving schools in
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">

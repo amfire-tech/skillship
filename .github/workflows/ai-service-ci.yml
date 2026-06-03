@@ -1,6 +1,52 @@
 # File:    .github/workflows/ai-service-ci.yml
-# Purpose: CI for the FastAPI AI service.
+# Purpose: Test the FastAPI AI service on every PR / push that touches ai-service/.
 # Owner:   Navanish
-# TODO:
-#   on: pull_request  paths: ['ai-service/**']
-#   steps: setup-python, pip install -r ai-service/requirements.txt, ruff, pytest.
+
+name: AI Service CI
+
+on:
+  pull_request:
+    paths:
+      - "ai-service/**"
+      - ".github/workflows/ai-service-ci.yml"
+  push:
+    branches: [main, staging]
+    paths:
+      - "ai-service/**"
+      - ".github/workflows/ai-service-ci.yml"
+  workflow_dispatch:        # also lets you re-run by hand from the Actions tab
+
+concurrency:
+  group: ai-service-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GEMINI_API_KEY: ci-only-stub-key
+      AI_SERVICE_INTERNAL_KEY: ci-only-internal-key
+      PGVECTOR_URL: postgresql://stub:stub@127.0.0.1:5432/stub
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ai-service
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: pytest
+        working-directory: ai-service
+        run: pytest tests/ -q --no-header

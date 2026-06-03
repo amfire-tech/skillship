@@ -149,7 +149,7 @@ export function WorkshopFilters({
 
   return (
     <section aria-label="Workshop filters">
-      <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)] p-5 shadow-card md:p-6">
+      <div className="rounded-3xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-card md:p-6">
         <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary/75">

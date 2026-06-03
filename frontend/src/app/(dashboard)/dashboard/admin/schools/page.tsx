@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { useAuthStore } from "@/store/authStore";
+import { TableRowSkeleton } from "@/components/ui/TableRowSkeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { API_BASE, getToken } from "@/lib/auth";
 
 interface ApiSchool {
   id: string;
@@ -27,17 +29,6 @@ const planClass: Record<string, string> = {
 };
 const boardLabel: Record<string, string> = { CBSE: "CBSE", ICSE: "ICSE", STATE: "State Board" };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-
-async function getToken(): Promise<string | null> {
-  let token = useAuthStore.getState().accessToken;
-  if (!token) {
-    const ok = await useAuthStore.getState().refreshAuth();
-    if (!ok) return null;
-    token = useAuthStore.getState().accessToken;
-  }
-  return token;
-}
 
 function initialsColor(name: string) {
   const palette = ["from-primary to-accent", "from-teal-500 to-primary", "from-emerald-500 to-teal-500", "from-primary-700 to-primary", "from-accent to-primary-500"];
@@ -72,6 +63,10 @@ export default function SchoolsManagementPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    document.title = "Schools Management — Skillship";
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -176,11 +171,22 @@ export default function SchoolsManagementPage() {
         className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
       >
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-[var(--muted-foreground)]">
-            <svg className="mr-2 animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Loading schools…
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                  <th className="px-5 py-3">School Name</th>
+                  <th className="px-5 py-3">City / State</th>
+                  <th className="px-5 py-3">Board</th>
+                  <th className="px-5 py-3">Plan</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <TableRowSkeleton rows={6} columns={6} withAvatar />
+              </tbody>
+            </table>
           </div>
         ) : fetchError ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -191,7 +197,7 @@ export default function SchoolsManagementPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   <th className="px-5 py-3">School Name</th>
                   <th className="px-5 py-3">City / State</th>
                   <th className="px-5 py-3">Board</th>
@@ -202,11 +208,14 @@ export default function SchoolsManagementPage() {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-sm text-[var(--muted-foreground)]">
-                      {schools.length === 0 ? "No schools yet. Add one to get started." : "No schools match your filters."}
-                    </td>
-                  </tr>
+                  <tr><td colSpan={6} className="px-5 py-8">
+                    <EmptyState
+                      title={schools.length === 0 ? "No schools yet" : "No schools match"}
+                      description={schools.length === 0 ? "Onboard your first school to start managing classes, teachers, and students." : "Adjust the search or filters to see more results."}
+                      action={schools.length === 0 ? { label: "Add School", href: "/dashboard/admin/schools/new" } : undefined}
+                      icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l8-4v18" /><path d="M19 21V11l-6-4" /></svg>}
+                    />
+                  </td></tr>
                 ) : (
                   filtered.map((s, i) => (
                     <motion.tr
@@ -229,20 +238,20 @@ export default function SchoolsManagementPage() {
                       </td>
                       <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{boardLabel[s.board] ?? s.board}</td>
                       <td className="px-5 py-3.5">
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${planClass[s.plan] ?? "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${planClass[s.plan] ?? "bg-gray-50 text-gray-600 border-gray-200"}`}>
                           {planLabel[s.plan] ?? s.plan}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${s.is_active ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${s.is_active ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
                           {s.is_active ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-3 text-xs">
-                          <button onClick={() => router.push(`/dashboard/admin/schools/${s.id}`)} className="font-semibold text-primary transition-colors hover:text-primary-700">View</button>
-                          <button onClick={() => router.push(`/dashboard/admin/schools/${s.id}`)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-primary">Edit</button>
-                          <button onClick={() => setConfirmRemove(s)} className="font-semibold text-[var(--muted-foreground)] transition-colors hover:text-red-500">Remove</button>
+                        <div className="flex items-center justify-end gap-1 text-xs">
+                          <button onClick={() => router.push(`/dashboard/admin/schools/${s.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-primary transition-colors hover:bg-primary/10 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/20">View</button>
+                          <button onClick={() => router.push(`/dashboard/admin/schools/${s.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20">Edit</button>
+                          <button onClick={() => setConfirmRemove(s)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-300/40">Remove</button>
                         </div>
                       </td>
                     </motion.tr>

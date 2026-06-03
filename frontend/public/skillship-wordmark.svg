@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Skillship wordmark — recreated from the brand PDF.
+     SKILL  in orange #F39C32, SHIP in teal #2EB6B5.
+     Rounded, friendly weight to match the original Fredoka-ish letterforms.
+     Use this anywhere the wordmark appears: Navbar, Footer, Login brand
+     panel, Dashboard sidebar header. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" fill="none" role="img" aria-label="Skillship">
+  <text
+    x="0" y="58"
+    font-family="Inter, system-ui, sans-serif"
+    font-size="62"
+    font-weight="800"
+    letter-spacing="-1"
+  >
+    <tspan fill="#F39C32">SKILL</tspan><tspan fill="#2EB6B5">SHIP</tspan>
+  </text>
+</svg>

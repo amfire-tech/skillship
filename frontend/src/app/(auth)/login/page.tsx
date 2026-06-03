@@ -1,60 +1,463 @@
+/*
+ * File:    frontend/src/app/(auth)/login/page.tsx
+ * Purpose: Public-side login. Two-panel layout matching the homepage's
+ *          cream / orange-teal aesthetic — left panel carries brand + value
+ *          props, right panel carries the form. Role gate is enforced
+ *          server-side (see backend/apps/accounts/serializers.py::LoginSerializer)
+ *          so picking the wrong role with the right email + password fails
+ *          with a generic "Invalid email, password, or role" message.
+ *
+ *          Demo-account helper: a collapsible row of 5 buttons that
+ *          pre-fills the form for each seeded demo role. The seed defaults
+ *          live alongside the DEMO_PASSWORD in backend/apps/common/
+ *          management/commands/seed_demo.py — if those change, update the
+ *          DEMO_ACCOUNTS constant below.
+ * Owner:   Pranav
+ */
+
 "use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import {
+  ShieldCheck, Layers, LineChart, Users, Sparkles,
+  Eye, EyeOff, ArrowRight, Loader2, Mail, Lock, Check, type LucideIcon,
+} from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { getDefaultRouteForRole } from "@/lib/role-guard";
-import { seedCredentials, ROLE_LABEL } from "@/lib/seed-credentials";
 import type { UserRole } from "@/types";
+import { SkillshipLockup } from "@/components/brand/SkillshipMark";
 
-const roleOptions: { value: UserRole; label: string }[] = [
-  { value: "MAIN_ADMIN", label: "Super Admin" },
-  { value: "SUB_ADMIN", label: "Sub Admin" },
-  { value: "PRINCIPAL", label: "Principal" },
-  { value: "TEACHER", label: "Teacher" },
-  { value: "STUDENT", label: "Student" },
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+interface RoleOption {
+  value: UserRole;
+  label: string;
+  /** Sub-label shown under the title to disambiguate (e.g. "Platform-level"). */
+  hint: string;
+  icon: LucideIcon;
+  /** Tailwind gradient utility — matches the homepage RoleCards palette. */
+  gradient: string;
+}
+
+const ROLES: RoleOption[] = [
+  { value: "MAIN_ADMIN", label: "Super Admin", hint: "Platform-level",  icon: ShieldCheck, gradient: "bg-warmth-gradient" },
+  { value: "SUB_ADMIN",  label: "Sub Admin",   hint: "Operations",      icon: Layers,      gradient: "bg-brand-gradient"  },
+  { value: "PRINCIPAL",  label: "Principal",   hint: "School leader",   icon: LineChart,   gradient: "bg-cool-gradient"   },
+  { value: "TEACHER",    label: "Teacher",     hint: "Class management",icon: Users,       gradient: "bg-[linear-gradient(135deg,#2EB6B5_0%,#4FB956_100%)]" },
+  { value: "STUDENT",    label: "Student",     hint: "Learning",        icon: Sparkles,    gradient: "bg-[linear-gradient(135deg,#4FB956_0%,#F39C32_100%)]" },
 ];
+
+// Seeded demo credentials. Must stay in sync with backend seed_demo.py.
+// Different schools intentionally — seeded users live under the DPS demo school
+// (except MAIN_ADMIN which is platform-level).
+const DEMO_PASSWORD = "Skillship#Test-2026";
+const DEMO_ACCOUNTS: Record<UserRole, string> = {
+  MAIN_ADMIN: "platform@demo.skillship.test",
+  SUB_ADMIN:  "demo_dps_demo_sub_admin@demo.skillship.test",
+  PRINCIPAL:  "demo_dps_demo_principal@demo.skillship.test",
+  TEACHER:    "demo_dps_demo_teacher_1@demo.skillship.test",
+  STUDENT:    "demo_dps_demo_student_1@demo.skillship.test",
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/* ──────────────── decorative ambient orbs (matches Hero) ──────────────── */
+
+function AmbientOrbs() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -left-32 top-12 h-80 w-80 rounded-full bg-[var(--orange-500)] opacity-[0.10] blur-3xl animate-hero-drift" style={{ animationDuration: "12s" }} />
+      <div className="absolute -right-32 bottom-8 h-96 w-96 rounded-full bg-[var(--teal-500)] opacity-[0.10] blur-3xl animate-hero-drift" style={{ animationDuration: "14s", animationDelay: "1.2s" }} />
+    </div>
+  );
+}
+
+/* ──────────────── Brand panel (left side on desktop) ──────────────── */
+
+function BrandPanel() {
+  return (
+    <motion.aside
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.8, ease: EASE }}
+      className="relative isolate hidden flex-1 overflow-hidden lg:flex"
+      style={{ backgroundImage: "var(--gradient-dawn)" }}
+    >
+      <AmbientOrbs />
+
+      <div className="relative z-10 flex w-full max-w-[520px] flex-col justify-between px-12 py-14 xl:px-16 xl:py-20">
+        <Link href="/" className="self-start" aria-label="Skillship home">
+          <SkillshipLockup badgeSize={44} wordmarkSize="lg" />
+        </Link>
+
+        {/* Hero copy */}
+        <div className="my-auto">
+          <p className="text-[11.5px] font-semibold uppercase tracking-[0.22em] text-[var(--teal-600)]">
+            Where fun meets learning
+          </p>
+          <h2
+            className="mt-4 font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ink-primary)]"
+            style={{ fontSize: "clamp(2rem, 3.8vw, 3rem)" }}
+          >
+            One sign-in.<br />
+            <span
+              className="bg-clip-text text-transparent"
+              style={{ backgroundImage: "var(--gradient-brand)" }}
+            >
+              Your whole school.
+            </span>
+          </h2>
+          <p className="mt-5 max-w-[400px] text-[15.5px] leading-[1.6] text-[var(--ink-secondary)]">
+            Skillship runs real AI on every quiz, content view, and dashboard.
+            Sign in to your role and pick up where you left off.
+          </p>
+
+          {/* Mini feature ticks */}
+          <ul className="mt-8 space-y-3" role="list">
+            {[
+              "Adaptive quizzes tuned to each student",
+              "AI Career Pilot built into every dashboard",
+              "School-grade isolation across every tenant",
+            ].map((line, i) => (
+              <motion.li
+                key={line}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 + i * 0.12, ease: EASE }}
+                className="flex items-center gap-3 text-[14px] text-[var(--ink-secondary)]"
+              >
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-white shadow-soft" style={{ backgroundImage: "var(--gradient-cool)" }}>
+                  <Check size={12} strokeWidth={2.8} />
+                </span>
+                {line}
+              </motion.li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer breadcrumb */}
+        <p className="text-[12px] text-[var(--ink-tertiary)]">
+          Built by <a href="https://www.amfire.in" target="_blank" rel="noreferrer noopener" className="font-semibold underline decoration-[var(--orange-500)]/40 decoration-2 underline-offset-2 hover:text-[var(--ink-secondary)]">amfire</a>
+        </p>
+      </div>
+    </motion.aside>
+  );
+}
+
+/* ──────────────── Form panel ──────────────── */
+
+interface FormPanelProps { onLogin: (role: UserRole, email: string, password: string) => Promise<void>; error: string | null; submitting: boolean; }
+
+function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
+  const [role, setRole] = useState<UserRole | "">("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showDemoHelper, setShowDemoHelper] = useState(false);
+
+  const canSubmit =
+    role !== "" && EMAIL_RE.test(email.trim()) && password.length >= 1 && !submitting;
+
+  function fillDemo(r: UserRole) {
+    setRole(r);
+    setEmail(DEMO_ACCOUNTS[r]);
+    setPassword(DEMO_PASSWORD);
+    setShowDemoHelper(false);
+  }
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!canSubmit || !role) return;
+    onLogin(role, email.trim(), password);
+  }
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.7, ease: EASE }}
+      className="relative flex flex-1 items-center justify-center bg-white px-6 py-12 lg:px-12"
+    >
+      <div className="w-full max-w-[440px]">
+        {/* Mobile lockup (brand panel is hidden under lg) */}
+        <Link href="/" className="mb-10 inline-block lg:hidden" aria-label="Skillship home">
+          <SkillshipLockup badgeSize={40} wordmarkSize="md" />
+        </Link>
+
+        {/* Heading */}
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.1, ease: EASE }}
+          className="font-semibold leading-[1.1] tracking-[-0.025em] text-[var(--ink-primary)]"
+          style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)" }}
+        >
+          Welcome back.
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.2, ease: EASE }}
+          className="mt-2 text-[15px] text-[var(--ink-secondary)]"
+        >
+          Sign in to your Skillship account.
+        </motion.p>
+
+        <form onSubmit={submit} className="mt-10 space-y-6" noValidate>
+          {/* Role grid — replaces the dropdown but stays a required gate */}
+          <motion.fieldset
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.3, ease: EASE }}
+          >
+            <legend className="mb-3 flex items-center justify-between gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-tertiary)]">
+              <span>I am a</span>
+              {role && (
+                <span className="text-[11px] font-medium text-[var(--teal-600)] normal-case tracking-normal">
+                  {ROLES.find((r) => r.value === role)?.label}
+                </span>
+              )}
+            </legend>
+            <div className="grid grid-cols-5 gap-2">
+              {ROLES.map((r) => {
+                const Icon = r.icon;
+                const active = role === r.value;
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => setRole(r.value)}
+                    aria-pressed={active}
+                    title={`${r.label} — ${r.hint}`}
+                    className={`group relative flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border text-[10px] font-semibold transition-all duration-300 ease-out-expo ${
+                      active
+                        ? "border-transparent shadow-medium -translate-y-0.5"
+                        : "border-[color:var(--border-subtle)] bg-white text-[var(--ink-secondary)] hover:-translate-y-0.5 hover:border-[var(--teal-500)]/30 hover:text-[var(--ink-primary)]"
+                    }`}
+                  >
+                    {active && (
+                      <span aria-hidden className={`absolute inset-0 rounded-2xl ${r.gradient}`} />
+                    )}
+                    <Icon
+                      size={18}
+                      strokeWidth={1.8}
+                      className={`relative ${active ? "text-white" : ""}`}
+                    />
+                    <span className={`relative leading-tight ${active ? "text-white" : ""}`}>
+                      {r.label.replace(" Admin", "")}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.fieldset>
+
+          {/* Email */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.42, ease: EASE }}
+            className="relative"
+          >
+            <label
+              htmlFor="login-email"
+              className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-tertiary)]"
+            >
+              Email
+            </label>
+            <div className="relative">
+              <Mail
+                aria-hidden
+                size={16}
+                strokeWidth={1.8}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ink-tertiary)]"
+              />
+              <input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@school.in"
+                className="h-[52px] w-full rounded-2xl border border-[color:var(--border-subtle)] bg-white pl-11 pr-4 text-[15px] text-[var(--ink-primary)] outline-none transition-all duration-200 placeholder:text-[var(--ink-tertiary)] focus:border-[var(--teal-500)] focus:shadow-[0_0_0_4px_rgba(46,182,181,0.12)]"
+              />
+            </div>
+          </motion.div>
+
+          {/* Password */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.5, ease: EASE }}
+            className="relative"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <label
+                htmlFor="login-password"
+                className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-tertiary)]"
+              >
+                Password
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-[12px] font-medium text-[var(--teal-600)] transition-colors hover:text-[var(--orange-500)]"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <div className="relative">
+              <Lock
+                aria-hidden
+                size={16}
+                strokeWidth={1.8}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--ink-tertiary)]"
+              />
+              <input
+                id="login-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="h-[52px] w-full rounded-2xl border border-[color:var(--border-subtle)] bg-white pl-11 pr-12 text-[15px] text-[var(--ink-primary)] outline-none transition-all duration-200 placeholder:text-[var(--ink-tertiary)] focus:border-[var(--teal-500)] focus:shadow-[0_0_0_4px_rgba(46,182,181,0.12)]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[var(--ink-tertiary)] transition-colors hover:bg-[var(--cream)] hover:text-[var(--ink-primary)]"
+              >
+                {showPassword ? <EyeOff size={16} strokeWidth={1.8}/> : <Eye size={16} strokeWidth={1.8}/>}
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Error band */}
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              role="alert"
+              aria-live="assertive"
+              className="rounded-xl border border-[#E94F37]/20 bg-[#E94F37]/8 px-4 py-3 text-[13px] font-medium text-[#B43A28]"
+            >
+              {error}
+            </motion.p>
+          )}
+
+          {/* Submit */}
+          <motion.button
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.6, ease: EASE }}
+            type="submit"
+            disabled={!canSubmit}
+            aria-busy={submitting}
+            className="group relative inline-flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl text-[15px] font-semibold text-white shadow-warm transition-all duration-300 ease-out-expo hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(243,156,50,0.32)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-warm"
+            style={{ backgroundImage: "var(--gradient-brand)" }}
+          >
+            {submitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Signing in…
+              </>
+            ) : (
+              <>
+                Sign in
+                <ArrowRight size={15} strokeWidth={2.2} className="transition-transform group-hover:translate-x-0.5" />
+              </>
+            )}
+          </motion.button>
+
+          {/* Demo helper */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.55, delay: 0.75, ease: EASE }}
+            className="rounded-2xl border border-dashed border-[color:var(--border-subtle)] bg-[var(--cream-soft)] p-4"
+          >
+            <button
+              type="button"
+              onClick={() => setShowDemoHelper((v) => !v)}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <span className="flex items-center gap-2 text-[13px] font-semibold text-[var(--ink-primary)]">
+                <Sparkles size={14} strokeWidth={2} className="text-[var(--orange-500)]" />
+                Try a demo account
+              </span>
+              <span className="text-[12px] text-[var(--ink-tertiary)]">
+                {showDemoHelper ? "Hide" : "Show"}
+              </span>
+            </button>
+
+            {showDemoHelper && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                transition={{ duration: 0.35, ease: EASE }}
+                className="mt-4 overflow-hidden"
+              >
+                <p className="text-[12px] leading-[1.5] text-[var(--ink-secondary)]">
+                  One click to fill the form with a seeded role. All demo accounts
+                  share the password{" "}
+                  <code className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-[var(--ink-primary)]">
+                    {DEMO_PASSWORD}
+                  </code>
+                  .
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {ROLES.map((r) => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => fillDemo(r.value)}
+                      className="rounded-xl border border-[color:var(--border-subtle)] bg-white px-3 py-2 text-left text-[12px] font-medium text-[var(--ink-primary)] transition-all hover:-translate-y-0.5 hover:border-[var(--teal-500)]/40 hover:shadow-soft"
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        </form>
+
+        <p className="mt-10 text-center text-[12px] text-[var(--ink-tertiary)]">
+          By signing in, you agree to our{" "}
+          <Link href="/terms" className="font-medium text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]">Terms</Link>
+          {" "}and{" "}
+          <Link href="/privacy" className="font-medium text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]">Privacy Policy</Link>.
+        </p>
+      </div>
+    </motion.section>
+  );
+}
+
+/* ──────────────── Page ──────────────── */
 
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
 
-  const [role, setRole] = useState<UserRole | "">("");
-  const [userId, setUserId] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const roleRef = useRef<HTMLDivElement>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!showRoleMenu) return;
-    function handleClick(e: MouseEvent) {
-      if (roleRef.current && !roleRef.current.contains(e.target as Node)) {
-        setShowRoleMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [showRoleMenu]);
+  useEffect(() => { document.title = "Sign in — Skillship"; }, []);
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleLogin(role: UserRole, email: string, password: string) {
+    if (submitting) return;
     setError(null);
-    if (!userId || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
+    setSubmitting(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userId, password }),
+        body: JSON.stringify({ email, password, role }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.detail || data?.non_field_errors?.[0] || "Invalid credentials. Please try again.");
         return;
@@ -63,121 +466,15 @@ export default function LoginPage() {
       router.replace(getDefaultRouteForRole(data.user.role));
     } catch {
       setError("Network error. Is the server running?");
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  const selectedRoleLabel = roleOptions.find((r) => r.value === role)?.label;
-
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--muted)]/40 px-4 py-10">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(5,150,105,0.10),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(13,148,136,0.08),_transparent_55%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-30" style={{ maskImage: "radial-gradient(ellipse at center, rgba(255,255,255,0.85), transparent 70%)" }} aria-hidden="true" />
-      <div className="pointer-events-none absolute -left-24 top-1/4 h-64 w-64 rounded-full bg-primary/15 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-1/4 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 18, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-md"
-      >
-        {/* Brand */}
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2 2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <p className="text-lg font-bold tracking-tight text-[var(--foreground)]">Skillship</p>
-        </div>
-
-        {/* Card */}
-        <div className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-white/90 p-7 shadow-[0_30px_80px_-40px_rgba(5,150,105,0.3)] backdrop-blur-xl md:p-8">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
-          <h1 className="text-center text-2xl font-bold tracking-tight text-[var(--foreground)]">Login</h1>
-          <p className="mt-1.5 text-center text-sm text-[var(--muted-foreground)]">Welcome back. Sign in to your Skillship account.</p>
-
-          <form onSubmit={handleSubmit} className="mt-6 space-y-3.5" noValidate>
-            {/* Role select */}
-            <div className="relative" ref={roleRef}>
-              <button type="button" onClick={() => setShowRoleMenu((v) => !v)} className="group flex h-[52px] w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-white px-4 text-left shadow-sm transition-colors hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                </span>
-                <span className={`flex-1 text-[15px] ${selectedRoleLabel ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]"}`}>{selectedRoleLabel ?? "Select Role"}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-[var(--muted-foreground)] transition-transform ${showRoleMenu ? "rotate-90" : ""}`}><path d="m9 18 6-6-6-6" /></svg>
-              </button>
-              {showRoleMenu && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }} className="absolute z-10 mt-2 w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_24px_60px_-20px_rgba(5,150,105,0.25)]">
-                  {roleOptions.map((opt) => (
-                    <button key={opt.value} type="button" onClick={() => { setRole(opt.value); setShowRoleMenu(false); }} className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors hover:bg-primary/5 ${role === opt.value ? "bg-primary/5 font-semibold text-primary" : "text-[var(--foreground)]"}`}>
-                      <span>{opt.label}</span>
-                      {role === opt.value && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </div>
-
-            {/* User ID */}
-            <div className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-              </span>
-              <input type="email" value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="Email address" autoComplete="email" className="h-[52px] w-full rounded-2xl border border-[var(--border)] bg-white pl-14 pr-4 text-[15px] text-[var(--foreground)] shadow-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10" />
-            </div>
-
-            {/* Password */}
-            <div className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-              </span>
-              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" className="h-[52px] w-full rounded-2xl border border-[var(--border)] bg-white pl-14 pr-12 text-[15px] text-[var(--foreground)] shadow-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10" />
-              <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary">
-                {showPassword ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" x2="23" y1="1" y2="23" /></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                )}
-              </button>
-            </div>
-
-            {error && <p role="alert" aria-live="assertive" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
-
-            <button type="submit" className="group relative mt-2 flex h-[52px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-accent text-[15px] font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.6)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-12px_rgba(5,150,105,0.7)]">
-              Login
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:translate-x-0.5"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-            </button>
-
-            <div className="pt-1 text-center">
-              <Link href="/forgot-password" className="text-sm font-medium text-[var(--muted-foreground)] transition-colors hover:text-primary">Forgot password?</Link>
-            </div>
-          </form>
-        </div>
-
-        <p className="mt-6 text-center text-xs text-[var(--muted-foreground)]">
-          By signing in, you agree to our{" "}
-          <Link href="/terms" className="text-primary hover:underline">Terms</Link>{" "}and{" "}
-          <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
-        </p>
-
-        {/* Demo credentials panel — remove when Django auth is live */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }} className="mt-5 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
-          <div className="flex items-center gap-2 border-b border-amber-200 px-4 py-2.5">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-amber-600"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
-            <p className="text-[11px] font-semibold text-amber-700">Demo credentials — click any row to fill</p>
-          </div>
-          <div className="divide-y divide-amber-100">
-            {seedCredentials.map((c) => (
-              <button key={c.role} type="button" onClick={() => { setRole(c.role); setUserId(c.userId); setPassword(c.password); }} className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-amber-100">
-                <span className="text-[11px] font-semibold text-amber-800">{ROLE_LABEL[c.role]}</span>
-                <span className="font-mono text-[10px] text-amber-700">{c.userId} / {c.password}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
+    <main className="flex min-h-screen w-full overflow-hidden bg-white">
+      <BrandPanel />
+      <FormPanel onLogin={handleLogin} error={error} submitting={submitting} />
     </main>
   );
 }

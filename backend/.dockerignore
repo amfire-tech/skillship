@@ -1,0 +1,42 @@
+# File: backend/.dockerignore
+# Keep secrets, build artefacts, and dev caches out of the image.
+
+# Environments / secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+*.pyenv
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build / package
+build/
+dist/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local data / media (production uses managed storage)
+media/
+staticfiles/
+db.sqlite3*
+
+# Git / CI metadata
+.git/
+.github/
+.gitignore
