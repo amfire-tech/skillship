@@ -46,7 +46,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 RUN apk update && apk upgrade --no-cache && apk add --no-cache curl \
     && addgroup --system --gid 1001 nodejs \

@@ -70,6 +70,11 @@ services:
     image: ${BACKEND_IMAGE:-ghcr.io/amfire-tech/skillship-backend:latest}
     container_name: skillship-celery-worker
     restart: unless-stopped
+    # Reuses the backend image, which carries an HTTP healthcheck. A celery
+    # worker has no web server, so disable the inherited check (it would always
+    # report unhealthy). restart: unless-stopped still recovers a crash.
+    healthcheck:
+      disable: true
     command: ["celery", "-A", "jobs.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
     env_file: ${ENV_FILE:-.env.prod}
     environment:
@@ -92,6 +97,9 @@ services:
     image: ${BACKEND_IMAGE:-ghcr.io/amfire-tech/skillship-backend:latest}
     container_name: skillship-celery-beat
     restart: unless-stopped
+    # Same as celery-worker: no web server, so disable the inherited HTTP check.
+    healthcheck:
+      disable: true
     command: ["celery", "-A", "jobs.celery_app", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
     env_file: ${ENV_FILE:-.env.prod}
     environment:
@@ -128,6 +136,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # Next.js standalone binds to $HOSTNAME; Docker defaults that to the
+      # container ID, so it only listens on the container IP and the localhost
+      # healthcheck fails. Force it to all interfaces.
+      - HOSTNAME=0.0.0.0
       # NEXT_PUBLIC_API_BASE_URL is inlined at BUILD time (see frontend/Dockerfile
       # ARG + .github/workflows/deploy.yml). Setting it here would be a no-op.
     healthcheck:
