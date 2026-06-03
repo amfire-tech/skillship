@@ -26,10 +26,15 @@ from .views import (
 app_name = "quizzes"
 
 router = DefaultRouter()
+# Sub-resources first. QuizViewSet is registered LAST at the app root (r"") so
+# the Quiz resource lives at /api/v1/quizzes/ (matching the documented API and
+# the users app convention) rather than the doubly-nested /quizzes/quizzes/.
+# Order matters: the explicit prefixes below must resolve before the root
+# viewset's bare detail route (^(?P<pk>)/$), so they are registered first.
 router.register(r"banks", QuestionBankViewSet, basename="question-bank")
 router.register(r"questions", QuestionViewSet, basename="question")
-router.register(r"quizzes", QuizViewSet, basename="quiz")
 router.register(r"attempts", QuizAttemptViewSet, basename="quiz-attempt")
 router.register(r"assignments", QuizAssignmentViewSet, basename="quiz-assignment")
+router.register(r"", QuizViewSet, basename="quiz")
 
 urlpatterns = router.urls

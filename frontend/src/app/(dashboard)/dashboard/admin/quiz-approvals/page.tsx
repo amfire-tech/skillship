@@ -14,12 +14,22 @@ import { API_BASE, getToken } from "@/lib/auth";
 interface ApprovalItem {
   id: string;
   title: string;
+  description?: string;
   subject?: string;
   grade?: string;
   created_by_name?: string;
   school_name?: string;
   created_at: string;
   question_count?: number;
+  total_questions?: number;
+}
+
+interface PreviewQuestion {
+  id: string;
+  text: string;
+  type: string;
+  options: { id: string; text: string }[];
+  correct_option_ids: string[];
 }
 
 export default function QuizApprovalPage() {
@@ -29,6 +39,30 @@ export default function QuizApprovalPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [approvedCount, setApprovedCount] = useState(0);
   const [rejectedCount, setRejectedCount] = useState(0);
+  // Inline question preview so the reviewer can read the quiz before deciding.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [previewCache, setPreviewCache] = useState<Record<string, PreviewQuestion[]>>({});
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+
+  const togglePreview = useCallback(async (item: ApprovalItem) => {
+    if (openId === item.id) { setOpenId(null); return; }
+    setOpenId(item.id);
+    if (previewCache[item.id]) return;
+    setPreviewLoading(item.id);
+    const token = await getToken();
+    if (!token) { setPreviewLoading(null); return; }
+    try {
+      const res = await fetch(`${API_BASE}/quizzes/${item.id}/questions/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = res.ok ? await res.json() : [];
+      setPreviewCache((c) => ({ ...c, [item.id]: Array.isArray(data) ? data : (data.results ?? []) }));
+    } catch {
+      setPreviewCache((c) => ({ ...c, [item.id]: [] }));
+    } finally {
+      setPreviewLoading(null);
+    }
+  }, [openId, previewCache]);
 
   useEffect(() => {
     document.title = "Quiz Approvals — Skillship";
@@ -59,17 +93,19 @@ export default function QuizApprovalPage() {
     const token = await getToken();
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/quizzes/${item.id}/`, {
-        method: "PATCH",
+      // Status is managed by the quiz state machine, not a writable field — a
+      // PATCH of `status` is silently ignored. Approve = the publish transition.
+      const res = await fetch(`${API_BASE}/quizzes/${item.id}/publish/`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "PUBLISHED" }),
       });
       if (res.ok) {
         setQueue((prev) => prev.filter((i) => i.id !== item.id));
         setApprovedCount((n) => n + 1);
         toast("Quiz approved", "success");
       } else {
-        toast("Failed to approve quiz", "error");
+        const body = await res.json().catch(() => ({}));
+        toast(body?.detail ?? "Failed to approve quiz", "error");
       }
     } catch {
       toast("Network error", "error");
@@ -80,17 +116,18 @@ export default function QuizApprovalPage() {
     const token = await getToken();
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/quizzes/${item.id}/`, {
-        method: "PATCH",
+      // Reject = return the quiz to the author as DRAFT (state-machine action).
+      const res = await fetch(`${API_BASE}/quizzes/${item.id}/return-to-draft/`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "DRAFT" }),
       });
       if (res.ok) {
         setQueue((prev) => prev.filter((i) => i.id !== item.id));
         setRejectedCount((n) => n + 1);
         toast("Quiz rejected", "info");
       } else {
-        toast("Failed to reject quiz", "error");
+        const body = await res.json().catch(() => ({}));
+        toast(body?.detail ?? "Failed to reject quiz", "error");
       }
     } catch {
       toast("Network error", "error");
@@ -226,6 +263,15 @@ export default function QuizApprovalPage() {
                     {/* Actions */}
                     <div className="flex shrink-0 items-center gap-2">
                       <button
+                        onClick={() => togglePreview(item)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border)] bg-white px-4 text-xs font-semibold text-[var(--foreground)] transition-colors hover:border-primary/40 hover:text-primary"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" />
+                        </svg>
+                        {openId === item.id ? "Hide" : "View"} questions
+                      </button>
+                      <button
                         onClick={() => reject(item)}
                         className="inline-flex h-9 items-center gap-1.5 rounded-full border border-red-200 bg-white px-4 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
                       >
@@ -242,6 +288,52 @@ export default function QuizApprovalPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Inline question preview */}
+                  <AnimatePresence initial={false}>
+                    {openId === item.id && (
+                      <motion.div
+                        key="preview"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-4 space-y-3 border-t border-[var(--border)] pt-4">
+                          {item.description && (
+                            <p className="text-xs italic text-[var(--muted-foreground)]">{item.description}</p>
+                          )}
+                          {previewLoading === item.id ? (
+                            <p className="text-xs text-[var(--muted-foreground)]">Loading questions…</p>
+                          ) : (previewCache[item.id]?.length ?? 0) === 0 ? (
+                            <p className="text-xs text-amber-600">⚠ This quiz has no questions — reject it back to the author.</p>
+                          ) : (
+                            previewCache[item.id].map((pq, qi) => (
+                              <div key={pq.id} className="rounded-xl bg-[var(--muted)]/40 p-3">
+                                <p className="text-sm font-semibold text-[var(--foreground)]">{qi + 1}. {pq.text}</p>
+                                <ul className="mt-2 space-y-1">
+                                  {pq.options.map((o) => {
+                                    const correct = pq.correct_option_ids?.includes(o.id);
+                                    return (
+                                      <li key={o.id} className={`flex items-center gap-2 text-xs ${correct ? "font-semibold text-primary" : "text-[var(--muted-foreground)]"}`}>
+                                        <span className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] ${correct ? "border-primary bg-primary/10" : "border-[var(--border)]"}`}>{o.id}</span>
+                                        {o.text}
+                                        {correct && <span className="ml-1 text-[10px] uppercase tracking-wide">✓ correct</span>}
+                                      </li>
+                                    );
+                                  })}
+                                  {pq.options.length === 0 && (
+                                    <li className="text-xs italic text-[var(--muted-foreground)]">Short-answer question</li>
+                                  )}
+                                </ul>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               ))
             )}

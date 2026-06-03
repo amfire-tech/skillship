@@ -15,6 +15,7 @@
 
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Star, User } from "lucide-react";
 
@@ -101,68 +102,81 @@ function IndiaMap() {
   );
 }
 
-/* ── Store badges ── */
-function PlayBadge() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" aria-label="Google Play">
-      <path fill="#00A0FF" d="M3.6 2.3 13 11.7 3.6 21.1c-.36-.2-.6-.6-.6-1.1V3.4c0-.5.24-.9.6-1.1z" />
-      <path fill="#00E676" d="M3.6 2.3c.2-.12.45-.16.7-.1L16 8.7l-3 3z" />
-      <path fill="#FF3A44" d="M3.6 21.1 13 11.7l3 3-11.7 6.5c-.25.06-.5.02-.7-.1z" />
-      <path fill="#FFCE00" d="M16 8.7l4.3 2.4c.7.4.7 1.4 0 1.8L16 15.3 12.9 11.7z" />
-    </svg>
-  );
-}
-function AppleBadge() {
-  return (
-    <span className="grid h-5 w-5 place-items-center rounded-[5px] bg-[#0A84FF]">
-      <svg viewBox="0 0 24 24" width="12" height="12" aria-label="App Store">
-        <path
-          fill="#fff"
-          d="M16.36 1.43c0 1.06-.43 2.07-1.13 2.83-.74.82-1.94 1.46-2.9 1.38-.11-.98.4-1.99 1.05-2.69.72-.82 2-1.45 2.97-1.5l.01-.02zM20 17.05c-.55 1.27-.82 1.83-1.52 2.95-.98 1.55-2.36 3.48-4.07 3.5-1.52.01-1.91-.99-3.98-.98-2.07.01-2.5 1-4.02.98-1.71-.02-3.02-1.77-4-3.32C-.32 16.5-.86 11.32 1.43 8.66c1.14-1.33 2.91-2.16 4.53-2.16 1.65 0 2.69 1 4.06 1 1.32 0 2.13-1 4.04-1 1.44 0 2.96.78 4.05 2.13-3.56 1.95-2.98 7.03.89 8.42z"
-        />
-      </svg>
-    </span>
-  );
-}
-
 interface Review {
   quote: string;
-  name: string;
+  /** Author's role — Principal / Director. */
+  role: string;
+  school: string;
   city: string;
   seed: Seed;
-  store: "play" | "apple";
 }
 
+// Real principal / director testimonials from partner schools.
 const REVIEWS: Review[] = [
   {
     quote:
-      "Skillship is taking care of my skills with its web development course. The best part is that I can easily learn using mobile only — anytime, anywhere.",
-    name: "Rishi", city: "Lucknow", seed: "warm", store: "play",
+      "Skillship Edutech has made technology learning highly interactive and engaging for our students. Through hands-on activities, collaborative projects, AI tools, and robotics challenges, students actively participate in the learning process rather than simply observing it. The curriculum has created an exciting classroom environment where curiosity, creativity, and innovation thrive every day.",
+    role: "Principal", school: "Vidyakunj Group of Schools", city: "Surat", seed: "warm",
   },
   {
     quote:
-      "Great app for the labs! The MCQs are well-designed, cover all key topics, and come with clear explanations. Clean UI and helpful performance tracking.",
-    name: "Preet Kapoor", city: "Amritsar", seed: "cool", store: "play",
+      "Skillship Edutech has empowered our students to move beyond traditional learning and embrace innovation through its AI & Robotics Curriculum. The hands-on projects, real-world applications, and exposure to emerging technologies have sparked curiosity and creativity among our learners. We have witnessed greater student engagement, confidence, and enthusiasm for technology-driven learning.",
+    role: "Principal", school: "Jeevanshilp Campus", city: "Kapadwanj", seed: "cool",
   },
   {
     quote:
-      "Amazing class! Looking forward to building my own game. Thank you for teaching me Python — the quizzes really help with understanding.",
-    name: "Shinaya", city: "Gurugram", seed: "fresh", store: "apple",
+      "The AI & Robotics Curriculum by Skillship Edutech has transformed the way our students learn and interact with technology. Through engaging projects and hands-on experiences, students have developed essential 21st-century skills such as critical thinking, creativity, collaboration, and problem-solving. We are delighted to see our learners becoming more confident, innovative, and future-ready.",
+    role: "Principal", school: "Iqra School", city: "Visnagar", seed: "brand",
   },
   {
     quote:
-      "The way it urges me to attempt questions daily to maintain streaks is brilliant. I keep practising regardless, and it has genuinely improved my scores.",
-    name: "Ria", city: "Pune", seed: "brand", store: "apple",
+      "Skillship Edutech has brought innovation and future-ready learning to our classrooms through its AI & Robotics Curriculum. The hands-on, project-based approach has enabled our students to learn by creating, experimenting, and solving real-world challenges. We have seen a noticeable improvement in student engagement, creativity, and confidence, making technology education both meaningful and inspiring.",
+    role: "Principal", school: "Trinity School", city: "Talod", seed: "fresh",
   },
   {
     quote:
-      "Mind-blowing course. The instructor's explanation was clear, and the interactive animated content makes concepts easy to understand.",
-    name: "Jay Prakash", city: "Agra", seed: "brand", store: "play",
+      "Skillship Edutech's AI & Robotics Curriculum has introduced a new era of experiential learning at our school. Through hands-on projects, innovation-driven activities, and exposure to emerging technologies, our students have developed stronger problem-solving, creativity, and analytical skills. The program has inspired students to explore technology with confidence and enthusiasm while preparing them for the future.",
+    role: "Principal", school: "Rishikul International School", city: "Mathura", seed: "warm",
   },
   {
     quote:
-      "Really super — the instructor explained everything so well. The instant doubt resolution gives me a smooth flow in my studies.",
-    name: "Ansh", city: "Mumbai", seed: "fresh", store: "apple",
+      "Skillship Edutech has been a driving force in transforming our school into an AI-driven learning hub. Through the integration of AI-powered educational tools, coding platforms, robotics labs, and future-ready technology programs, our students are now learning in a more innovative, personalized, and technology-rich environment. This transformation has fostered a culture of creativity, digital excellence, and continuous innovation across the school.",
+    role: "Principal", school: "Royal EduWorld School", city: "Vadodara", seed: "cool",
+  },
+  {
+    quote:
+      "As educators, we have witnessed a remarkable increase in student engagement and curiosity through Skillship Edutech's AI & Robotics Curriculum. The project-based approach encourages students to apply concepts practically, collaborate effectively, and develop critical thinking skills. The curriculum is well-structured, easy to implement, and has brought a new level of innovation and excitement to our classrooms.",
+    role: "Director", school: "Sadguru School", city: "Vadodara", seed: "brand",
+  },
+  {
+    quote:
+      "Skillship Edutech has been instrumental in our journey toward becoming an AI-enabled school. From AI-powered learning tools and intelligent classroom solutions to hands-on exposure in Artificial Intelligence, Robotics, and Coding, their comprehensive approach has transformed the learning experience for both students and educators. This initiative has helped create a culture of innovation, preparing our students for the opportunities of an AI-driven future.",
+    role: "Principal", school: "IDP School", city: "Ahmedabad", seed: "fresh",
+  },
+  {
+    quote:
+      "Skillship Edutech has played a key role in transforming our institution into an AI-enabled campus. Through the integration of AI-powered learning tools, robotics education, coding platforms, and future-ready technology infrastructure, our students now experience a more innovative and engaging learning environment. This transformation has strengthened digital literacy across the school and positioned our students to thrive in a technology-driven world.",
+    role: "Principal", school: "Shree Ganesh Educational Campus", city: "Ahmedabad", seed: "warm",
+  },
+  {
+    quote:
+      "As a Principal, I strongly believe that students learn best when they are encouraged to explore, create, and innovate. Skillship Edutech's AI & Robotics Curriculum has provided our students with exactly that opportunity. The hands-on, future-focused approach has enhanced their creativity, confidence, and problem-solving skills while making technology learning both meaningful and enjoyable. We are pleased with the positive impact the program has had on our school community.",
+    role: "Principal", school: "Bluebells School", city: "Ahmedabad", seed: "cool",
+  },
+  {
+    quote:
+      "Skillship Edutech's AI & Robotics Curriculum has provided our students with a highly engaging, project-driven learning experience. By working on real-world projects in AI, Robotics, Coding, and IoT, students have strengthened their innovation, critical thinking, and problem-solving abilities. The curriculum effectively bridges the gap between theory and practical application, preparing students for the technologies of tomorrow.",
+    role: "Principal", school: "Knowledge High School", city: "Nadiad", seed: "brand",
+  },
+  {
+    quote:
+      "The AI & Robotics Curriculum by Skillship Edutech has transformed the way our students engage with technology. Through hands-on learning and practical projects, students have developed critical thinking, creativity, and problem-solving skills while exploring emerging technologies. We appreciate Skillship's dedication to making future-ready education accessible and engaging for our learners.",
+    role: "Principal", school: "Knowledge High School", city: "Mahemdabad", seed: "fresh",
+  },
+  {
+    quote:
+      "Skillship Edutech's AI & Robotics Curriculum has brought a new dimension to learning at our school. The hands-on activities, innovative projects, and future-focused approach have significantly enhanced student engagement, creativity, and problem-solving skills. We are pleased with the positive impact of the program and highly appreciate Skillship's commitment to delivering quality STEM education.",
+    role: "Principal", school: "Knowledge High School", city: "Dholka", seed: "warm",
   },
 ];
 
@@ -170,28 +184,42 @@ function Stars() {
   return (
     <div className="flex items-center gap-1" aria-label="5 out of 5 stars">
       {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} size={17} className="fill-[var(--orange-500)] text-[var(--orange-500)]" />
+        <Star key={i} size={16} className="fill-[var(--orange-500)] text-[var(--orange-500)]" />
       ))}
     </div>
   );
 }
 
-function ReviewCard({ r }: { r: Review }) {
+function ReviewCard({ r, onToggle }: { r: Review; onToggle: (open: boolean) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    onToggle(next);
+  };
   return (
-    <article className="rounded-3xl border border-[color:var(--border-subtle)] bg-[var(--card)] p-6 shadow-soft">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className={`grid h-10 w-10 place-items-center rounded-full text-[15px] font-semibold text-white ${SEED_GRADIENT[r.seed]}`}>
-            {r.name.charAt(0)}
-          </span>
-          <div>
-            <p className="text-[15px] font-semibold leading-tight text-[var(--ink-primary)]">{r.name}</p>
-            <p className="text-[12px] text-[var(--ink-tertiary)]">{r.city}</p>
-          </div>
+    <article className="card-lift rounded-3xl border border-[color:var(--border-subtle)] bg-[var(--card)] p-6 shadow-soft">
+      <header className="flex items-center gap-3">
+        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-[15px] font-semibold text-white ${SEED_GRADIENT[r.seed]}`}>
+          {r.school.charAt(0)}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[15px] font-semibold leading-tight text-[var(--ink-primary)]">{r.school}</p>
+          <p className="text-[12px] text-[var(--ink-tertiary)]">{r.role} · {r.city}</p>
         </div>
-        {r.store === "play" ? <PlayBadge /> : <AppleBadge />}
       </header>
-      <p className="mt-4 text-[14.5px] leading-[1.6] text-[var(--ink-secondary)]">{r.quote}</p>
+
+      <p className={`mt-4 text-[14.5px] leading-[1.6] text-[var(--ink-secondary)] ${expanded ? "" : "line-clamp-3"}`}>
+        &ldquo;{r.quote}&rdquo;
+      </p>
+      <button
+        type="button"
+        onClick={toggle}
+        className="mt-2 text-[13px] font-semibold text-[var(--teal-600)] transition-colors hover:text-[var(--orange-500)]"
+      >
+        {expanded ? "Read less" : "Read more"}
+      </button>
+
       <div className="mt-4">
         <Stars />
       </div>
@@ -201,6 +229,10 @@ function ReviewCard({ r }: { r: Review }) {
 
 export function SocialProof() {
   const loop = [...REVIEWS, ...REVIEWS];
+  // Pause the auto-scroll whenever any card is expanded so the reader can
+  // actually read the full review without it sliding away.
+  const [openCount, setOpenCount] = useState(0);
+  const onToggle = (open: boolean) => setOpenCount((n) => Math.max(0, n + (open ? 1 : -1)));
 
   return (
     <section className="bg-[var(--bg-warm)]">
@@ -255,9 +287,12 @@ export function SocialProof() {
           {/* Auto-scrolling reviews */}
           <div className="lg:col-span-5">
             <div className="review-viewport relative h-[460px] overflow-hidden md:h-[560px]">
-              <div className="review-track flex flex-col gap-5">
+              <div
+                className="review-track flex flex-col gap-5"
+                style={{ animationPlayState: openCount > 0 ? "paused" : undefined }}
+              >
                 {loop.map((r, i) => (
-                  <ReviewCard key={`${r.name}-${i}`} r={r} />
+                  <ReviewCard key={`${r.school}-${r.city}-${i}`} r={r} onToggle={onToggle} />
                 ))}
               </div>
               {/* fade edges */}

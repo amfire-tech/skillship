@@ -56,6 +56,7 @@ from .serializers import (
     QuestionBankSerializer,
     QuizAssignmentSerializer,
     QuizAttemptReadSerializer,
+    QuizAuthoringSerializer,
     QuizSerializer,
     QuizStudentSerializer,
 )
@@ -180,6 +181,13 @@ class QuizViewSet(TenantScopedViewSet):
         course_id = self.request.query_params.get("course")
         if course_id:
             qs = qs.filter(course_id=course_id)
+        # Optional ?status=REVIEW filter — the approval panel relies on this to
+        # show only pending quizzes (ignored values are silently skipped).
+        status_param = self.request.query_params.get("status")
+        if status_param and self.request.user.role != Role.STUDENT:
+            wanted = status_param.upper()
+            if wanted in Quiz.Status.values:
+                qs = qs.filter(status=wanted)
         return qs
 
     # Writes (create / update / delete) are staff-only.
@@ -195,6 +203,80 @@ class QuizViewSet(TenantScopedViewSet):
             serializer.save(school_id=school_id, created_by=self.request.user)
         else:
             serializer.save(school_id=self.request.user.school_id, created_by=self.request.user)
+
+    @extend_schema(request=QuizAuthoringSerializer, responses={201: QuizSerializer, 400: _BAD_REQUEST})
+    @action(detail=False, methods=["post"], url_path="authoring",
+            permission_classes=[IsAuthenticated, CanAuthorContent])
+    def authoring(self, request):
+        """One-shot wizard create: provision course + bank + questions + quiz and
+        run the DRAFT→REVIEW transition. The wizard sends a self-contained quiz;
+        services.author_quiz bridges it to the course/bank data model."""
+        self._require_author()
+        ser = QuizAuthoringSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        if self._user_is_main_admin():
+            school_id = request.data.get("school")
+            if not school_id:
+                raise ValidationError({"school": "MAIN_ADMIN must specify a target school."})
+        else:
+            school_id = request.user.school_id
+
+        try:
+            quiz = services.author_quiz(
+                actor=request.user, school_id=school_id, data=ser.validated_data,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": _err(exc)}) from exc
+        return Response(QuizSerializer(quiz).data, status=status.HTTP_201_CREATED)
+
+    @extend_schema(responses={200: QuestionSerializer(many=True)})
+    @action(detail=True, methods=["get"], url_path="questions")
+    def questions(self, request, id=None):
+        """Questions for this quiz (drawn from its bank).
+
+        - STUDENT: answer-free shape (no correct_option_ids), limited to
+          `total_questions`, shuffled when `randomize_questions` is on. Only
+          reachable for PUBLISHED quizzes (get_object is status-scoped).
+        - Staff: full shape WITH correct answers — used by the approval panel
+          to review content before publishing.
+        """
+        quiz = self.get_object()
+        pool = list(quiz.bank.questions.all())
+        if request.user.role == Role.STUDENT:
+            import random
+            if quiz.randomize_questions:
+                random.shuffle(pool)
+            pool = pool[: quiz.total_questions or len(pool)]
+            data = QuestionStudentSerializer(pool, many=True).data
+        else:
+            data = QuestionSerializer(pool, many=True).data
+        return Response(data)
+
+    @extend_schema(request=None, responses={201: OpenApiResponse(description="Scored attempt.")})
+    @action(detail=True, methods=["post"], url_path="attempts",
+            permission_classes=[IsAuthenticated, CanReadQuiz])
+    def attempts(self, request, id=None):
+        """Student submits all answers at once ({question_id: option_id}); we
+        grade server-side and return the score."""
+        quiz = self.get_object()
+        if request.user.role != Role.STUDENT:
+            raise ValidationError({"detail": "Only students can attempt a quiz."})
+        try:
+            attempt = services.submit_full_attempt(
+                quiz=quiz, student=request.user, answers=request.data.get("answers") or {},
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": _err(exc)}) from exc
+        return Response({
+            "id": str(attempt.id),
+            "score_percent": float(attempt.score_percent),
+            "points_earned": attempt.points_earned,
+            "points_total": attempt.points_total,
+            "correct_count": attempt.correct_count,
+            "total_questions": len(attempt.question_order),
+            "passed": float(attempt.score_percent) >= quiz.pass_percentage,
+        }, status=status.HTTP_201_CREATED)
 
     def perform_update(self, serializer):
         self._require_author()

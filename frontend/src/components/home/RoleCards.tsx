@@ -1,7 +1,9 @@
 /*
  * File:    frontend/src/components/home/RoleCards.tsx
- * Purpose: "Built for every role" — 5 stakeholder cards (brief §9). 5-col on
- *          desktop, horizontal-scroll on narrow viewports. Each card has a
+ * Purpose: "Built for every role" — 3 stakeholder cards (Principal, Teacher,
+ *          Student). 3-col on desktop, horizontal-scroll on narrow viewports.
+ *          Admin / Sub-Admin sign in from the footer, not the marketing page.
+ *          Each card has a
  *          role-specific gradient band, a lucide icon in a white circle, and
  *          a single-line tagline. Cards link to /login (the real surface for
  *          that role) rather than a fake "See dashboard" modal — the modal
@@ -15,7 +17,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  ShieldCheck, Layers, LineChart, Users, Sparkles,
+  LineChart, Users, Sparkles,
   ArrowUpRight, type LucideIcon,
 } from "lucide-react";
 
@@ -30,18 +32,6 @@ interface Role {
 }
 
 const ROLES: Role[] = [
-  {
-    name: "Admin",
-    tagline: "Full platform control. School onboarding. AI tuning.",
-    icon: ShieldCheck,
-    gradient: "bg-[linear-gradient(135deg,#F39C32_0%,#F8B660_100%)]",
-  },
-  {
-    name: "Sub-Admin",
-    tagline: "Question banks, content workflows, school-level reports.",
-    icon: Layers,
-    gradient: "bg-brand-gradient",
-  },
   {
     name: "Principal",
     tagline: "School-wide analytics. Benchmarking. PDF and Excel exports.",
@@ -74,7 +64,7 @@ function RoleCard({ role, index }: { role: Role; index: number }) {
     >
       <Link
         href="/login"
-        className="relative flex h-[360px] w-full flex-col overflow-hidden rounded-[20px] border border-[color:var(--border-subtle)] bg-white shadow-soft transition-all duration-300 ease-out-expo hover:-translate-y-2 hover:shadow-strong"
+        className="card-lift relative flex h-[360px] w-full flex-col overflow-hidden rounded-[20px] border border-[color:var(--border-subtle)] bg-white shadow-soft"
       >
         {/* Gradient band — top 40% */}
         <div className={`relative h-[144px] ${role.gradient}`}>
@@ -115,7 +105,7 @@ export function RoleCards() {
             transition={{ duration: 0.5, ease: EASE }}
             className="text-[11.5px] font-semibold uppercase tracking-[0.22em] text-[var(--teal-600)]"
           >
-            Five stakeholders, five experiences
+            Three roles, three tailored experiences
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 14 }}
@@ -129,8 +119,8 @@ export function RoleCards() {
           </motion.h2>
         </div>
 
-        {/* Grid: 5-col desktop, horizontal scroll on small viewports */}
-        <div className="role-grid mt-16 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Grid: 3-col desktop, horizontal scroll on small viewports */}
+        <div className="role-grid mx-auto mt-16 grid max-w-[1040px] grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {ROLES.map((r, i) => (
             <RoleCard key={r.name} role={r} index={i} />
           ))}

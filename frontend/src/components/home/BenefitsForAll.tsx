@@ -98,7 +98,8 @@ function AudienceColumn({ a, index }: { a: Audience; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 0.7, delay: index * 0.12, ease: EASE }}
-      className="card-pop group relative flex flex-col overflow-hidden rounded-[28px] border border-[color:var(--border-subtle)] bg-white shadow-soft"
+      whileHover={{ y: -10, scale: 1.025, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+      className="card-pop card-lift group relative flex flex-col overflow-hidden rounded-[28px] border border-[color:var(--border-subtle)] bg-white shadow-soft"
     >
       {/* Header band */}
       <div className={`relative px-7 py-9 ${a.band}`}>

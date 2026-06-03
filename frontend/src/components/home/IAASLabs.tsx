@@ -457,12 +457,12 @@ export function IAASLabs() {
               <motion.div
                 key={a.title}
                 initial={{ opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                whileInView={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: i * 0.05, ease: EASE } }}
                 viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 0.5, delay: i * 0.05, ease: EASE }}
-                className="flex flex-col items-start gap-3 rounded-2xl border border-[color:var(--border-subtle)] bg-white p-5 shadow-soft"
+                whileHover={{ y: -10, scale: 1.035, transition: { type: "spring", stiffness: 320, damping: 20 } }}
+                className="group card-lift flex flex-col items-start gap-3 rounded-2xl border border-[color:var(--border-subtle)] bg-white p-5 shadow-soft"
               >
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--cream)] text-[var(--teal-600)]">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--cream)] text-[var(--teal-600)] transition-all duration-300 group-hover:scale-110 group-hover:bg-[var(--teal-500)] group-hover:text-white group-hover:shadow-[0_6px_16px_-4px_var(--teal-500)]">
                   <Icon size={20} strokeWidth={1.7} />
                 </span>
                 <p className="text-[13.5px] font-semibold leading-[1.3] text-[var(--ink-primary)]">

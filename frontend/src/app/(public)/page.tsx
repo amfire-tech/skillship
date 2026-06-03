@@ -25,6 +25,7 @@
  */
 
 import { Hero } from "@/components/home/Hero";
+import { SchoolLogos } from "@/components/home/SchoolLogos";
 import { ThePromise } from "@/components/home/ThePromise";
 import { ThreePillars } from "@/components/home/ThreePillars";
 import { IAASLabs } from "@/components/home/IAASLabs";
@@ -34,7 +35,7 @@ import { CareerPilot } from "@/components/home/CareerPilot";
 import { AdaptiveQuiz } from "@/components/home/AdaptiveQuiz";
 import { QuestionGenerator } from "@/components/home/QuestionGenerator";
 import { CareerRoadmap } from "@/components/home/CareerRoadmap";
-import { Marketplace } from "@/components/home/Marketplace";
+import { SkillsShowcase } from "@/components/home/SkillsShowcase";
 import { RoleCards } from "@/components/home/RoleCards";
 import { BenefitsForAll } from "@/components/home/BenefitsForAll";
 import { ImpactGallery } from "@/components/home/ImpactGallery";
@@ -46,6 +47,7 @@ export default function HomePage() {
   return (
     <>
       <Hero />
+      <SchoolLogos />
       <ThePromise />
       <ThreePillars />
       {/* The three pillars run consecutively so the reader walks 1 → 2 → 3
@@ -61,7 +63,7 @@ export default function HomePage() {
         <CareerRoadmap />
       </div>
       <HardwareShowcase />
-      <Marketplace />
+      <SkillsShowcase />
       <RoleCards />
       <BenefitsForAll />
       <ImpactGallery />

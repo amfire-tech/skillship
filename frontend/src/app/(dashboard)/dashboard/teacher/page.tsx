@@ -152,10 +152,12 @@ export default function TeacherHomePage() {
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setGenerating(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/quizzes/generate/`, {
+      const res = await fetch(`${API_BASE}/ai/quiz/generate/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        // Quick free-text box: the whole prompt is the topic; the AI infers
+        // count/grade/difficulty from it. The full wizard sends them explicitly.
+        body: JSON.stringify({ topic: prompt }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -163,14 +165,30 @@ export default function TeacherHomePage() {
         return;
       }
       const data = await res.json();
+      // AI returns options as [{id,text}] + correct_option_ids (["C"]); the
+      // wizard expects string options + a correct_answer_index. Normalise both.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items = (data?.questions ?? data ?? [])
-        .map((q: { text?: string; question_text?: string; question?: string; options?: string[]; choices?: string[]; correct_answer_index?: number; correct_index?: number; difficulty?: string }) => ({
-          text: q.text ?? q.question_text ?? q.question ?? "",
-          subject: data?.subject,
-          difficulty: (q.difficulty ?? data?.difficulty ?? "MEDIUM").toString().toUpperCase(),
-          options: q.options ?? q.choices ?? [],
-          correct_answer_index: q.correct_answer_index ?? q.correct_index ?? 0,
-        }))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((q: any) => {
+          const rawOpts: unknown[] = q.options ?? q.choices ?? [];
+          const options: string[] = rawOpts.map((o) =>
+            typeof o === "string" ? o : ((o as { text?: string })?.text ?? ""),
+          );
+          let correct_answer_index = q.correct_answer_index ?? q.correct_index ?? 0;
+          const correctIds = q.correct_option_ids ?? q.correct_ids;
+          if (Array.isArray(correctIds) && correctIds.length && rawOpts.length && typeof rawOpts[0] === "object") {
+            const idx = (rawOpts as { id?: string }[]).findIndex((o) => o?.id === correctIds[0]);
+            if (idx >= 0) correct_answer_index = idx;
+          }
+          return {
+            text: q.text ?? q.question_text ?? q.question ?? "",
+            subject: data?.subject,
+            difficulty: (q.difficulty ?? data?.difficulty ?? "MEDIUM").toString().toUpperCase(),
+            options,
+            correct_answer_index,
+          };
+        })
         .filter((q: { text: string; options: string[] }) => q.text && q.options.length >= 2);
 
       if (items.length === 0) { toast("Generator returned no usable questions.", "error"); return; }

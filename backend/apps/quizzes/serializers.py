@@ -238,6 +238,42 @@ class QuizSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class _AuthoringQuestionSerializer(serializers.Serializer):
+    """One inline question as the wizard sends it (options are plain strings)."""
+
+    text = serializers.CharField()
+    options = serializers.ListField(
+        child=serializers.CharField(allow_blank=True), required=False, default=list,
+    )
+    correct_answer_index = serializers.IntegerField(required=False, default=0)
+    difficulty = serializers.CharField(required=False, allow_blank=True, default="")
+    explanation = serializers.CharField(required=False, allow_blank=True, default="")
+    points = serializers.IntegerField(required=False, default=1, min_value=1)
+
+
+class QuizAuthoringSerializer(serializers.Serializer):
+    """Accepts the teacher/sub-admin wizard payload. The view hands the validated
+    data to services.author_quiz, which provisions course + bank + questions +
+    quiz and runs the DRAFT→REVIEW transition. Write-only — reads use QuizSerializer."""
+
+    title = serializers.CharField(max_length=200)
+    subject = serializers.CharField(max_length=120, required=False, allow_blank=True, default="General")
+    grade = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    instructions = serializers.CharField(required=False, allow_blank=True, default="")
+    difficulty = serializers.CharField(max_length=10, required=False, allow_blank=True, default="MEDIUM")
+    duration_minutes = serializers.IntegerField(required=False, default=30, min_value=1, max_value=600)
+    passing_score = serializers.IntegerField(required=False, default=50, min_value=0, max_value=100)
+    attempts_allowed = serializers.IntegerField(required=False, default=1, min_value=1, max_value=20)
+    shuffle_questions = serializers.BooleanField(required=False, default=True)
+    status = serializers.ChoiceField(choices=["DRAFT", "REVIEW"], required=False, default="DRAFT")
+    questions = _AuthoringQuestionSerializer(many=True)
+
+    def validate_questions(self, value):
+        if not value:
+            raise serializers.ValidationError("Add at least one question.")
+        return value
+
+
 class QuizStudentSerializer(serializers.ModelSerializer):
     """Lightweight, read-only quiz shape for STUDENT listings."""
 

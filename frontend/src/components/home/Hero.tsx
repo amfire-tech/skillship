@@ -483,7 +483,7 @@ export function Hero() {
     >
       <AmbientBackground />
 
-      <div className="relative mx-auto grid w-full max-w-[1280px] grid-cols-1 items-center gap-10 px-6 pb-10 pt-10 lg:grid-cols-12 lg:gap-8 lg:px-12 lg:pb-14 lg:pt-16">
+      <div className="relative mx-auto grid w-full max-w-[1280px] grid-cols-1 items-center gap-10 px-6 pb-8 pt-5 lg:grid-cols-12 lg:gap-8 lg:px-12 lg:pb-10 lg:pt-6">
         {/* Left: copy column */}
         <div className="lg:col-span-7">
           {/* Eyebrow */}

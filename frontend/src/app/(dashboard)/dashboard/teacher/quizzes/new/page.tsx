@@ -2,7 +2,7 @@
  * File:    frontend/src/app/(dashboard)/dashboard/teacher/quizzes/new/page.tsx
  * Purpose: 4-step quiz creation wizard with AI question generator side panel.
  *          Steps: Basic Info → Add Questions → Settings → Review & Submit.
- *          AI generator calls /quizzes/generate/ (Plan-01 AI feature).
+ *          AI generator calls /ai/quiz/generate/ (Plan-01 AI feature).
  *          Real API only.
  * Owner:   Pranav
  */
@@ -140,22 +140,29 @@ export default function QuizCreationWizard() {
     if (!token) { toast("Session expired", "error"); return null; }
 
     try {
-      const quizRes = await fetch(`${API_BASE}/quizzes/`, {
+      // One atomic call: the backend authoring adapter provisions the course +
+      // question bank, creates the questions, builds the quiz, and applies the
+      // DRAFT/REVIEW transition. (Publishing is the reviewer's job.)
+      const quizRes = await fetch(`${API_BASE}/quizzes/authoring/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           title: basic.title.trim(),
           subject: basic.subject,
           grade: basic.grade,
-          section: basic.section === "All" ? null : basic.section,
-          duration_minutes: basic.duration,
           instructions: basic.instructions.trim(),
           difficulty: basic.difficulty,
-          shuffle_questions: settings.shuffle_questions,
-          show_correct_answers: settings.show_correct,
+          duration_minutes: basic.duration,
           passing_score: settings.passing_score,
           attempts_allowed: settings.attempts_allowed,
-          status,
+          shuffle_questions: settings.shuffle_questions,
+          status: status === "PUBLISHED" ? "REVIEW" : status,
+          questions: questions.map((q) => ({
+            text: q.text,
+            options: q.options,
+            correct_answer_index: q.correct_answer_index,
+            difficulty: q.difficulty ?? basic.difficulty,
+          })),
         }),
       });
       if (!quizRes.ok) {
@@ -164,16 +171,7 @@ export default function QuizCreationWizard() {
         return null;
       }
       const quiz = await quizRes.json();
-      const quizId: string = quiz?.id;
-
-      if (quizId && questions.length > 0) {
-        await fetch(`${API_BASE}/quizzes/${quizId}/questions/`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ questions }),
-        }).catch(() => undefined);
-      }
-      return quizId;
+      return quiz?.id ?? null;
     } catch {
       toast("Network error", "error");
       return null;
@@ -637,14 +635,14 @@ function AIGeneratorPanel({
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setLoading(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/quizzes/generate/`, {
+      const res = await fetch(`${API_BASE}/ai/quiz/generate/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           topic: topic.trim(),
           subject: defaultSubject || topic.trim(),
           grade: grade || undefined,
-          difficulty,
+          difficulty: difficulty.toLowerCase(),
           count,
         }),
       });
@@ -654,14 +652,31 @@ function AIGeneratorPanel({
         return;
       }
       const data = await res.json();
+      // The AI service returns options as [{id,text}] and the answer as
+      // correct_option_ids (e.g. ["C"]). The wizard works with plain string
+      // options + a correct_answer_index, so normalise both here.
       const items: DraftQuestion[] = (data?.questions ?? data ?? [])
-        .map((q: { text?: string; question_text?: string; question?: string; options?: string[]; choices?: string[]; correct_answer_index?: number; correct_index?: number; answer_index?: number; correct?: number }) => ({
-          text: q.text ?? q.question_text ?? q.question ?? "",
-          subject: defaultSubject,
-          difficulty,
-          options: q.options ?? q.choices ?? [],
-          correct_answer_index: q.correct_answer_index ?? q.correct_index ?? q.answer_index ?? q.correct ?? 0,
-        }))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((q: any) => {
+          const rawOpts: unknown[] = q.options ?? q.choices ?? [];
+          const options: string[] = rawOpts.map((o) =>
+            typeof o === "string" ? o : ((o as { text?: string })?.text ?? ""),
+          );
+          let correct_answer_index =
+            q.correct_answer_index ?? q.correct_index ?? q.answer_index ?? q.correct ?? 0;
+          const correctIds = q.correct_option_ids ?? q.correct_ids;
+          if (Array.isArray(correctIds) && correctIds.length && rawOpts.length && typeof rawOpts[0] === "object") {
+            const idx = (rawOpts as { id?: string }[]).findIndex((o) => o?.id === correctIds[0]);
+            if (idx >= 0) correct_answer_index = idx;
+          }
+          return {
+            text: q.text ?? q.question_text ?? q.question ?? "",
+            subject: defaultSubject,
+            difficulty,
+            options,
+            correct_answer_index,
+          };
+        })
         .filter((q: DraftQuestion) => q.text && q.options.length >= 2);
 
       if (items.length === 0) {

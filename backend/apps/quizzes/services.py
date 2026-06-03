@@ -41,7 +41,7 @@ from django.utils import timezone
 
 from apps.common.permissions import Role
 
-from .models import Answer, Question, Quiz, QuizAttempt
+from .models import Answer, Question, QuestionBank, Quiz, QuizAttempt
 
 
 # ── Quiz state machine ──────────────────────────────────────────────────────
@@ -105,6 +105,182 @@ def transition_quiz_status(quiz: Quiz, *, target: str, actor) -> Quiz:
             locked.archived_at = timezone.now()
         locked.save(update_fields=["status", "published_at", "archived_at", "updated_at"])
         return locked
+
+
+# ── Wizard authoring adapter ────────────────────────────────────────────────
+#
+# The teacher/sub-admin quiz wizard thinks of a quiz as a self-contained object:
+# title + subject + grade + a list of inline questions. The data model is
+# course + question-bank based (questions live in a bank; a quiz draws from it).
+# This adapter bridges the two: it provisions a Course and a QuestionBank from
+# the wizard's subject/grade, creates the inline Questions in that bank, builds
+# the Quiz, and runs the requested DRAFT→REVIEW transition — all atomically.
+
+_OPTION_IDS = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+
+def _parse_grade(grade: str) -> int:
+    """'Class 6' / '6' / 'Grade 8' → 6 / 6 / 8. Clamped to 1–12, default 1."""
+    import re
+
+    m = re.search(r"\d+", grade or "")
+    if not m:
+        return 1
+    return max(1, min(12, int(m.group())))
+
+
+def _convert_question(raw: dict, default_difficulty: str) -> dict:
+    """Map a wizard DraftQuestion (options as plain strings + correct index) to
+    the stored Question shape (options as [{id,text}] + correct_option_ids)."""
+    opts = [str(o) for o in (raw.get("options") or []) if str(o).strip()]
+    diff = (raw.get("difficulty") or default_difficulty or "MEDIUM").upper()
+    if diff not in {d.value for d in Question.Difficulty}:
+        diff = Question.Difficulty.MEDIUM
+    if opts:
+        options = [{"id": _OPTION_IDS[i], "text": text} for i, text in enumerate(opts)]
+        idx = raw.get("correct_answer_index") or 0
+        idx = idx if 0 <= idx < len(options) else 0
+        return {
+            "text": raw["text"],
+            "type": Question.Type.MCQ,
+            "difficulty": diff,
+            "options": options,
+            "correct_option_ids": [options[idx]["id"]],
+            "explanation": raw.get("explanation", "") or "",
+            "points": raw.get("points") or 1,
+        }
+    return {
+        "text": raw["text"],
+        "type": Question.Type.SHORT_ANSWER,
+        "difficulty": diff,
+        "options": [],
+        "correct_option_ids": [],
+        "explanation": raw.get("explanation", "") or "",
+        "points": raw.get("points") or 1,
+    }
+
+
+@transaction.atomic
+def author_quiz(*, actor, school_id, data: dict) -> Quiz:
+    """Provision course + bank + questions + quiz from the wizard payload and
+    apply the requested status transition. Returns the created Quiz."""
+    from uuid import uuid4
+
+    from apps.academics.models import Course
+
+    subject = (data.get("subject") or "General").strip() or "General"
+    grade_num = _parse_grade(data.get("grade") or "")
+    default_difficulty = (data.get("difficulty") or "MEDIUM").upper()
+
+    course, _ = Course.objects.get_or_create(
+        school_id=school_id,
+        name=subject,
+        defaults={
+            "code": f"{subject[:6].upper().replace(' ', '')}-{grade_num}",
+            "grade_min": grade_num,
+            "grade_max": grade_num,
+        },
+    )
+
+    bank = QuestionBank.objects.create(
+        school_id=school_id,
+        course=course,
+        # Unique per (school, course, name); suffix keeps same-titled quizzes distinct.
+        name=f"{data['title'][:180]} — {uuid4().hex[:6]}",
+        created_by=actor,
+    )
+
+    questions = data.get("questions") or []
+    Question.objects.bulk_create([
+        Question(bank=bank, school_id=school_id, created_by=actor,
+                 **_convert_question(q, default_difficulty))
+        for q in questions
+    ])
+
+    quiz = Quiz.objects.create(
+        school_id=school_id,
+        course=course,
+        bank=bank,
+        title=data["title"],
+        description=data.get("instructions", "") or "",
+        randomize_questions=data.get("shuffle_questions", True),
+        duration_minutes=data.get("duration_minutes") or 30,
+        total_questions=max(len(questions), 1),
+        pass_percentage=data.get("passing_score", 50),
+        attempts_allowed=data.get("attempts_allowed", 1),
+        created_by=actor,
+        status=Quiz.Status.DRAFT,
+    )
+
+    # Teacher "Submit" asks for REVIEW; "Save draft" stays DRAFT. Publishing is
+    # the reviewer's job (admin/principal/sub-admin) via the approval panel.
+    if (data.get("status") or "DRAFT").upper() == "REVIEW":
+        quiz = transition_quiz_status(quiz, target=Quiz.Status.REVIEW, actor=actor)
+
+    return quiz
+
+
+@transaction.atomic
+def submit_full_attempt(*, quiz: Quiz, student, answers: dict) -> QuizAttempt:
+    """One-shot attempt grading: the student submits every answer at once
+    ({question_id: option_id}). We create the attempt, grade server-side against
+    each question's correct_option_ids, and return the scored attempt.
+
+    Scoring is server-authoritative — the client's view of correctness is never
+    trusted (students only ever receive the answer-free question shape)."""
+    if quiz.status != Quiz.Status.PUBLISHED:
+        raise ValidationError("Quiz is not published.")
+    if student.school_id != quiz.school_id:
+        raise ValidationError("Quiz does not belong to your school.")
+
+    prior = (
+        QuizAttempt.objects.filter(quiz=quiz, student=student)
+        .exclude(status=QuizAttempt.Status.IN_PROGRESS)
+        .count()
+    )
+    if quiz.attempts_allowed and prior >= quiz.attempts_allowed:
+        raise ValidationError("You have used all your attempts for this quiz.")
+
+    now = timezone.now()
+    questions = list(quiz.bank.questions.all())
+    attempt = QuizAttempt.objects.create(
+        school_id=quiz.school_id,
+        quiz=quiz,
+        student=student,
+        status=QuizAttempt.Status.SUBMITTED,
+        attempt_number=prior + 1,
+        expires_at=now,
+        submitted_at=now,
+        question_order=[str(q.id) for q in questions],
+    )
+
+    points_earned = points_total = correct_count = 0
+    rows = []
+    for q in questions:
+        sel = (answers or {}).get(str(q.id))
+        selected_ids = [sel] if sel else []
+        is_correct = bool(selected_ids) and sorted(selected_ids) == sorted(q.correct_option_ids)
+        awarded = q.points if is_correct else 0
+        points_total += q.points
+        points_earned += awarded
+        correct_count += 1 if is_correct else 0
+        rows.append(Answer(
+            school_id=quiz.school_id, attempt=attempt, question=q,
+            selected_option_ids=selected_ids, is_correct=is_correct, points_awarded=awarded,
+        ))
+    Answer.objects.bulk_create(rows)
+
+    pct = (
+        Decimal(0) if points_total == 0
+        else (Decimal(points_earned) / Decimal(points_total) * 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
+    )
+    attempt.score_percent = pct
+    attempt.points_earned = points_earned
+    attempt.points_total = points_total
+    attempt.correct_count = correct_count
+    attempt.save(update_fields=["score_percent", "points_earned", "points_total", "correct_count"])
+    return attempt
 
 
 # ── Attempt lifecycle ───────────────────────────────────────────────────────

@@ -192,7 +192,7 @@ export default function DashboardLayout({
 
   if (ADMIN_SHELL_ROLES.includes(user.role)) {
     return (
-      <div className="flex min-h-screen bg-[var(--muted)]/30">
+      <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
         {/* Mobile overlay */}
         {mobileSidebarOpen && (
           <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeSidebar} aria-hidden="true" />
@@ -215,7 +215,7 @@ export default function DashboardLayout({
   const roleConfig = ROLE_NAV[user.role as UserRole];
   if (roleConfig) {
     return (
-      <div className="flex min-h-screen bg-[var(--muted)]/30">
+      <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
         {/* Mobile overlay */}
         {mobileSidebarOpen && (
           <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeSidebar} aria-hidden="true" />

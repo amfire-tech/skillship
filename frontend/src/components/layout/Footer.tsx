@@ -21,12 +21,12 @@ const PLATFORM = [
   { label: "About",        href: "/about" },
 ];
 
-const COURSES = [
-  { label: "Beginner's Python for AI",   href: "/marketplace" },
-  { label: "Advanced Python for AI",     href: "/marketplace" },
-  { label: "Complete Artificial Intelligence", href: "/marketplace" },
-  { label: "Robotics with Hardware Kit", href: "/marketplace" },
-  { label: "View all",                   href: "/marketplace" },
+// The three pillars of the Skillship ecosystem (see ThreePillars section).
+const ECOSYSTEM = [
+  { label: "AI & Robotics Labs (IAAS)",  href: "/#iaas-labs" },
+  { label: "Teacher Training (TAAS)",    href: "/#pillars" },
+  { label: "Learning Software (SAAS)",   href: "/#pillars" },
+  { label: "Explore the ecosystem",      href: "/#pillars" },
 ];
 
 const LEGAL = [
@@ -90,13 +90,13 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Courses */}
+          {/* Ecosystem — the three Skillship pillars */}
           <div>
             <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-tertiary)]">
-              Courses
+              Our Ecosystem
             </h3>
             <ul className="mt-5 space-y-3" role="list">
-              {COURSES.map((l) => (
+              {ECOSYSTEM.map((l) => (
                 <li key={l.label}>
                   <Link
                     href={l.href}

@@ -8,9 +8,9 @@
  *          rhythm. Mobile collapses to a single column with the hero photo
  *          first. Each photo has a soft-zoom hover state.
  *
- *          IMPORTANT: photos here are illustrative Unsplash placeholders.
- *          The client owns real Skillship classroom photography — swap
- *          each src/alt pair once those land. The grid auto-adapts.
+ *          Photos are the client's real Skillship classroom / event
+ *          photography, served from /public/impact. The grid auto-adapts if
+ *          more src/caption pairs are added.
  * Owner:   Pranav (homepage rebuild — Skillship catalogue refresh)
  */
 
@@ -30,54 +30,43 @@ interface Photo {
   caption?: string;
 }
 
-// Gallery doubles as a "what we offer" reminder — every photo here maps
-// to one of Skillship's 8 labs / SAAS products. Captions name the lab so
-// the principal reads the offerings while looking at the action shots.
-//
-// All five photo IDs below have been HTTP-verified against Unsplash
-// (HEAD 200) — replacing earlier IDs that either 404'd (broken tile)
-// or returned the wrong subject (math chalkboard tagged "Robotics").
-//
-// TODO: swap each src with a real Skillship lab photo when delivered.
-// Stock photos are licensed for commercial use under the Unsplash
-// License, but real Skillship classroom shots will be far stronger
-// brand storytelling than generic stock.
+// Real Skillship photos from the field. Captions name the lab / moment so a
+// principal reads the offerings while looking at the action shots.
 const PHOTOS: Photo[] = [
   {
-    // Humanoid robot face — clear, iconic "robotics" subject
-    src: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=1400&auto=format&fit=crop&q=80",
-    alt: "Friendly humanoid robot — Skillship Robotics Lab",
+    // Students presenting a smart-road / toll-gate Arduino build
+    src: "/impact/robotics-iot-lab.jpg",
+    alt: "Students presenting a smart-road IoT project they built — Skillship Robotics & IoT Lab",
     span: "lg:col-span-2 lg:row-span-2",
-    caption: "Robotics Lab",
+    caption: "Robotics & IoT Lab",
   },
   {
-    // Code editor on a laptop — Code4AI software pillar in action
-    src: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=1200&auto=format&fit=crop&q=80",
-    alt: "A code editor open on a laptop — Coding & AI lab",
+    // Students with an Arduino + ultrasonic-sensor build in the computer lab
+    src: "/impact/coding-ai-lab.jpg",
+    alt: "Students with their Arduino sensor project in the Skillship coding lab",
     span: "lg:col-span-2 lg:row-span-1",
     caption: "Coding & AI Lab",
   },
   {
-    // Drone in flight — Drone Technology Lab
-    src: "https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=900&auto=format&fit=crop&q=80",
-    alt: "A drone in flight during a Skillship aero session",
+    // Skillship Drone & Space / AI & Robotics program banners with a telescope
+    src: "/impact/drone-space-programs.jpg",
+    alt: "Skillship Drone & Space and AI & Robotics program setup at a school",
     span: "lg:col-span-1 lg:row-span-1",
-    caption: "Drone Tech Lab",
+    caption: "Drone & Space",
   },
   {
-    // Close-up of a circuit board — Electronics & IoT Lab
-    src: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=900&auto=format&fit=crop&q=80",
-    alt: "A close-up of an electronic circuit board with components",
+    // Whole-cohort photo holding AI completion certificates
+    src: "/impact/ai-certification-cohort.jpg",
+    alt: "A full cohort of students holding their AI program certificates",
     span: "lg:col-span-1 lg:row-span-1",
-    caption: "Electronics & IoT",
+    caption: "AI Certified",
   },
   {
-    // Workbench with prototyping tools — stands in for the 3D
-    // Printing & Design Lab while we wait for a real lab shot.
-    src: "https://images.unsplash.com/photo-1581094271901-8022df4466f9?w=1200&auto=format&fit=crop&q=80",
-    alt: "Workbench with prototyping tools — 3D Printing & Design Lab",
+    // Students and mentor celebrating with their certificates
+    src: "/impact/young-innovators.jpg",
+    alt: "Students and their mentor celebrating with completion certificates",
     span: "lg:col-span-2 lg:row-span-1",
-    caption: "3D Printing & Design",
+    caption: "Young Innovators",
   },
 ];
 

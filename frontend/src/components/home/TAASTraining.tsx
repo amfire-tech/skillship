@@ -53,7 +53,8 @@ function ServiceCard({ s, index }: { s: Service; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.5, delay: index * 0.05, ease: EASE }}
-      className="card-pop group relative flex h-full flex-col rounded-2xl border border-[color:var(--border-subtle)] bg-white p-6 shadow-soft"
+      whileHover={{ y: -10, scale: 1.03, transition: { type: "spring", stiffness: 320, damping: 20 } }}
+      className="card-pop card-lift group relative flex h-full flex-col rounded-2xl border border-[color:var(--border-subtle)] bg-white p-6 shadow-soft"
     >
       <div className="flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--cream-soft)] text-[var(--orange-500)] transition-colors duration-300 group-hover:bg-[var(--orange-500)] group-hover:text-white">

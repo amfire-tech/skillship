@@ -319,6 +319,53 @@
     --tw-gradient-via-position: ;
     --tw-gradient-stops: var(--tw-gradient-from), var(--card) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
   }
+
+  /* ── Dashboard: pure-orange brand gradient (no teal/green mix) ──
+     The authenticated dashboards lean on `from-primary … to-accent`
+     (orange → teal, #F39C32 → #2EB6B5) for every highlight button, active
+     nav item and gradient fill. The marketing site's primary button uses the
+     punchy all-orange `--gradient-brand` instead. To make the dashboards match
+     the homepage button — and drop the teal/green leg the team flagged — we
+     remap the gradient STOPS to the orange brand ramp, but ONLY inside the
+     `.dashboard-shell` scope so the public site's brand colours are untouched.
+     The `.dashboard-shell .to-accent` rule is intentionally last so it wins
+     the `--tw-gradient-to` cascade over `.from-primary` (equal specificity). */
+  .dashboard-shell .from-primary {
+    --tw-gradient-from: #FF5E0E var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(255 94 14 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+  .dashboard-shell .via-accent {
+    --tw-gradient-to: rgb(255 138 0 / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), #FF8A00 var(--tw-gradient-via-position), var(--tw-gradient-to);
+  }
+  .dashboard-shell .to-accent {
+    --tw-gradient-to: #FFB02E var(--tw-gradient-to-position);
+  }
+  /* Tailwind `bg-brand-gradient` is also orange→teal; force it orange here. */
+  .dashboard-shell .bg-brand-gradient {
+    background-image: var(--gradient-brand) !important;
+  }
+
+  /* Dashboard content headings → orange headline gradient (clipped text),
+     matching the marketing headlines — no teal/green. Scoped to <main> so the
+     sidebar wordmark and topbar chrome keep their own styling. The descendant
+     selector's specificity (0,1,2) beats Tailwind's text-* colour utilities
+     (0,1,0), so `color: transparent` wins without !important. */
+  .dashboard-shell main :is(h1, h2, h3) {
+    background-image: var(--gradient-headline);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* …but a heading sitting on a solid/gradient brand surface (white text on a
+     coloured card) must stay readable — opt those out with `text-white`. */
+  .dashboard-shell main :is(h1, h2, h3).text-white {
+    background-image: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: #fff;
+  }
 }
 
 @keyframes float-slow {
@@ -573,6 +620,25 @@
   .cr-node-dot { animation: none !important; }
 }
 
+/* ── School-logo marquee — seamless right-to-left loop ──
+   The track holds the logo set twice; translating -50% advances exactly one
+   full set, so the loop is gapless. Pauses on hover; honours reduced-motion. */
+@keyframes school-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-school-marquee {
+  animation: school-marquee 50s linear infinite;
+}
+.animate-school-marquee:hover { animation-play-state: paused; }
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-school-marquee { animation: none; }
+}
+
 @layer components {
   .section-padding   { @apply py-20 md:py-24; }
   .container-main    { @apply mx-auto max-w-container px-6 lg:px-8; }
@@ -632,6 +698,47 @@
       0 2px 4px rgba(0,0,0,0.45),
       0 10px 22px rgba(0,0,0,0.5),
       0 20px 42px rgba(0,0,0,0.45);
+  }
+
+  /* ── Card: glass-matte finish + clearly visible lift on hover ──
+     Frosted translucent surface with a subtle inner highlight. On hover the
+     card lifts a full 8px, the border picks up the teal brand, and a soft glow
+     + depth shadow makes the motion obvious on BOTH light and dark themes
+     (a plain dark box-shadow is invisible on a dark section, so we add a teal
+     ring-glow for dark). Apply `.card-lift` to any card container. */
+  .card-lift {
+    transition:
+      transform 0.34s cubic-bezier(0.16,1,0.3,1),
+      box-shadow 0.34s cubic-bezier(0.16,1,0.3,1),
+      border-color 0.34s ease,
+      background-color 0.34s ease;
+    will-change: transform;
+  }
+  /* CSS transform lift applies to plain (non-motion) cards. Framer-motion cards
+     drive the lift via whileHover (its inline transform wins over this), so we
+     scope the CSS transform away from them with :not([style*="transform"]). */
+  .card-lift:not([style*="transform"]):hover {
+    transform: translateY(-10px) scale(1.02);
+  }
+  .card-lift:hover {
+    border-color: color-mix(in srgb, var(--teal-500) 60%, transparent);
+    background-color: color-mix(in srgb, var(--card) 100%, white 5%);
+    box-shadow:
+      0 14px 28px -10px rgba(15,20,25,0.22),
+      0 30px 60px -18px rgba(15,20,25,0.28),
+      0 0 0 1.5px color-mix(in srgb, var(--teal-500) 35%, transparent),
+      0 0 32px -4px color-mix(in srgb, var(--teal-500) 28%, transparent);
+  }
+  .dark .card-lift:hover {
+    border-color: color-mix(in srgb, var(--teal-400) 70%, transparent);
+    background-color: color-mix(in srgb, var(--card) 100%, white 7%);
+    box-shadow:
+      0 18px 44px -12px rgba(0,0,0,0.65),
+      0 0 0 1.5px color-mix(in srgb, var(--teal-400) 45%, transparent),
+      0 0 44px -2px color-mix(in srgb, var(--teal-400) 42%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-lift:not([style*="transform"]):hover { transform: none; }
   }
 
   /* Animated website background — slow-panning grid + drifting orange wash.

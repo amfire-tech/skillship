@@ -23,7 +23,9 @@ interface Quiz {
 
 interface Question {
   id: string;
-  question_text: string;
+  // Backend returns `text`; older mocks used `question_text` — accept both.
+  text?: string;
+  question_text?: string;
   options?: { id: string; text: string }[];
   choices?: string[];
 }
@@ -184,7 +186,7 @@ export default function StudentQuizTakerPage() {
                 <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((current + 1) / total) * 100}%` }} />
               </div>
             </div>
-            <h2 className="text-base font-semibold leading-relaxed text-[var(--foreground)]">{q.question_text}</h2>
+            <h2 className="text-base font-semibold leading-relaxed text-[var(--foreground)]">{q.text ?? q.question_text}</h2>
 
             <div className="mt-6 space-y-2">
               {(q.options ?? q.choices?.map((c, i) => ({ id: String(i), text: c })) ?? []).map((opt) => {

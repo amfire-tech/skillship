@@ -150,7 +150,7 @@ export function AdminSidebar({ onClose }: { onClose?: () => void }) {
                   onClick={onClose}
                   className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all ${
                     active
-                      ? "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)]"
+                      ? "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(255,122,24,0.6)]"
                       : "text-[var(--muted-foreground)] hover:bg-primary/5 hover:text-primary"
                   }`}
                 >

@@ -45,7 +45,9 @@ class GenerateQuestionsSerializer(serializers.Serializer):
     """Teacher requests AI-generated questions for a given topic."""
 
     topic      = serializers.CharField(max_length=500)
-    grade      = serializers.CharField(max_length=10)
+    # Optional: the quick free-text generator (teacher dashboard) sends only a
+    # topic and lets the model infer the level. The full wizard supplies grade.
+    grade      = serializers.CharField(max_length=10, required=False, allow_blank=True, default="")
     count      = serializers.IntegerField(min_value=1, max_value=20, default=5)
     difficulty = serializers.ChoiceField(choices=_DIFFICULTY_CHOICES, default="medium")
     types      = serializers.ListField(

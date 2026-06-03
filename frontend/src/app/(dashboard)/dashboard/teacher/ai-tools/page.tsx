@@ -32,7 +32,7 @@ const TOOLS: Tool[] = [
     key: "generate",
     title: "AI Question Generator",
     description: "Generate MCQ questions instantly from a topic, PDF, or learning objective. Powered by Gemini.",
-    endpoint: "/quizzes/generate/",
+    endpoint: "/ai/quiz/generate/",
     cta: "Open generator",
     href: "/dashboard/teacher/quizzes/new",
     tone: "primary",
