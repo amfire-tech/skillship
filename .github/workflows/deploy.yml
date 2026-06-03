@@ -18,7 +18,7 @@ name: Build & Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [prod]
   workflow_dispatch:        # also lets you re-run by hand
 
 concurrency:
@@ -27,7 +27,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  # The image base name is derived from the repo path (e.g. ghcr.io/amfire-tech/skillship_test-backend).
+  # The image base name is derived from the repo path (e.g. ghcr.io/amfire-tech/skillship-backend).
   IMAGE_OWNER: ${{ github.repository_owner }}
   IMAGE_REPO: ${{ github.event.repository.name }}
 
@@ -94,10 +94,14 @@ jobs:
   deploy-staging:
     name: Deploy → staging
     needs: build
+    # Gated OFF until a VPS + SSH secrets exist. The build job above still runs
+    # and pushes images to GHCR. To turn on auto-deploy later, add repo Variable
+    # AUTO_DEPLOY=true (Settings → Secrets and variables → Actions → Variables).
+    if: ${{ vars.AUTO_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     environment:
       name: staging
-      url: https://staging.skillship.example.com
+      url: https://staging.skillship.in
     steps:
       - uses: actions/checkout@v4
 
@@ -110,8 +114,8 @@ jobs:
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_DIR }}"
-            git fetch --quiet origin main
-            git reset --hard origin/main
+            git fetch --quiet origin prod
+            git reset --hard origin/prod
             # Pull the freshly-built images CI just pushed.
             docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod pull
             # Apply Django migrations once before bringing the services up.
@@ -127,7 +131,7 @@ jobs:
           set -e
           # Give the stack ~30s to settle (nginx waits on healthy backend+frontend).
           for i in $(seq 1 30); do
-            if curl -fsS "https://staging.skillship.example.com/healthz/" >/dev/null; then
+            if curl -fsS "https://staging.skillship.in/healthz/" >/dev/null; then
               echo "Staging healthz OK"
               exit 0
             fi
@@ -140,12 +144,13 @@ jobs:
   deploy-production:
     name: Deploy → production (manual gate)
     needs: deploy-staging
+    if: ${{ vars.AUTO_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     environment:
       # GitHub-side "required reviewers" on this environment is what makes
       # this job wait for human approval. Without that, this would auto-fire.
       name: production
-      url: https://skillship.example.com
+      url: https://skillship.in
     steps:
       - uses: actions/checkout@v4
 
@@ -158,8 +163,8 @@ jobs:
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_DIR }}"
-            git fetch --quiet origin main
-            git reset --hard origin/main
+            git fetch --quiet origin prod
+            git reset --hard origin/prod
             docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod pull
             docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod \
               run --rm backend python manage.py migrate --noinput
@@ -170,7 +175,7 @@ jobs:
         run: |
           set -e
           for i in $(seq 1 30); do
-            if curl -fsS "https://skillship.example.com/healthz/" >/dev/null; then
+            if curl -fsS "https://skillship.in/healthz/" >/dev/null; then
               echo "Production healthz OK"
               exit 0
             fi
