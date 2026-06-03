@@ -54,6 +54,19 @@ if not CSRF_TRUSTED_ORIGINS:
 
 CORS_ALLOWED_ORIGINS = CSRF_TRUSTED_ORIGINS
 
+# ── Database — managed Postgres via the Supabase pooler ──────────────────────
+#
+# Production-only tweaks, kept out of base.py so local dev / CI (plain Postgres,
+# no TLS) are unaffected:
+#   - sslmode=require            Supabase only accepts TLS connections.
+#   - DISABLE_SERVER_SIDE_CURSORS server-side cursors don't survive a pooled
+#     connection; turning them off avoids "cursor does not exist" crashes.
+DATABASES["default"]["OPTIONS"] = {  # noqa: F405
+    **DATABASES["default"].get("OPTIONS", {}),  # noqa: F405
+    "sslmode": "require",
+}
+DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True  # noqa: F405
+
 # ── TLS / proxy trust ────────────────────────────────────────────────────────
 
 # nginx terminates TLS and forwards `X-Forwarded-Proto: https`. Tell Django
