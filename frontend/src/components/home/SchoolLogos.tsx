@@ -1,10 +1,14 @@
 /*
  * File:    frontend/src/components/home/SchoolLogos.tsx
  * Purpose: "Trusted by schools" strip — an infinite right-to-left marquee of
- *          partner-school logos (the SaaS "logo wall" pattern). Logos sit on
- *          white chips so every brand stays legible on the dark band. The
- *          track renders the set twice and translates -50% for a seamless loop
- *          (see .animate-school-marquee in globals.css). Pauses on hover.
+ *          partner-school logos (the SaaS "logo wall" pattern). The strip sits
+ *          on a light band so the logos float directly with no card/box behind
+ *          them (client direction). A light band is required because the source
+ *          logos are built for white — most are white-background rasters or
+ *          transparent PNGs with dark text, both of which are unreadable on a
+ *          dark band without a chip. The track renders the set twice and
+ *          translates -50% for a seamless loop (see .animate-school-marquee in
+ *          globals.css). Pauses on hover.
  * Owner:   Pranav (homepage rebuild — Skillship catalogue refresh)
  */
 
@@ -21,8 +25,8 @@ const LOGOS = [
 
 export function SchoolLogos() {
   return (
-    <section className="relative border-y border-white/5 bg-[#0A0F1E] py-14">
-      <p className="mb-9 text-center text-[11.5px] font-semibold uppercase tracking-[0.22em] text-[var(--teal-400)]">
+    <section className="relative border-y border-black/[0.06] bg-white py-14">
+      <p className="mb-9 text-center text-[11.5px] font-semibold uppercase tracking-[0.22em] text-[#1F9594]">
         Trusted by schools across India
       </p>
 
@@ -32,7 +36,7 @@ export function SchoolLogos() {
           {[...LOGOS, ...LOGOS].map((file, i) => (
             <li
               key={`${file}-${i}`}
-              className="flex h-[88px] w-[176px] shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white px-6 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)]"
+              className="flex h-[88px] w-[176px] shrink-0 items-center justify-center px-6"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
