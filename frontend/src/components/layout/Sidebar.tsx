@@ -51,7 +51,7 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-white dark:bg-[var(--background)]">
       {/* Brand */}
       <div className="px-5 py-5">
-        <SkillshipLockup badgeSize={40} wordmarkSize="md" tagline={roleLabel} />
+        <SkillshipLockup badgeSize={40} wordmarkSize="md" subLabel={roleLabel} />
       </div>
 
       {/* Nav */}

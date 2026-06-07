@@ -50,12 +50,14 @@ export function Footer() {
           {/* Brand */}
           <div>
             <Link href="/" aria-label={`${siteConfig.name} home`}>
-              <SkillshipLockup badgeSize={40} wordmarkSize="md" />
+              {/* Official trademark lockup — wordmark + "# Where Fun Meets
+                  Learning" tagline (tone follows the theme). */}
+              <SkillshipLockup badgeSize={40} wordmarkSize="md" brandTagline tone="auto" />
             </Link>
 
             <p className="mt-5 text-[14px] leading-[1.55] text-[var(--ink-secondary)]">
-              Where fun meets learning. AI-powered school management for India&apos;s
-              next generation of engineers.
+              AI-powered school management for India&apos;s next generation of
+              engineers.
             </p>
 
             <p className="mt-5 text-[12px] text-[var(--ink-tertiary)]">

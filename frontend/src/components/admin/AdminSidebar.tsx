@@ -132,7 +132,7 @@ export function AdminSidebar({ onClose }: { onClose?: () => void }) {
         <SkillshipLockup
           badgeSize={40}
           wordmarkSize="md"
-          tagline={roleLabel[user?.role ?? ""] ?? "Admin"}
+          subLabel={roleLabel[user?.role ?? ""] ?? "Admin"}
         />
       </div>
 
