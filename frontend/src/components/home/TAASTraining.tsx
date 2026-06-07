@@ -134,10 +134,9 @@ export function TAASTraining() {
           >
             <div className="sticky top-28 overflow-hidden rounded-[28px] border border-[color:var(--border-subtle)] shadow-medium">
               <div className="relative aspect-[4/5] w-full">
-                {/* TODO: replace with real Skillship teacher-training photo. */}
                 <Image
-                  src="https://images.unsplash.com/photo-1577896851231-70ef18881754?w=1200&auto=format&fit=crop&q=80"
-                  alt="Skillship teacher training session in progress"
+                  src="/teacher-training.jpg"
+                  alt="Skillship students holding their AI program certificates at an on-campus AI Lab session"
                   fill
                   sizes="(max-width: 1024px) 100vw, 520px"
                   className="object-cover"
