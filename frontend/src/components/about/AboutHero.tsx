@@ -9,7 +9,7 @@ import { siteConfig } from "@/config/site";
 
 export function AboutHero() {
   return (
-    <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_left,_rgba(5,150,105,0.08),_transparent_55%),radial-gradient(ellipse_at_top_right,_rgba(13,148,136,0.06),_transparent_50%)] pb-16 pt-20 md:pb-24 md:pt-28 lg:pt-32">
+    <section className="relative overflow-hidden bg-[radial-gradient(ellipse_at_top_left,_rgba(255,94,14,0.10),_transparent_55%),radial-gradient(ellipse_at_top_right,_rgba(255,176,46,0.08),_transparent_50%)] pb-16 pt-20 md:pb-24 md:pt-28 lg:pt-32">
       <div
         className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-30"
         style={{ maskImage: "linear-gradient(to bottom, rgba(255,255,255,0.9), transparent 70%)" }}
@@ -29,7 +29,7 @@ export function AboutHero() {
             <MotionSection className="mt-6" delay={1}>
               <h1 className="text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-5xl lg:text-[56px] lg:leading-[1.05]">
                 Building the{" "}
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#FF5E0E] to-[#FFB02E] bg-clip-text text-transparent">
                   intelligence layer
                 </span>{" "}
                 for modern schools.
@@ -46,7 +46,7 @@ export function AboutHero() {
 
             <MotionSection className="mt-8 flex flex-wrap gap-3" delay={3}>
               <Link href={siteConfig.cta.href}>
-                <Button size="lg" className="rounded-full px-7 shadow-[0_16px_40px_-16px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5">
+                <Button size="lg" className="rounded-full px-7 shadow-[0_16px_40px_-16px_rgba(243,156,50,0.5)] transition-all hover:-translate-y-0.5">
                   {siteConfig.cta.label}
                 </Button>
               </Link>
@@ -61,11 +61,11 @@ export function AboutHero() {
           {/* Right: Compact stats stack */}
           <MotionSection delay={2}>
             <div className="relative">
-              <div className="absolute -inset-4 -z-10 rounded-[32px] bg-gradient-to-br from-primary/15 to-accent/10 blur-2xl" />
-              <div className="space-y-3 rounded-3xl border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_-30px_rgba(5,150,105,0.25)] backdrop-blur md:p-6">
+              <div className="absolute -inset-4 -z-10 rounded-[32px] bg-gradient-to-br from-[var(--orange-500)]/20 to-[var(--orange-400)]/10 blur-2xl" />
+              <div className="space-y-3 rounded-3xl border border-primary/10 bg-white/90 p-5 shadow-[0_24px_60px_-30px_rgba(243,156,50,0.25)] backdrop-blur md:p-6">
                 {[
-                  { value: "50+", label: "schools connected", delay: 0 },
-                  { value: "10,000+", label: "students on platform", delay: 0.15 },
+                  { value: "100+", label: "schools connected", delay: 0 },
+                  { value: "50,000+", label: "students on platform", delay: 0.15 },
                   { value: "5,000+", label: "hours of live learning", delay: 0.3 },
                 ].map((s) => (
                   <motion.div

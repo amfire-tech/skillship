@@ -44,7 +44,7 @@ export function Team() {
           </p>
         </MotionSection>
 
-        <div className="mt-12 divide-y divide-[var(--border)] rounded-3xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-40px_rgba(5,150,105,0.2)] md:mt-14">
+        <div className="mt-12 divide-y divide-[var(--border)] rounded-3xl border border-[var(--border)] bg-white shadow-[0_20px_60px_-40px_rgba(243,156,50,0.2)] md:mt-14">
           {team.map((member, i) => (
             <motion.div
               key={member.name}
@@ -54,7 +54,7 @@ export function Team() {
               transition={{ duration: 0.5, delay: i * 0.1 }}
               className="group flex items-center gap-5 p-6 transition-colors hover:bg-[var(--muted)]/60 md:p-8"
             >
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-base font-bold text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)] md:h-16 md:w-16 md:text-lg">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[var(--orange-400)] text-base font-bold text-white shadow-[0_10px_24px_-10px_rgba(243,156,50,0.5)] md:h-16 md:w-16 md:text-lg">
                 {member.initials}
               </div>
 

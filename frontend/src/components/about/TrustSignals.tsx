@@ -6,9 +6,9 @@ import { MotionSection } from "@/components/ui/MotionWrapper";
 
 const signals = [
   {
-    title: "Built for Indian schools",
+    title: "Built for global schools",
     description:
-      "Designed around real timetables, Board patterns (CBSE, ICSE, State), and how Indian classrooms actually operate.",
+      "Designed around real timetables, diverse curricula, and how classrooms actually operate — anywhere in the world.",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 22h18" /><path d="M5 22V10l7-5 7 5v12" /><path d="M9 22V12h6v10" />
@@ -68,9 +68,9 @@ export function TrustSignals() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.55, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-              className="group flex items-start gap-5 rounded-2xl border border-[var(--border)] bg-white dark:bg-[var(--background)] p-6 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_20px_50px_-25px_rgba(5,150,105,0.25)] md:p-7"
+              className="group flex items-start gap-5 rounded-2xl border border-[var(--border)] bg-white dark:bg-[var(--background)] p-6 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_20px_50px_-25px_rgba(243,156,50,0.25)] md:p-7"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-gradient-to-br group-hover:from-primary group-hover:to-accent group-hover:text-white">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-gradient-to-br group-hover:from-primary group-hover:to-[var(--orange-400)] group-hover:text-white">
                 {s.icon}
               </div>
               <div>
