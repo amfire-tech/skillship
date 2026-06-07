@@ -17,8 +17,8 @@ import { MotionSection } from "@/components/ui/MotionWrapper";
 import { BookingCalendar } from "@/components/request-demo/BookingCalendar";
 
 const heroStats = [
-  { value: "50+", label: "Partner schools" },
-  { value: "10,000+", label: "Students onboarded" },
+  { value: "100+", label: "Partner schools" },
+  { value: "50,000+", label: "Students empowered" },
   { value: "30 min", label: "Typical demo" },
 ];
 

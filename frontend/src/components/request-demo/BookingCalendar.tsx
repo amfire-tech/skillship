@@ -199,7 +199,7 @@ export function BookingCalendar({
               Step 2 · Pick a time
             </p>
             <p className="mt-1 text-sm font-bold text-[var(--foreground)]">
-              30-minute video call
+              30-minute video or voice call
             </p>
           </div>
           <Clock size={18} className="text-[var(--muted-foreground)]" />
@@ -238,7 +238,7 @@ export function BookingCalendar({
                       {slot.label}
                     </p>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      30 min · Video call
+                      30 min · Video or voice call
                     </p>
                   </div>
                 </div>

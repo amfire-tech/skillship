@@ -6,7 +6,6 @@ const benefitGroups = [
   {
     title: "Platform access",
     items: [
-      "Free 30-day trial for your entire school",
       "AI-powered quiz generation for all subjects",
       "AI Career Pilot for every student (Class 6–12)",
       "Bulk student onboarding via CSV upload",
@@ -24,8 +23,8 @@ const benefitGroups = [
 ];
 
 const trustStats = [
-  { value: "50+", label: "Schools" },
-  { value: "10,000+", label: "Students" },
+  { value: "100+", label: "Schools" },
+  { value: "50,000+", label: "Students" },
   { value: "5,000+", label: "Live Hours" },
 ];
 
@@ -83,7 +82,7 @@ export function DemoBenefits() {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-700 via-primary to-primary-500 p-6 text-white shadow-[0_20px_50px_-25px_rgba(5,150,105,0.5)]">
         <div className="relative z-10">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
-            50+ schools already onboard
+            100+ schools already onboard
           </p>
           <h3 className="mt-2 text-xl font-bold tracking-tight">
             Trusted across India
