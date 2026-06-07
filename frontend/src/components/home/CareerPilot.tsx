@@ -18,9 +18,16 @@
 
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
-import { motion, useScroll, useTransform, type MotionValue } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValueEvent,
+  useScroll,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import { PillarNumberBackdrop } from "@/components/home/PillarNumberBackdrop";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -108,7 +115,13 @@ function FallbackListens() {
 
   return (
     <Stage>
-      {/* Sonar rings — expand from centre, fade as they grow */}
+      {/* Sonar rings — expand from centre, fade as they grow. The centering
+          translate lives INSIDE the cp-sonar keyframe, so a ring is only
+          centred while its animation is running. We use NEGATIVE delays so
+          each ring starts already mid-cycle (centred from the first frame);
+          a positive delay would leave the un-started rings un-translated —
+          offset down-right and intersecting the orb. fill-mode backwards is
+          the same safeguard. */}
       {[0, 1, 2, 3].map((i) => (
         <span
           key={i}
@@ -116,7 +129,8 @@ function FallbackListens() {
           className="absolute left-1/2 top-1/2 h-20 w-20 rounded-full border-2 border-[var(--teal-500)]"
           style={{
             animation: "cp-sonar 4s ease-out infinite",
-            animationDelay: `${i * 1}s`,
+            animationDelay: `${i * -1}s`,
+            animationFillMode: "backwards",
             transformOrigin: "center",
           }}
         />
@@ -524,103 +538,143 @@ function FallbackGrows() {
 
 const FALLBACKS = [FallbackListens, FallbackMaps, FallbackGuides, FallbackGrows];
 
-/* ──────────────── Single sticky visual ──────────────── */
+/* ──────────────── Left visual — crossfades to the active stage ──────────────── */
 
-function StickyVisual({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
-  // Crossfade ranges — each image is fully visible across its quarter of
-  // the scroll, with 12% bridges where the next image fades in.
-  const opacities = [
-    useTransform(scrollYProgress, [0,    0.22, 0.30], [1, 1, 0]),
-    useTransform(scrollYProgress, [0.22, 0.30, 0.47, 0.55], [0, 1, 1, 0]),
-    useTransform(scrollYProgress, [0.47, 0.55, 0.72, 0.80], [0, 1, 1, 0]),
-    useTransform(scrollYProgress, [0.72, 0.80, 1],          [0, 1, 1]),
-  ];
-
+function StickyVisual({ active }: { active: number }) {
+  const step = STEPS[active];
+  const Fallback = FALLBACKS[active];
   return (
-    <div className="relative aspect-square w-full max-w-[420px]">
-      {STEPS.map((step, i) => {
-        const Fallback = FALLBACKS[i];
-        return (
-          <motion.div
-            key={step.image}
-            style={{ opacity: opacities[i] }}
-            className="absolute inset-0"
-          >
-            {/* CSS fallback layer */}
-            <Fallback />
-            {/* AI-image layer on top (if file is present) */}
-            <Image
-              src={step.image}
-              alt={step.alt}
-              fill
-              sizes="(max-width: 1024px) 90vw, 560px"
-              className="rounded-[32px] object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }}
-            />
-          </motion.div>
-        );
-      })}
+    <div className="relative aspect-square w-full max-w-[440px]">
+      {/* Only the ACTIVE stage is mounted — its animated fallback (sonar /
+          particles / SMIL paths) is heavy, so rendering just one keeps the
+          frame rate high and the scroll fluid. AnimatePresence crossfades the
+          outgoing stage out as the new one fades in. */}
+      <AnimatePresence>
+        <motion.div
+          key={active}
+          initial={{ opacity: 0, scale: 0.985 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.015 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="absolute inset-0"
+        >
+          <Fallback />
+          <Image
+            src={step.image}
+            alt={step.alt}
+            fill
+            sizes="(max-width: 1024px) 90vw, 560px"
+            className="rounded-[32px] object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }}
+          />
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
 
-/* ──────────────── Step indicator on the right column ──────────────── */
+/* ──────────────── Right side — vertical focus stepper ────────────────
+ * All four steps stay on screen as a lit timeline. The ACTIVE step expands
+ * its description; the others recede to a dim title. The connector below a
+ * completed step fills in, and a thin bar under the active title tracks how
+ * far you've scrolled toward the next step. Pure scroll-driven focus — no
+ * snap, no empty gaps. */
 
-function StepIndicator({
-  index,
+function FocusStep({
   step,
-  scrollYProgress,
+  index,
+  active,
+  progress,
 }: {
-  index: number;
   step: Step;
-  scrollYProgress: MotionValue<number>;
+  index: number;
+  active: number;
+  progress: MotionValue<number>;
 }) {
-  // Active range for this step — quarter of total scroll, with 6% bleed on either side.
-  const start = index / STEPS.length;
-  const end   = (index + 1) / STEPS.length;
-  const activeOpacity = useTransform(
-    scrollYProgress,
-    [start - 0.06, start, end, end + 0.06],
-    [0, 1, 1, 0]
+  const isActive = index === active;
+  const isDone = index < active;
+  const isLast = index === STEPS.length - 1;
+
+  // Fraction scrolled through THIS step's dwell (0→1) — fills the "time to
+  // next" bar under the active title.
+  const local = useTransform(
+    progress,
+    [index / STEPS.length, (index + 1) / STEPS.length],
+    [0, 1],
+    { clamp: true },
   );
 
   return (
-    <div className="relative flex min-h-[80vh] items-center">
-      <div className="flex w-full items-start gap-5">
-        {/* Step pill — animated by stacking two coloured layers and crossfading
-           via opacity. We never animate a CSS-variable string directly because
-           WAAPI cannot interpolate var(...) references. */}
-        <div className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-[color:var(--border-subtle)] bg-white">
-          {/* active gradient fill — fades in when this step is in scroll range */}
+    <div className="flex gap-5">
+      {/* Rail: node + connector down to the next step */}
+      <div className="flex flex-col items-center">
+        <motion.div
+          animate={{ scale: isActive ? 1.1 : 1 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[color:var(--border-subtle)] bg-white"
+        >
+          {/* gradient fill for active + completed nodes */}
           <motion.span
             aria-hidden
-            style={{ opacity: activeOpacity, backgroundImage: "var(--gradient-cool)" }}
+            animate={{ opacity: isActive || isDone ? 1 : 0 }}
+            transition={{ duration: 0.4 }}
             className="absolute inset-0 rounded-full"
+            style={{ backgroundImage: "var(--gradient-cool)" }}
           />
-          {/* inactive number — always rendered underneath */}
-          <span className="absolute inset-0 grid place-items-center text-[12px] font-semibold tracking-wider text-[var(--ink-tertiary)]">
+          {isActive && (
+            <span aria-hidden className="absolute -inset-1 rounded-full ring-2 ring-[var(--teal-500)]/35" />
+          )}
+          <span className={`relative text-[12px] font-semibold tracking-wider ${isActive || isDone ? "text-white" : "text-[var(--ink-tertiary)]"}`}>
             {step.num}
           </span>
-          {/* active number — opacity follows the same motion value as the bg */}
-          <motion.span
-            style={{ opacity: activeOpacity }}
-            className="absolute inset-0 grid place-items-center text-[12px] font-semibold tracking-wider text-white"
-          >
-            {step.num}
-          </motion.span>
-        </div>
+        </motion.div>
 
-        <div>
-          <h3
-            className="font-semibold leading-[1.1] tracking-[-0.025em] text-[var(--ink-primary)]"
-            style={{ fontSize: "clamp(1.75rem, 3.2vw, 2.5rem)" }}
-          >
-            {step.title}
-          </h3>
-          <p className="mt-3 max-w-[440px] text-[16px] leading-[1.65] text-[var(--ink-secondary)] md:text-[17px]">
-            {step.body}
-          </p>
-        </div>
+        {!isLast && (
+          <div className="relative my-1.5 w-[2px] flex-1 overflow-hidden rounded-full bg-[var(--border)]">
+            <motion.div
+              aria-hidden
+              className="absolute inset-x-0 top-0 rounded-full"
+              style={{ backgroundImage: "var(--gradient-cool)" }}
+              animate={{ height: isDone ? "100%" : "0%" }}
+              transition={{ duration: 0.5, ease: EASE }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="pb-10">
+        <motion.h3
+          animate={{ opacity: isActive ? 1 : 0.32 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="font-semibold leading-[1.1] tracking-[-0.025em] text-[var(--ink-primary)]"
+          style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)" }}
+        >
+          {step.title}
+        </motion.h3>
+
+        <AnimatePresence initial={false}>
+          {isActive && (
+            <motion.div
+              key="body"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.45, ease: EASE }}
+              className="overflow-hidden"
+            >
+              <p className="mt-3 max-w-[440px] text-[16px] leading-[1.65] text-[var(--ink-secondary)] md:text-[17px]">
+                {step.body}
+              </p>
+              <div className="mt-5 h-[3px] w-32 overflow-hidden rounded-full bg-[var(--border)]">
+                <motion.div
+                  className="h-full origin-left rounded-full"
+                  style={{ scaleX: local, backgroundImage: "var(--gradient-cool)" }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -629,17 +683,29 @@ function StepIndicator({
 /* ──────────────── Main section ──────────────── */
 
 export function CareerPilot() {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  // Sticky scroll bound to the section: progress goes 0→1 as the section
-  // moves from "just entered the viewport" to "just left it". With sticky
-  // pinning, each ~25% of progress aligns with one step block on the right.
+  // The pinned scroll-timeline: this tall element provides the scroll
+  // distance; its inner `sticky` child stays pinned full-viewport while the
+  // four steps take focus one after another. `active` is derived from scroll
+  // progress and drives BOTH the left crossfade and the right focus stepper,
+  // so they stay in perfect sync.
+  const timelineRef = useRef<HTMLDivElement>(null);
+  // Drive everything off the RAW scroll progress (no spring): scroll-linked
+  // motion values already update once per frame, so this tracks the wheel
+  // 1:1 with zero lag — the fluid feel. A spring here only adds trailing
+  // sluggishness.
   const { scrollYProgress } = useScroll({
-    target: sectionRef,
+    target: timelineRef,
     offset: ["start start", "end end"],
   });
 
+  const [active, setActive] = useState(0);
+  useMotionValueEvent(scrollYProgress, "change", (v) => {
+    const i = Math.min(STEPS.length - 1, Math.max(0, Math.floor(v * STEPS.length)));
+    setActive(i);
+  });
+
   return (
-    <section ref={sectionRef} className="relative bg-white">
+    <section className="relative bg-white">
       {/* Giant pillar 03 — holds for the whole Career Pilot (Pillar 3 / SaaS)
           section. Sits behind content (z-0); everything else is z-10. */}
       <PillarNumberBackdrop number="03" align="right" />
@@ -662,26 +728,28 @@ export function CareerPilot() {
         </p>
       </div>
 
-      {/* ── Desktop: two-column sticky scroll ── */}
-      <div className="relative z-10 mx-auto hidden max-w-[1280px] px-6 pb-20 pt-16 lg:block lg:px-12">
-        <div className="grid grid-cols-12 gap-10">
-          {/* Sticky visual */}
-          <div className="col-span-6">
-            <div className="sticky top-24 flex h-[calc(100vh-6rem)] items-center">
-              <StickyVisual scrollYProgress={scrollYProgress} />
+      {/* ── Desktop: pinned scroll-timeline ──
+          The tall outer div is the scroll runway; its sticky child stays
+          pinned for the whole runway while `active` advances 0→3. */}
+      <div
+        ref={timelineRef}
+        className="relative z-10 hidden lg:block"
+        style={{ height: `${STEPS.length * 56}vh` }}
+      >
+        <div className="sticky top-0 flex h-screen items-center">
+          <div className="mx-auto w-full max-w-[1280px] px-6 lg:px-12">
+            <div className="grid grid-cols-12 items-center gap-10">
+              {/* Left — crossfading visual */}
+              <div className="col-span-6 flex justify-center">
+                <StickyVisual active={active} />
+              </div>
+              {/* Right — focus stepper */}
+              <div className="col-span-6">
+                {STEPS.map((step, i) => (
+                  <FocusStep key={step.num} step={step} index={i} active={active} progress={scrollYProgress} />
+                ))}
+              </div>
             </div>
-          </div>
-
-          {/* Scrolling steps */}
-          <div className="col-span-6">
-            {STEPS.map((step, i) => (
-              <StepIndicator
-                key={step.num}
-                index={i}
-                step={step}
-                scrollYProgress={scrollYProgress}
-              />
-            ))}
           </div>
         </div>
       </div>

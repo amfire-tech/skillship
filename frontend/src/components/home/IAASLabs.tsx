@@ -3,29 +3,38 @@
  * Purpose: Pillar 1 — Infrastructure as a Service. The 8 advanced labs that
  *          Skillship installs on a partner school's campus (catalogue p.4).
  *
- *          Design intent (client refresh): mirror the AI Career Pilot scroll
- *          pattern — a CONSTANT left frame that stays pinned while the right
- *          column scrolls through all 8 labs. As each lab enters its scroll
- *          range, the pinned frame crossfades to that lab's animated visual
- *          (themed glyph + sonar rings + orbiting nodes + big number) and the
- *          right-side step lights up. Header photo + IAAS-advantage strip are
- *          retained around the showcase.
+ *          Showcase (client refresh): an auto-playing, interactive spotlight.
+ *          A themed stage crossfades through each lab's animated glyph while a
+ *          row of story-style progress bars fills underneath — one per lab.
+ *          Hover/focus pauses it, a click jumps to any lab, and arrow keys
+ *          step through. The active lab's brand colour tints the whole panel.
+ *          Header photo + IAAS-advantage strip are retained around it.
  * Owner:   Pranav (homepage rebuild — Skillship catalogue refresh)
  */
 
 "use client";
 
 import Image from "next/image";
-import { useRef } from "react";
-import { motion, useInView, useScroll, useSpring, useTransform, type MotionValue } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useInView,
+  useMotionValue,
+  useReducedMotion,
+} from "framer-motion";
 import { PillarNumberBackdrop } from "@/components/home/PillarNumberBackdrop";
 import {
   Brain, Bot, Plane, Rocket, Code2, PlaneTakeoff, Cpu, Boxes,
   Wrench, ShieldCheck, BookOpen, TrendingUp, Headphones, CheckCircle2,
+  ChevronLeft, ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+/** How long each lab holds before the spotlight advances (ms). */
+const AUTO_MS = 4800;
 
 interface Lab {
   n: string;
@@ -123,17 +132,41 @@ const ADVANTAGES: Advantage[] = [
 
 const N = LABS.length;
 
+/* Directional slide for the headline/description swap. `custom` carries the
+   travel direction (+1 forward, -1 back) so content enters from the side it
+   is travelling toward and exits the opposite way. */
+const contentVariants = {
+  enter: (d: number) => ({ opacity: 0, x: d * 36 }),
+  center: { opacity: 1, x: 0 },
+  exit: (d: number) => ({ opacity: 0, x: d * -36 }),
+};
+
+/** hex (#RRGGBB) → rgba() string at the given alpha. */
+function hexA(hex: string, a: number) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 /* ─────────────────────────────────────────────────────────────────────
- * The animated lab glyph that lives inside the constant frame. Themed by
- * the lab's tint: a big gradient icon tile, expanding sonar rings, three
- * orbiting nodes, and a large faint number watermark. Loops continuously
- * so whichever lab is active always feels alive.
+ * The animated lab glyph that lives inside the stage. Themed by the lab's
+ * tint: a big gradient icon tile, expanding sonar rings, three orbiting
+ * nodes. Loops continuously so the active lab always feels alive.
  * ───────────────────────────────────────────────────────────────────── */
 function LabGlyph({ lab }: { lab: Lab }) {
   const Icon = lab.icon;
   return (
     <div className="relative grid h-full w-full place-items-center">
-      {/* sonar rings — cp-sonar applies translate(-50%,-50%) so anchor at centre */}
+      {/* sonar rings — cp-sonar carries the translate(-50%,-50%) centering, so
+          the ring is ONLY centred while the animation is running. We use a
+          NEGATIVE delay (not positive) to phase the three rings: each starts
+          already mid-cycle, so the centering transform applies from the very
+          first frame. A positive delay would leave the un-started rings with
+          no transform — offset down-right and intersecting the icon for the
+          first seconds after each card remounts. fill-mode backwards is a
+          safety net for the same reason. */}
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -142,7 +175,8 @@ function LabGlyph({ lab }: { lab: Lab }) {
           style={{
             borderColor: lab.tint,
             animation: "cp-sonar 4s ease-out infinite",
-            animationDelay: `${i * 1.1}s`,
+            animationDelay: `${i * -1.333}s`,
+            animationFillMode: "backwards",
           }}
         />
       ))}
@@ -182,116 +216,215 @@ function LabGlyph({ lab }: { lab: Lab }) {
   );
 }
 
-/* Each lab's visual layer — owns its own scroll-driven opacity so the
-   pinned frame crossfades through all 8 as the column scrolls. */
-function LabVisualLayer({
-  lab,
-  index,
-  scrollYProgress,
-}: {
-  lab: Lab;
-  index: number;
-  scrollYProgress: MotionValue<number>;
-}) {
-  const seg = 1 / N;
-  const cf = seg * 0.4; // crossfade window
-  const a = index * seg;
-  const b = (index + 1) * seg;
+/* ─────────────────────────────────────────────────────────────────────
+ * The interactive auto-playing spotlight. Drives a single `active` index;
+ * a framer motion value (`progress`) fills the active lab's bar and, on
+ * complete, advances. Hover/focus pauses; clicks + arrow keys navigate.
+ * Replaces the old scroll-pinned showcase entirely.
+ * ───────────────────────────────────────────────────────────────────── */
+function LabsSpotlight() {
+  const reduce = useReducedMotion();
+  const [active, setActive] = useState(0);
+  const [dir, setDir] = useState(1); // slide direction for content swaps
+  const [paused, setPaused] = useState(false);
+  const progress = useMotionValue(0); // 0→1 fill of the ACTIVE bar
 
-  // First lab visible from the top; last lab visible to the very end; the
-  // middle labs fade in/out across their segment so adjacent visuals
-  // crossfade with no dark dip at the boundary.
-  const input =
-    index === 0
-      ? [0, b - cf, b]
-      : index === N - 1
-        ? [a - cf, a, 1]
-        : [a - cf, a, b - cf, b];
-  const output =
-    index === 0
-      ? [1, 1, 0]
-      : index === N - 1
-        ? [0, 1, 1]
-        : [0, 1, 1, 0];
+  // Auto-advance: animate `progress` to 1 over the remaining time, then step.
+  // Pausing stops the animation and freezes the value; resuming continues
+  // from where it left off. Reduced motion → no autoplay (manual only).
+  useEffect(() => {
+    if (reduce || paused) return;
+    const remaining = AUTO_MS * (1 - progress.get());
+    const controls = animate(progress, 1, {
+      duration: Math.max(remaining, 0) / 1000,
+      ease: "linear",
+      onComplete: () => {
+        progress.set(0);
+        setDir(1);
+        setActive((a) => (a + 1) % N);
+      },
+    });
+    return () => controls.stop();
+  }, [active, paused, reduce, progress]);
 
-  const opacity = useTransform(scrollYProgress, input, output);
-
-  return (
-    <motion.div style={{ opacity }} className="absolute inset-0 grid place-items-center p-10">
-      <LabGlyph lab={lab} />
-      {/* lab name caption pinned at the bottom of the frame */}
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 border-t border-[color:var(--border-subtle)] bg-white/60 px-7 py-5 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <span
-            className="grid h-9 w-9 place-items-center rounded-xl text-[13px] font-semibold text-white"
-            style={{ backgroundColor: lab.tint }}
-          >
-            {lab.n}
-          </span>
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-primary)]">
-            {lab.name}
-          </span>
-        </div>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-tertiary)]">
-          Lab {lab.n} / {LABS.length.toString().padStart(2, "0")}
-        </span>
-      </div>
-    </motion.div>
+  const go = useCallback(
+    (next: number) => {
+      const target = (next + N) % N;
+      setDir(target > active || (active === N - 1 && target === 0) ? 1 : -1);
+      progress.set(0);
+      setActive(target);
+    },
+    [active, progress],
   );
-}
 
-/* The constant pinned frame. */
-function StickyFrame({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
-  return (
-    <div className="relative aspect-square w-full max-w-[420px] overflow-hidden rounded-[28px] border border-[color:var(--border-subtle)] bg-[var(--card)] shadow-strong ring-1 ring-black/5">
-      {/* soft brand wash inside the constant frame */}
-      <div aria-hidden className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle at 50% 42%, rgba(255,138,0,0.10), transparent 62%)" }} />
-      <div aria-hidden className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle at 50% 70%, rgba(46,182,181,0.08), transparent 65%)" }} />
-      {LABS.map((lab, i) => (
-        <LabVisualLayer key={lab.n} lab={lab} index={i} scrollYProgress={scrollYProgress} />
-      ))}
-    </div>
-  );
-}
-
-/* Right-column scrolling step — lights up across its scroll range. */
-function LabStep({
-  lab,
-  index,
-  scrollYProgress,
-}: {
-  lab: Lab;
-  index: number;
-  scrollYProgress: MotionValue<number>;
-}) {
-  const seg = 1 / N;
-  const a = index * seg;
-  const b = (index + 1) * seg;
-  const active = useTransform(scrollYProgress, [a - 0.03, a, b, b + 0.03], [0, 1, 1, 0]);
-  const dim = useTransform(active, [0, 1], [0.45, 1]);
+  const lab = LABS[active];
 
   return (
-    <div className="relative flex min-h-[62vh] items-center">
-      <motion.div style={{ opacity: dim }} className="flex w-full items-start gap-5">
-        {/* number badge — fills with the lab tint while active */}
-        <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[color:var(--border-subtle)] bg-white">
-          <motion.span aria-hidden style={{ opacity: active, backgroundColor: lab.tint }} className="absolute inset-0 rounded-2xl" />
-          <span className="absolute inset-0 grid place-items-center text-[14px] font-semibold tracking-wider text-[var(--ink-tertiary)]">{lab.n}</span>
-          <motion.span style={{ opacity: active }} className="absolute inset-0 grid place-items-center text-[14px] font-semibold tracking-wider text-white">{lab.n}</motion.span>
+    <div
+      className="relative z-10 mx-auto max-w-[1280px] px-6 lg:px-12"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+      role="group"
+      aria-roledescription="carousel"
+      aria-label="Skillship labs"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") { e.preventDefault(); go(active + 1); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); go(active - 1); }
+      }}
+    >
+      <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+        {/* ── Stage ── */}
+        <div className="relative mx-auto aspect-square w-full max-w-[460px] overflow-hidden rounded-[32px] border border-[color:var(--border-subtle)] bg-[var(--card)] shadow-strong ring-1 ring-black/5">
+          {/* the themed glyph + wash crossfade together, keyed by active */}
+          <AnimatePresence>
+            <motion.div
+              key={active}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.55, ease: EASE }}
+              className="absolute inset-0"
+            >
+              <div
+                aria-hidden
+                className="absolute inset-0"
+                style={{ backgroundImage: `radial-gradient(circle at 50% 40%, ${hexA(lab.tint, 0.18)}, transparent 64%)` }}
+              />
+              {/* big faint number watermark */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -bottom-6 right-1 select-none text-[12rem] font-bold leading-none tracking-tighter"
+                style={{ color: hexA(lab.tint, 0.1) }}
+              >
+                {lab.n}
+              </span>
+              <motion.div
+                initial={{ scale: 0.94 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.6, ease: EASE }}
+                className="absolute inset-0 grid place-items-center p-10"
+              >
+                <LabGlyph lab={lab} />
+              </motion.div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* caption pinned at the bottom of the stage */}
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 border-t border-[color:var(--border-subtle)] bg-[var(--card)]/70 px-7 py-5 backdrop-blur-sm">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <span
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[13px] font-semibold text-white transition-colors"
+                style={{ backgroundColor: lab.tint }}
+              >
+                {lab.n}
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={active}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                  className="truncate text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink-primary)]"
+                >
+                  {lab.name}
+                </motion.span>
+              </AnimatePresence>
+            </div>
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ink-tertiary)]">
+              {lab.n} / {N.toString().padStart(2, "0")}
+            </span>
+          </div>
         </div>
 
+        {/* ── Content + selector ── */}
         <div>
-          <h3
-            className="font-semibold leading-[1.12] tracking-[-0.025em] text-[var(--ink-primary)]"
-            style={{ fontSize: "clamp(1.6rem, 3vw, 2.35rem)" }}
+          <p
+            className="text-[11.5px] font-semibold uppercase tracking-[0.2em]"
+            style={{ color: lab.tint }}
           >
-            {lab.name}
-          </h3>
-          <p className="mt-3 max-w-[440px] text-[16px] leading-[1.65] text-[var(--ink-secondary)] md:text-[17px]">
-            {lab.desc}
+            Lab {lab.n} of {N.toString().padStart(2, "0")}
           </p>
+
+          {/* swap headline + description with a directional slide */}
+          <div className="relative mt-3 min-h-[210px] md:min-h-[200px]">
+            <AnimatePresence mode="wait" custom={dir}>
+              <motion.div
+                key={active}
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.42, ease: EASE }}
+                className="absolute inset-0"
+              >
+                <h3
+                  className="font-semibold leading-[1.1] tracking-[-0.025em] text-[var(--ink-primary)]"
+                  style={{ fontSize: "clamp(1.7rem, 3vw, 2.5rem)" }}
+                >
+                  {lab.name}
+                </h3>
+                <p className="mt-4 max-w-[460px] text-[16px] leading-[1.65] text-[var(--ink-secondary)] md:text-[17px]">
+                  {lab.desc}
+                </p>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* story-style progress bars — one per lab, click to jump */}
+          <div className="mt-8 flex items-center gap-2.5">
+            {LABS.map((l, i) => (
+              <button
+                key={l.n}
+                type="button"
+                onClick={() => go(i)}
+                aria-label={`Show ${l.name}`}
+                aria-current={i === active}
+                className="group relative h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--border)] transition-[height] hover:h-2.5 focus-visible:h-2.5"
+              >
+                {/* labs already seen → solid fill */}
+                {i < active && (
+                  <span className="absolute inset-0 rounded-full" style={{ backgroundColor: hexA(l.tint, 0.45) }} />
+                )}
+                {/* active lab → live progress fill */}
+                {i === active && (
+                  <motion.span
+                    className="absolute inset-y-0 left-0 w-full origin-left rounded-full"
+                    style={{ scaleX: progress, backgroundColor: lab.tint }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* prev / next + counter */}
+          <div className="mt-7 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => go(active - 1)}
+              aria-label="Previous lab"
+              className="grid h-10 w-10 place-items-center rounded-full border border-[color:var(--border-subtle)] bg-[var(--card)] text-[var(--ink-secondary)] transition-all hover:-translate-y-0.5 hover:border-[color:var(--border-strong)] hover:text-[var(--ink-primary)]"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => go(active + 1)}
+              aria-label="Next lab"
+              className="grid h-10 w-10 place-items-center rounded-full border border-[color:var(--border-subtle)] bg-[var(--card)] text-[var(--ink-secondary)] transition-all hover:-translate-y-0.5 hover:border-[color:var(--border-strong)] hover:text-[var(--ink-primary)]"
+            >
+              <ChevronRight size={18} />
+            </button>
+            <span className="ml-1 text-[13px] font-medium text-[var(--ink-tertiary)]">
+              Hover to pause · use ← → to browse
+            </span>
+          </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -299,15 +432,6 @@ function LabStep({
 export function IAASLabs() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.1 });
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: scrollRef,
-    offset: ["start start", "end end"],
-  });
-  // Smooth the raw scroll progress so the crossfades glide instead of
-  // tracking every jitter of the wheel — "extreme smooth" flow.
-  const smooth = useSpring(scrollYProgress, { stiffness: 70, damping: 24, mass: 0.4 });
 
   return (
     <section id="iaas-labs" ref={ref} className="relative bg-[var(--cream-soft)]">
@@ -390,53 +514,9 @@ export function IAASLabs() {
         </div>
       </div>
 
-      {/* ── Desktop: sticky constant frame + scrolling 8 labs ──
-          mt-24 keeps a clear gap below the hero photo so the pinned frame
-          never visually merges into it. */}
-      <div ref={scrollRef} className="relative z-10 mx-auto mt-24 hidden max-w-[1280px] px-6 lg:block lg:px-12">
-        <div className="grid grid-cols-12 gap-10">
-          <div className="col-span-6">
-            <div className="sticky top-28 flex h-[calc(100vh-7rem)] items-center justify-center">
-              <StickyFrame scrollYProgress={smooth} />
-            </div>
-          </div>
-          <div className="col-span-6">
-            {LABS.map((lab, i) => (
-              <LabStep key={lab.n} lab={lab} index={i} scrollYProgress={smooth} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Mobile / tablet: stacked cards, each lab its own glyph ── */}
-      <div className="relative z-10 mx-auto max-w-[720px] px-6 pt-12 lg:hidden">
-        <div className="space-y-14">
-          {LABS.map((lab, i) => (
-            <motion.div
-              key={lab.n}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.7, ease: EASE }}
-            >
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[28px] border border-[color:var(--border-subtle)] bg-[var(--cream-soft)] shadow-soft">
-                <div aria-hidden className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle at 50% 45%, rgba(255,138,0,0.10), transparent 62%)" }} />
-                <div className="absolute inset-0 grid place-items-center p-8">
-                  <LabGlyph lab={lab} />
-                </div>
-              </div>
-              <div className="mt-5 flex items-start gap-4">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[13px] font-semibold text-white" style={{ backgroundColor: lab.tint }}>
-                  {lab.n}
-                </span>
-                <div>
-                  <h3 className="text-[20px] font-semibold tracking-[-0.02em] text-[var(--ink-primary)]">{lab.name}</h3>
-                  <p className="mt-2 text-[15px] leading-[1.6] text-[var(--ink-secondary)]">{lab.desc}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+      {/* ── The interactive auto-playing labs spotlight (all breakpoints) ── */}
+      <div className="mt-20 md:mt-24">
+        <LabsSpotlight />
       </div>
 
       {/* The IAAS advantage strip */}
