@@ -260,3 +260,46 @@ class UsersViewSet(ModelViewSet):
         from . import bulk as _bulk
         result = _bulk.import_users_csv(actor=request.user, csv_text=text)
         return Response(result)
+
+    # ── Class onboarding (generate credentials + create + enrol) ────────────
+
+    @action(detail=False, methods=["post"], url_path="onboard-class")
+    def onboard_class(self, request):
+        """
+        POST /api/v1/users/onboard-class/   (MAIN_ADMIN only via CanManageUsers)
+
+        Body (JSON):
+            {
+              "school": "<uuid>",
+              "klass":  "<class uuid>",            # must belong to `school`
+              "course_code": "AI-INTRO",            # optional
+              "students": [
+                {"first_name": "Aarav", "last_name": "Sharma", "admission_number": "23-1042"},
+                {"first_name": "Diya",  "last_name": "Patel"}
+              ]
+            }
+
+        For each student we generate a unique login (email + username
+        namespaced under the school slug) and a readable password, create the
+        STUDENT account (school-stamped), and enrol them into the class — one
+        atomic transaction per student. Rows whose admission_number already
+        exists in the school are re-enrolled, not duplicated.
+
+        Response: {created_count, existing_count, error_count, students[], errors[]}
+        The plaintext passwords appear ONCE here (the DB stores only the hash).
+        """
+        from . import onboarding
+        from .serializers import OnboardClassSerializer
+
+        serializer = OnboardClassSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        result = onboarding.onboard_class(
+            school=data["school"],
+            klass=data["klass"],
+            course=data["course"],
+            students=[dict(s) for s in data["students"]],
+        )
+        code = status.HTTP_200_OK if result["error_count"] == 0 else status.HTTP_207_MULTI_STATUS
+        return Response(result, status=code)

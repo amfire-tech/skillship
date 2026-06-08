@@ -15,6 +15,7 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.academics.models import Class, Course
 from apps.common.permissions import Role
 from apps.schools.models import School
 
@@ -256,3 +257,57 @@ class PasswordSetSerializer(serializers.Serializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError(list(exc.messages)) from exc
         return value
+
+
+# ── Class onboarding (used by /api/v1/users/onboard-class/) ─────────────────
+
+
+class OnboardStudentSerializer(serializers.Serializer):
+    """One student row in an onboarding request. Only the name is required;
+    everything else (email, username, password) is generated server-side."""
+
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    admission_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+
+
+class OnboardClassSerializer(serializers.Serializer):
+    """Body for POST /api/v1/users/onboard-class/ (MAIN_ADMIN only).
+
+    Validates that the target class belongs to the chosen school (tenant
+    safety) and resolves the optional course before any account is created.
+    """
+
+    school = serializers.PrimaryKeyRelatedField(
+        queryset=School.objects.all(), pk_field=serializers.UUIDField()
+    )
+    klass = serializers.PrimaryKeyRelatedField(
+        queryset=Class.objects.all(), pk_field=serializers.UUIDField()
+    )
+    course_code = serializers.CharField(required=False, allow_blank=True, default="")
+    students = OnboardStudentSerializer(many=True)
+
+    def validate_students(self, value):
+        if not value:
+            raise serializers.ValidationError("Provide at least one student.")
+        return value
+
+    def validate(self, attrs):
+        school = attrs["school"]
+        klass = attrs["klass"]
+        # Tenant guard: the class must live in the selected school.
+        if klass.school_id != school.id:
+            raise serializers.ValidationError(
+                {"klass": "Class does not belong to the selected school."}
+            )
+
+        course = None
+        code = (attrs.get("course_code") or "").strip().upper()
+        if code:
+            course = Course.objects.filter(school=school, code__iexact=code).first()
+            if course is None:
+                raise serializers.ValidationError(
+                    {"course_code": f"No course {code!r} in this school."}
+                )
+        attrs["course"] = course
+        return attrs
