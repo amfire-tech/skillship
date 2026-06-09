@@ -96,6 +96,22 @@ export default function CreateUserRolePage() {
     fetchSchools();
   }, [meta]);
 
+  // Students are no longer created via this single-user form — they're onboarded
+  // in bulk (random credentials; the student sets their own profile on first
+  // login). Send anyone who lands here for a STUDENT straight to Onboard Students.
+  const isStudent = role.toUpperCase() === "STUDENT";
+  useEffect(() => {
+    if (isStudent) router.replace("/dashboard/admin/onboard");
+  }, [isStudent, router]);
+
+  if (isStudent) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-[var(--muted-foreground)]">
+        Redirecting to Onboard Students…
+      </div>
+    );
+  }
+
   if (!meta) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">

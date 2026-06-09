@@ -44,8 +44,8 @@ const roles = [
   {
     value: "STUDENT",
     label: "Student",
-    description: "Takes quizzes, accesses courses, views progress.",
-    href: "/dashboard/admin/users/new/STUDENT",
+    description: "Onboarded in bulk — generate login credentials, students set their own profile.",
+    href: "/dashboard/admin/onboard",
     tint: "bg-teal-50 text-teal-600",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
