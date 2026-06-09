@@ -8,20 +8,18 @@ Owner:   Prashant
 Why this is its own file:
     test_isolation.py asserts the *invariant* (no school sees another's data).
     test_login.py asserts the *auth contract*. This file asserts the
-    *user-management surface* — the matrix of "who may do what to whom" that
-    the product team will keep wanting to extend.
+    *user-management surface* — the matrix of "who may do what to whom".
 
-    Every new role / action / cross-cut should add a row here. A regression
-    silently giving a teacher write access to the user table is the kind of
-    bug that ends a school contract.
+Policy (2026-05-28 lockdown — see apps/accounts/permissions.py):
+    ONLY MAIN_ADMIN may touch /api/v1/users/. Principals, sub-admins, teachers,
+    and students are blocked at the surface (403) on EVERY action — they never
+    reach the queryset or object layer. MAIN_ADMIN may act on any user in any
+    school, subject to the role/school invariant.
 """
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
-from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 
@@ -36,7 +34,7 @@ def _set_password_url(user: User) -> str:
     return f"{LIST_URL}{user.id}/set-password/"
 
 
-# ── LIST + RETRIEVE — surface gating + tenant scoping ───────────────────────
+# ── LIST + RETRIEVE — MAIN_ADMIN sees everything ────────────────────────────
 
 
 @pytest.mark.django_db
@@ -66,36 +64,6 @@ class TestListAndRetrieve:
         assert str(student_b.id) in ids
         assert str(main_admin.id) in ids
 
-    def test_principal_lists_only_own_school_users(
-        self,
-        api_client,
-        principal_a,
-        password,
-        login,
-        teacher_a,
-        student_a,
-        principal_b,
-        student_b,
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.get(LIST_URL)
-        assert response.status_code == 200
-
-        results = response.data["results"] if "results" in response.data else response.data
-        ids = {item["id"] for item in results}
-        assert str(principal_a.id) in ids
-        assert str(teacher_a.id) in ids
-        assert str(student_a.id) in ids
-        assert str(principal_b.id) not in ids
-        assert str(student_b.id) not in ids
-
-    def test_principal_a_cannot_retrieve_school_b_user(
-        self, api_client, principal_a, password, login, student_b
-    ):
-        login(api_client, principal_a, password)
-        # 404 (filtered out by queryset), not 403 — we don't leak existence.
-        assert api_client.get(_detail_url(student_b)).status_code == 404
-
     def test_main_admin_can_retrieve_any_user(
         self, api_client, main_admin, password, login, student_b
     ):
@@ -104,16 +72,36 @@ class TestListAndRetrieve:
         assert response.status_code == 200
         assert response.data["id"] == str(student_b.id)
 
+    def test_main_admin_can_filter_by_role_and_school(
+        self, api_client, main_admin, password, login, school_a, student_a, teacher_a, student_b
+    ):
+        """The User Management screen filters server-side: ?role= and ?school=."""
+        login(api_client, main_admin, password)
+        response = api_client.get(f"{LIST_URL}?role=STUDENT&school={school_a.id}")
+        assert response.status_code == 200
+        results = response.data["results"] if "results" in response.data else response.data
+        ids = {item["id"] for item in results}
+        assert str(student_a.id) in ids       # STUDENT in school_a
+        assert str(teacher_a.id) not in ids   # filtered out by role
+        assert str(student_b.id) not in ids   # filtered out by school
+
+
+# ── Surface is closed to every non-admin role, on every action ──────────────
+
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("user_fixture", ["teacher_a", "student_a"])
+@pytest.mark.parametrize("user_fixture", ["principal_a", "teacher_a", "student_a"])
 class TestSurfaceClosedToNonAdmins:
+    """Only MAIN_ADMIN may use /users/. Everyone else is blocked at the surface
+    (403) before any view logic runs — list, retrieve, create, update, delete,
+    and the set-password action alike."""
+
     def test_list_is_403(self, request, api_client, password, login, user_fixture):
         user = request.getfixturevalue(user_fixture)
         login(api_client, user, password)
         assert api_client.get(LIST_URL).status_code == 403
 
-    def test_retrieve_anyone_is_403(
+    def test_retrieve_is_403(
         self, request, api_client, password, login, user_fixture, principal_a
     ):
         user = request.getfixturevalue(user_fixture)
@@ -135,6 +123,36 @@ class TestSurfaceClosedToNonAdmins:
         )
         assert response.status_code == 403
 
+    def test_update_is_403(
+        self, request, api_client, password, login, user_fixture, teacher_a
+    ):
+        user = request.getfixturevalue(user_fixture)
+        login(api_client, user, password)
+        response = api_client.patch(
+            _detail_url(teacher_a), {"first_name": "Hijacked"}, format="json"
+        )
+        assert response.status_code == 403
+        teacher_a.refresh_from_db()
+        assert teacher_a.first_name != "Hijacked"
+
+    def test_delete_is_403(
+        self, request, api_client, password, login, user_fixture, teacher_a
+    ):
+        user = request.getfixturevalue(user_fixture)
+        login(api_client, user, password)
+        assert api_client.delete(_detail_url(teacher_a)).status_code == 403
+        assert User.objects.filter(pk=teacher_a.id).exists()
+
+    def test_set_password_is_403(
+        self, request, api_client, password, login, user_fixture, teacher_a
+    ):
+        user = request.getfixturevalue(user_fixture)
+        login(api_client, user, password)
+        response = api_client.post(
+            _set_password_url(teacher_a), {"password": "Skillship#Reset-2026"}, format="json"
+        )
+        assert response.status_code == 403
+
 
 @pytest.mark.django_db
 class TestAnonymous:
@@ -145,7 +163,7 @@ class TestAnonymous:
         assert api_client.get(_detail_url(principal_a)).status_code == 401
 
 
-# ── CREATE — role/school invariant + role-based gating ──────────────────────
+# ── CREATE — role/school invariant + role-based gating (MAIN_ADMIN) ──────────
 
 
 @pytest.mark.django_db
@@ -264,102 +282,7 @@ class TestCreateAsMainAdmin:
         assert "email" in response.data
 
 
-@pytest.mark.django_db
-class TestCreateAsPrincipal:
-    def test_principal_creates_teacher_in_own_school(
-        self, api_client, principal_a, password, login, school_a
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            LIST_URL,
-            {
-                "email": "new.teacher@school-a.test",
-                "username": "new_teacher_a",
-                "role": "TEACHER",
-                "password": "Skillship#Test-2026",
-            },
-            format="json",
-        )
-        assert response.status_code == 201, response.content
-        assert response.data["school"] == str(school_a.id)
-        assert response.data["role"] == "TEACHER"
-
-    def test_principal_creates_student_in_own_school(
-        self, api_client, principal_a, password, login, school_a
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            LIST_URL,
-            {
-                "email": "new.student@school-a.test",
-                "username": "new_student_a",
-                "role": "STUDENT",
-                "password": "Skillship#Test-2026",
-            },
-            format="json",
-        )
-        assert response.status_code == 201
-        assert response.data["school"] == str(school_a.id)
-
-    def test_principal_cannot_create_a_principal(
-        self, api_client, principal_a, password, login
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            LIST_URL,
-            {
-                "email": "extra.principal@school-a.test",
-                "username": "extra_principal",
-                "role": "PRINCIPAL",
-                "password": "Skillship#Test-2026",
-            },
-            format="json",
-        )
-        assert response.status_code == 400
-        assert "role" in response.data
-
-    def test_principal_cannot_create_a_main_admin(
-        self, api_client, principal_a, password, login
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            LIST_URL,
-            {
-                "email": "rogue.admin@nowhere.test",
-                "username": "rogue_admin",
-                "role": "MAIN_ADMIN",
-                "password": "Skillship#Test-2026",
-            },
-            format="json",
-        )
-        assert response.status_code == 400
-
-    def test_principal_a_cannot_place_user_in_school_b_via_body(
-        self, api_client, principal_a, password, login, school_a, school_b
-    ):
-        """Principal sneaking in `school: <school_b>` — the serializer must
-        override school back to the actor's own school. The created user
-        ends up in school_a regardless."""
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            LIST_URL,
-            {
-                "email": "sneaky@school-a.test",
-                "username": "sneaky_student",
-                "role": "STUDENT",
-                "school": str(school_b.id),
-                "password": "Skillship#Test-2026",
-            },
-            format="json",
-        )
-        assert response.status_code == 201, response.content
-        # The serializer overrode the school silently — created in school_a.
-        assert response.data["school"] == str(school_a.id)
-        created = User.objects.get(username="sneaky_student")
-        assert created.school_id == school_a.id
-
-
-# ── UPDATE — only safe fields, scoped by school ─────────────────────────────
+# ── UPDATE — only safe fields (MAIN_ADMIN) ──────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -376,31 +299,6 @@ class TestUpdate:
         assert response.status_code == 200
         student_b.refresh_from_db()
         assert student_b.first_name == "Renamed"
-
-    def test_principal_can_patch_own_school_user(
-        self, api_client, principal_a, password, login, teacher_a
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.patch(
-            _detail_url(teacher_a),
-            {"phone": "+91-99999-00000"},
-            format="json",
-        )
-        assert response.status_code == 200
-        teacher_a.refresh_from_db()
-        assert teacher_a.phone == "+91-99999-00000"
-
-    def test_principal_a_cannot_patch_school_b_user(
-        self, api_client, principal_a, password, login, student_b
-    ):
-        login(api_client, principal_a, password)
-        # 404 because get_queryset filters them out — don't leak existence.
-        response = api_client.patch(
-            _detail_url(student_b), {"first_name": "Hijacked"}, format="json"
-        )
-        assert response.status_code == 404
-        student_b.refresh_from_db()
-        assert student_b.first_name != "Hijacked"
 
     def test_role_change_is_rejected_silently(
         self, api_client, main_admin, password, login, student_a
@@ -433,7 +331,7 @@ class TestUpdate:
         assert student_a.school_id != school_b.id
 
 
-# ── DESTROY ─────────────────────────────────────────────────────────────────
+# ── DESTROY (MAIN_ADMIN) ────────────────────────────────────────────────────
 
 
 @pytest.mark.django_db
@@ -446,24 +344,8 @@ class TestDestroy:
         assert response.status_code == 204
         assert not User.objects.filter(pk=student_b.id).exists()
 
-    def test_principal_can_delete_own_school_user(
-        self, api_client, principal_a, password, login, teacher_a
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.delete(_detail_url(teacher_a))
-        assert response.status_code == 204
-        assert not User.objects.filter(pk=teacher_a.id).exists()
 
-    def test_principal_a_cannot_delete_school_b_user(
-        self, api_client, principal_a, password, login, student_b
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.delete(_detail_url(student_b))
-        assert response.status_code == 404
-        assert User.objects.filter(pk=student_b.id).exists()
-
-
-# ── /set-password/ custom action ────────────────────────────────────────────
+# ── /set-password/ custom action (MAIN_ADMIN) ───────────────────────────────
 
 
 @pytest.mark.django_db
@@ -480,28 +362,6 @@ class TestSetPassword:
         assert response.status_code == 204
         student_b.refresh_from_db()
         assert student_b.check_password(self.NEW_PW)
-
-    def test_principal_resets_own_school_user(
-        self, api_client, principal_a, password, login, teacher_a
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            _set_password_url(teacher_a), {"password": self.NEW_PW}, format="json"
-        )
-        assert response.status_code == 204
-        teacher_a.refresh_from_db()
-        assert teacher_a.check_password(self.NEW_PW)
-
-    def test_principal_a_cannot_reset_school_b_user(
-        self, api_client, principal_a, password, login, student_b
-    ):
-        login(api_client, principal_a, password)
-        response = api_client.post(
-            _set_password_url(student_b), {"password": self.NEW_PW}, format="json"
-        )
-        assert response.status_code == 404
-        student_b.refresh_from_db()
-        assert not student_b.check_password(self.NEW_PW)
 
     def test_weak_password_returns_400(
         self, api_client, main_admin, password, login, student_a

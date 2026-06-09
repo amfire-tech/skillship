@@ -117,6 +117,42 @@ class TestOnboardClassHappyPath:
         assert resp.status_code == 400
         assert User.objects.filter(role=User.Role.STUDENT).count() == 0
 
+    def test_same_roll_in_two_sections_gets_distinct_logins(
+        self, api_client, login, main_admin, school_a
+    ):
+        """Roll 01 in 10-A and roll 01 in 10-B are different students and must
+        each get their own account + a unique, section-namespaced email."""
+        year = AcademicYear.objects.create(
+            school=school_a, name="2025-26",
+            start_date=date(2025, 4, 1), end_date=date(2026, 3, 31), is_current=True,
+        )
+        class_a = Class.objects.create(school=school_a, academic_year=year, grade=10, section="A")
+        class_b = Class.objects.create(school=school_a, academic_year=year, grade=10, section="B")
+        login(api_client, main_admin)
+
+        def onboard(klass):
+            return api_client.post(
+                URL,
+                {
+                    "school": str(school_a.id), "klass": str(klass.id),
+                    "students": [{"first_name": "Aarav", "admission_number": "01"}],
+                },
+                format="json",
+            ).json()
+
+        a = onboard(class_a)
+        b = onboard(class_b)
+
+        assert a["created_count"] == 1
+        assert b["created_count"] == 1  # NOT merged into the section-A student
+        # Two distinct accounts, two distinct emails carrying the section.
+        assert User.objects.filter(school=school_a, role=User.Role.STUDENT).count() == 2
+        email_a = a["students"][0]["email"]
+        email_b = b["students"][0]["email"]
+        assert email_a != email_b
+        assert email_a == "10a01@dps-a.skillship.in"
+        assert email_b == "10b01@dps-a.skillship.in"
+
     def test_idempotent_by_admission_number(
         self, api_client, login, main_admin, school_a
     ):

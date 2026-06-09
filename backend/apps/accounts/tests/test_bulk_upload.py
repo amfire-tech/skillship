@@ -44,52 +44,28 @@ class TestBulkUploadAuth:
         login(api_client, student_a)
         assert _upload(api_client, GOOD_CSV).status_code == 403
 
-
-@pytest.mark.django_db
-class TestBulkUploadByPrincipal:
-    def test_principal_imports_into_own_school(
-        self, api_client, login, school_a, principal_a
-    ):
+    def test_principal_blocked(self, api_client, login, principal_a):
+        # 2026-05-28 lockdown: only MAIN_ADMIN may bulk-upload (CanManageUsers).
         login(api_client, principal_a)
-        r = _upload(api_client, GOOD_CSV)
-        assert r.status_code == 200, r.content
-        body = r.json()
-        assert body["total_rows"] == 3
-        assert body["created"] == 3
-        assert body["errors"] == []
-        for u in User.objects.filter(email__in=["alice@a.test", "bob@a.test", "charlie@a.test"]):
-            assert u.school_id == school_a.id
-            assert u.check_password("Pass!2026")
-
-    def test_role_whitelist_blocks_main_admin(
-        self, api_client, login, principal_a
-    ):
-        csv_text = (
-            "username,email,first_name,last_name,role,password\n"
-            "evil,evil@a.test,Evil,Plan,MAIN_ADMIN,Pass!2026\n"
-        )
-        login(api_client, principal_a)
-        body = _upload(api_client, csv_text).json()
-        assert body["created"] == 0
-        assert "STUDENT / TEACHER / SUB_ADMIN" in body["errors"][0]["message"]
-
-    def test_principal_ignores_cross_school_column(
-        self, api_client, login, school_a, school_b, principal_a
-    ):
-        """Principal A uploads with `school=<school_b.slug>` → row still lands in school A."""
-        csv_text = (
-            "username,email,first_name,last_name,role,password,school\n"
-            f"sneaky,sneaky@a.test,Sneaky,Thief,STUDENT,Pass!2026,{school_b.slug}\n"
-        )
-        login(api_client, principal_a)
-        body = _upload(api_client, csv_text).json()
-        assert body["created"] == 1
-        user = User.objects.get(email="sneaky@a.test")
-        assert user.school_id == school_a.id  # NOT school_b
+        assert _upload(api_client, GOOD_CSV).status_code == 403
 
 
 @pytest.mark.django_db
 class TestBulkUploadByMainAdmin:
+    def test_role_whitelist_blocks_main_admin_rows(
+        self, api_client, login, school_a, main_admin
+    ):
+        """A MAIN_ADMIN row in the CSV is rejected by the role whitelist —
+        only STUDENT / TEACHER / SUB_ADMIN may be created via bulk upload."""
+        csv_text = (
+            "username,email,first_name,last_name,role,password,school\n"
+            f"evil,evil@a.test,Evil,Plan,MAIN_ADMIN,Pass!2026,{school_a.slug}\n"
+        )
+        login(api_client, main_admin)
+        body = _upload(api_client, csv_text).json()
+        assert body["created"] == 0
+        assert "STUDENT / TEACHER / SUB_ADMIN" in body["errors"][0]["message"]
+
     def test_main_admin_uses_school_column(
         self, api_client, login, school_a, school_b, main_admin
     ):
@@ -132,23 +108,23 @@ class TestBulkUploadByMainAdmin:
 @pytest.mark.django_db
 class TestBulkUploadValidation:
     def test_missing_required_column_aborts(
-        self, api_client, login, principal_a
+        self, api_client, login, main_admin
     ):
-        login(api_client, principal_a)
+        login(api_client, main_admin)
         body = _upload(api_client, "username,email\nalice,a@a.test\n").json()
         assert body["created"] == 0
         assert "Missing required columns" in body["errors"][0]["message"]
 
     def test_partial_success_per_row(
-        self, api_client, login, principal_a
+        self, api_client, login, school_a, main_admin
     ):
         csv_text = (
-            "username,email,first_name,last_name,role,password\n"
-            "good,good@a.test,Good,One,STUDENT,Pass!2026\n"
-            "noemail,,No,Email,STUDENT,Pass!2026\n"
-            "short,short@a.test,Sh,Ort,STUDENT,abc\n"
+            "username,email,first_name,last_name,role,password,school\n"
+            f"good,good@a.test,Good,One,STUDENT,Pass!2026,{school_a.slug}\n"
+            f"noemail,,No,Email,STUDENT,Pass!2026,{school_a.slug}\n"
+            f"short,short@a.test,Sh,Ort,STUDENT,abc,{school_a.slug}\n"
         )
-        login(api_client, principal_a)
+        login(api_client, main_admin)
         body = _upload(api_client, csv_text).json()
         assert body["total_rows"] == 3
         assert body["created"] == 1
