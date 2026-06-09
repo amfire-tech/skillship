@@ -23,7 +23,11 @@ The refresh token NEVER appears in a response body — it only flows through
 HttpOnly cookies. This is what keeps it safe from XSS.
 """
 
+import uuid
+
 from django.conf import settings
+from django.db import transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -170,34 +174,148 @@ class MeView(RetrieveAPIView):
         return self.request.user
 
 
+class CompleteProfileView(APIView):
+    """POST /api/v1/auth/complete-profile/ — a student's one-time first-login setup.
+
+    A blank account (minted by generate-credentials) has no name / roll / class.
+    The student fills those in here exactly ONCE: we set their name + roll, find
+    or create the class (grade + section) in THEIR OWN school, enrol them, and
+    flip profile_completed=True. After that the profile is locked — re-posting
+    returns 403, and only MAIN_ADMIN can change it (via /api/v1/users/).
+
+    The school is taken from request.user, never the body, so a student can
+    never place themselves in another tenant.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from apps.academics.models import Class, Enrollment
+
+        from .serializers import CompleteProfileSerializer
+
+        user = request.user
+        if user.role != Role.STUDENT:
+            return Response(
+                {"detail": "Only students complete a first-login profile."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if user.profile_completed:
+            return Response(
+                {"detail": "Your profile is already set and can only be changed by your school admin."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if user.school_id is None:
+            # A STUDENT always has a school (DB constraint), but guard anyway.
+            return Response(
+                {"detail": "Your account is not linked to a school yet — contact your admin."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = CompleteProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            year = self._current_year(user.school_id)
+            klass, _ = Class.objects.get_or_create(
+                school_id=user.school_id,
+                academic_year=year,
+                grade=data["grade"],
+                section=data["section"],
+            )
+            Enrollment.objects.get_or_create(
+                school_id=user.school_id, student=user, klass=klass, course=None,
+            )
+            user.first_name = data["first_name"]
+            user.last_name = data["last_name"]
+            user.admission_number = data["admission_number"]
+            user.profile_completed = True
+            user.save(update_fields=[
+                "first_name", "last_name", "admission_number", "profile_completed",
+            ])
+
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _current_year(school_id):
+        """The school's current AcademicYear — preferring is_current, else any
+        existing, else a freshly-created one for the Indian (Apr–Mar) year."""
+        from datetime import date
+
+        from apps.academics.models import AcademicYear
+
+        year = (
+            AcademicYear.objects.filter(school_id=school_id, is_current=True).first()
+            or AcademicYear.objects.filter(school_id=school_id).first()
+        )
+        if year is not None:
+            return year
+
+        today = date.today()
+        start_year = today.year if today.month >= 4 else today.year - 1
+        name = f"{start_year}-{str((start_year + 1) % 100).zfill(2)}"
+        # get_or_create (not create) keyed on the year's unique (school, name)
+        # so two students completing at the same time can't collide on it.
+        year, _ = AcademicYear.objects.get_or_create(
+            school_id=school_id,
+            name=name,
+            defaults={
+                "start_date": date(start_year, 4, 1),
+                "end_date": date(start_year + 1, 3, 31),
+                "is_current": True,
+            },
+        )
+        return year
+
+
 # ── /api/v1/users/ — user management surface ────────────────────────────────
 
 
 class UsersViewSet(ModelViewSet):
     """CRUD for User resources, plus a /set-password/ action.
 
-    Tenant scoping:
-        MAIN_ADMIN sees every user. PRINCIPAL sees only users in their own
-        school. The surface is closed to anyone else by `CanManageUsers`,
-        so the queryset filter is the second line of defence — never the only one.
-
-    Why a custom get_queryset() instead of TenantScopedViewSet:
-        Users have school=NULL for MAIN_ADMIN, and TenantScopedViewSet's
-        unconditional `school_id=…` filter would silently hide any future
-        platform-level user from a principal who somehow reached the surface.
-        Spelling out the role gate here is clearer than a generic helper.
+    Surface lock:
+        The entire /api/v1/users/ surface is MAIN_ADMIN-only via
+        `CanManageUsers` (see apps/accounts/permissions.py). No other role —
+        principal, sub-admin, teacher, student — can list, create, update, or
+        delete user accounts. Only the platform super admin manages users, so
+        only the super admin can change a student's locked profile.
     """
 
     permission_classes = [IsAuthenticated, CanManageUsers]
     lookup_field = "id"
 
     def get_queryset(self):
-        actor = self.request.user
-        qs = User.objects.all().order_by("-date_joined")
-        if actor.role == Role.MAIN_ADMIN:
-            return qs
-        # PRINCIPAL: scoped to own school. Anyone else never reaches here.
-        return qs.filter(school_id=actor.school_id)
+        # MAIN_ADMIN is the only role that reaches this surface (CanManageUsers
+        # gates has_permission), so they see every user — optionally narrowed by
+        # query params for the User Management screen: ?role=, ?school=<uuid>,
+        # ?search=. select_related("school") keeps school_name cheap on the list.
+        qs = User.objects.select_related("school").order_by("-date_joined")
+        params = self.request.query_params
+
+        role = params.get("role")
+        if role:
+            qs = qs.filter(role=role)
+
+        school = params.get("school")
+        if school:
+            try:
+                uuid.UUID(str(school))
+            except (ValueError, TypeError):
+                return qs.none()  # malformed school id → no matches, not a 500
+            qs = qs.filter(school_id=school)
+
+        search = (params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(email__icontains=search)
+                | Q(username__icontains=search)
+                | Q(admission_number__icontains=search)
+            )
+        return qs
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -300,6 +418,36 @@ class UsersViewSet(ModelViewSet):
             klass=data["klass"],
             course=data["course"],
             students=[dict(s) for s in data["students"]],
+        )
+        code = status.HTTP_200_OK if result["error_count"] == 0 else status.HTTP_207_MULTI_STATUS
+        return Response(result, status=code)
+
+    # ── Bulk credential generation (blank logins, no names) ─────────────────
+
+    @action(detail=False, methods=["post"], url_path="generate-credentials")
+    def generate_credentials(self, request):
+        """
+        POST /api/v1/users/generate-credentials/   (MAIN_ADMIN only)
+
+        Body (JSON): {"school": "<uuid>", "count": 100}
+
+        Mints `count` blank STUDENT accounts for the school — each with a unique
+        login + readable password but NO name, roll number, or class yet. The
+        Super Admin downloads the slips and hands one to each student, who fills
+        in their own details on first login (then it locks).
+
+        Response: {generated_count, error_count, school_name, students[], errors[]}
+        The plaintext passwords appear ONCE here (the DB stores only the hash).
+        """
+        from . import onboarding
+        from .serializers import GenerateCredentialsSerializer
+
+        serializer = GenerateCredentialsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        result = onboarding.generate_blank_credentials(
+            school=data["school"], count=data["count"],
         )
         code = status.HTTP_200_OK if result["error_count"] == 0 else status.HTTP_207_MULTI_STATUS
         return Response(result, status=code)

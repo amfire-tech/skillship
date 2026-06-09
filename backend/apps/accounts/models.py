@@ -53,6 +53,15 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     admission_number = models.CharField(max_length=50, blank=True)
 
+    # First-login profile lock. Accounts created blank (via bulk credential
+    # generation) start False: the student fills in their own name / roll /
+    # class exactly once on first login, after which this flips to True and
+    # the student can never edit again — only MAIN_ADMIN can. Accounts that
+    # arrive already-populated (admin-created, roster onboarding, or any row
+    # predating this field — see migration 0003) are True from the start so
+    # they are never sent to the first-login screen.
+    profile_completed = models.BooleanField(default=False)
+
     objects = UserManager()
 
     class Meta:

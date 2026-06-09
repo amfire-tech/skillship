@@ -14,18 +14,27 @@ Isolation: every account and enrolment is stamped with the passed `school`
            another tenant can never be targeted.
 
 Idempotency: when a row carries an `admission_number` that already maps to a
-           STUDENT in this school, no second account is made — that student is
-           simply (re)enrolled into the class and reported as `existing`. This
+           STUDENT *already enrolled in this class*, no second account is made —
+           that student is simply (re)enrolled and reported as `existing`. This
            makes re-running the same roster safe and lets you append students
-           to a class later.
+           to a class later. Dedupe is scoped to the class, not the school, so
+           the same roll number in a different section is a different student
+           and gets its own login (see `_class_prefix`).
+
+Login format: `{grade}{section}{admission}@{school-slug}.skillship.in`
+           e.g. roll 01 in Grade 10-A at "sunrise" -> 10a01@sunrise.skillship.in,
+           while roll 01 in 10-B -> 10b01@sunrise.skillship.in. Distinct logins.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from django.contrib.auth.hashers import get_hasher, make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
@@ -52,13 +61,24 @@ _WORDS = (
 )
 
 
-def _token_from(admission: str, fallback_index: int) -> str:
-    """A login-safe token: the admission number if present (lowercased, only
-    [a-z0-9]); otherwise a short unique fallback so emails never collide."""
+def _class_prefix(klass: Class) -> str:
+    """Login-safe grade+section tag for a class, e.g. Grade 10-A -> "10a".
+
+    This is prepended to every student token so the same roll/admission number
+    in different sections (or grades) yields a DISTINCT login. Without it,
+    "roll 01 in 10-A" and "roll 01 in 10-B" would collide on the same email."""
+    return re.sub(r"[^a-z0-9]+", "", f"{klass.grade}{klass.section}".lower())
+
+
+def _token_from(admission: str, fallback_index: int, klass: Class) -> str:
+    """A login-safe token, namespaced by the class (grade+section): the
+    admission number if present (lowercased, only [a-z0-9]); otherwise a short
+    unique fallback. The class prefix guarantees two sections sharing a roll
+    number never generate the same email."""
     base = re.sub(r"[^a-z0-9]+", "", (admission or "").strip().lower())
     if not base:
         base = f"s{fallback_index:03d}{secrets.token_hex(2)}"
-    return base
+    return f"{_class_prefix(klass)}{base}"
 
 
 def _gen_password() -> str:
@@ -97,6 +117,26 @@ def _valid_password_for(user: User) -> str:
     return f"{secrets.choice(_WORDS)}{secrets.token_hex(3)}"
 
 
+def _bulk_initial_hash(raw: str) -> str:
+    """Hash a freshly-generated password with a deliberately LIGHTER cost.
+
+    Full-strength PBKDF2 (~870k iterations, hundreds of ms) is far too slow to
+    run a few hundred times inline. These accounts are blank and unused until
+    the student first logs in, so we store a reduced-iteration hash now and let
+    Django upgrade it to the full default cost automatically on that first login
+    (check_password() calls the User's setter when must_update() is True). The
+    only window with a lighter hash is before the empty account is ever used.
+
+    Only PBKDF2 (which exposes an `iterations` knob) is sped up; any other
+    configured hasher (argon2 / bcrypt) falls back to full-strength make_password.
+    """
+    hasher = get_hasher("default")
+    iterations = getattr(hasher, "iterations", None)
+    if iterations:
+        return hasher.encode(raw, hasher.salt(), iterations=max(10_000, iterations // 12))
+    return make_password(raw)
+
+
 def onboard_class(
     *,
     school: School,
@@ -109,10 +149,16 @@ def onboard_class(
     errors: list[dict[str, Any]] = []
     created = existing = 0
 
-    # Index this school's existing students by admission number for dedupe.
+    # Index students ALREADY ENROLLED IN THIS CLASS by admission number, so a
+    # re-run of the same roster re-enrols instead of duplicating. Dedupe is
+    # scoped to the class (not the whole school) on purpose: the same roll
+    # number in another section is a DIFFERENT student and must get its own
+    # account + login — see _class_prefix().
     existing_by_adm: dict[str, User] = {
         u.admission_number.strip().lower(): u
-        for u in User.objects.filter(school=school, role=User.Role.STUDENT).exclude(admission_number="")
+        for u in User.objects.filter(
+            school=school, role=User.Role.STUDENT, enrollments__klass=klass,
+        ).exclude(admission_number="").distinct()
     }
 
     for idx, row in enumerate(students):
@@ -138,11 +184,14 @@ def onboard_class(
                 existing += 1
                 continue
 
-            token = _token_from(adm, idx + 1)
+            token = _token_from(adm, idx + 1, klass)
             email, username = _unique_login(school.slug, token)
             draft = User(
                 username=username, email=email, first_name=first, last_name=last,
                 role=User.Role.STUDENT, school=school, admission_number=adm, is_active=True,
+                # Roster onboarding supplies the full profile up front, so these
+                # accounts are already complete — they skip the first-login screen.
+                profile_completed=True,
             )
             password = _valid_password_for(draft)
 
@@ -169,4 +218,98 @@ def onboard_class(
         "error_count": len(errors),
         "students": results,
         "errors": errors,
+    }
+
+
+# Upper bound on a single generate request — a printed slip per student, so a
+# few hundred per class is plenty. Stops a fat-fingered "100000" from spinning
+# the DB. The serializer enforces the same ceiling for a clean 400.
+MAX_GENERATE = 500
+
+
+def generate_blank_credentials(*, school: School, count: int) -> dict[str, Any]:
+    """Create `count` blank STUDENT accounts for `school` and return their
+    plaintext logins ONCE so the caller can print credential slips.
+
+    Unlike `onboard_class`, no names / roll numbers / class are known yet: the
+    Super Admin just wants N ready-to-hand-out logins. Each account carries a
+    random login token, no name, and `profile_completed=False` — the student
+    fills in their own name / roll / class on first login (see
+    CompleteProfileView), after which it locks. The DB only ever stores the
+    password hash; the plaintext lives only in the returned payload.
+
+    Uniqueness is school-wide, not just per batch: we load the school's existing
+    logins once and dedupe new tokens against them (plus an in-batch set), so
+    generating the next 500 never collides with the first 500.
+
+    Speed: full-strength PBKDF2 hashing is deliberately slow (~hundreds of ms
+    each), so hashing a few hundred inline took a minute+. These accounts are
+    blank and unused until the student logs in, so we hash the initial password
+    with a lighter cost (see `_bulk_initial_hash`) — Django re-hashes it at full
+    strength automatically on the student's first login — and run the batch in
+    parallel + insert it in one bulk_create. A batch of 500 drops from ~80s to
+    a few seconds.
+    """
+    count = max(0, min(int(count), MAX_GENERATE))
+    if count == 0:
+        return {
+            "generated_count": 0, "error_count": 0,
+            "school_name": school.name, "students": [], "errors": [],
+        }
+
+    slug = school.slug
+    email_suffix = f"@{slug}.{_LOGIN_DOMAIN_SUFFIX}"
+    username_prefix = f"{slug}."
+
+    # Load this school's existing logins ONCE so a fresh batch can never collide
+    # with an earlier one. Lower-cased for case-insensitive comparison.
+    taken_emails = {
+        e.lower() for e in
+        User.objects.filter(email__iendswith=email_suffix).values_list("email", flat=True)
+    }
+    taken_usernames = {
+        u.lower() for u in
+        User.objects.filter(username__istartswith=username_prefix).values_list("username", flat=True)
+    }
+
+    # Build `count` unique, unsaved accounts + their plaintext passwords.
+    drafts: list[User] = []
+    plaintexts: list[str] = []
+    while len(drafts) < count:
+        token = secrets.token_hex(4)  # 8 hex chars (~4.3B space) → collisions rare
+        email = f"{token}{email_suffix}"
+        username = f"{username_prefix}{token}"
+        if email.lower() in taken_emails or username.lower() in taken_usernames:
+            continue
+        taken_emails.add(email.lower())
+        taken_usernames.add(username.lower())
+        draft = User(
+            username=username, email=email, role=User.Role.STUDENT,
+            school=school, is_active=True, profile_completed=False,
+        )
+        drafts.append(draft)
+        plaintexts.append(_valid_password_for(draft))
+
+    # Hash every initial password with a lighter cost (full strength is restored
+    # automatically on first login), in parallel across cores.
+    workers = min(32, os.cpu_count() or 4)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        hashes = list(pool.map(_bulk_initial_hash, plaintexts))
+    for draft, hashed in zip(drafts, hashes):
+        draft.password = hashed
+
+    # One bulk insert (in a transaction) instead of count× save + unique-check.
+    with transaction.atomic():
+        User.objects.bulk_create(drafts, batch_size=200)
+
+    students = [
+        {"index": i, "email": d.email, "username": d.username, "password": pw}
+        for i, (d, pw) in enumerate(zip(drafts, plaintexts))
+    ]
+    return {
+        "generated_count": len(students),
+        "error_count": 0,
+        "school_name": school.name,
+        "students": students,
+        "errors": [],
     }

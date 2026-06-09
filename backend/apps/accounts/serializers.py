@@ -15,7 +15,7 @@ from rest_framework.exceptions import AuthenticationFailed
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.academics.models import Class, Course
+from apps.academics.models import Class, Course, Enrollment
 from apps.common.permissions import Role
 from apps.schools.models import School
 
@@ -32,9 +32,24 @@ class UserSerializer(serializers.ModelSerializer):
         pk_field=serializers.UUIDField(),
     )
     school_name = serializers.SerializerMethodField()
+    current_class = serializers.SerializerMethodField()
 
     def get_school_name(self, obj):
         return obj.school.name if obj.school_id else None
+
+    def get_current_class(self, obj):
+        """The student's class as "Grade 6-A", resolved from their latest
+        enrolment. Computed ONLY on the single-user detail view so it never adds
+        an N+1 to the (paginated) user list — list/login/me responses get None.
+        """
+        view = self.context.get("view")
+        if obj.role != User.Role.STUDENT or getattr(view, "action", None) != "retrieve":
+            return None
+        enr = (
+            Enrollment.objects.filter(student=obj)
+            .select_related("klass").order_by("-enrolled_on").first()
+        )
+        return f"Grade {enr.klass.grade}-{enr.klass.section}" if enr else None
 
     class Meta:
         model = User
@@ -49,13 +64,15 @@ class UserSerializer(serializers.ModelSerializer):
             "school_name",
             "phone",
             "admission_number",
+            "current_class",
+            "profile_completed",
             "is_active",
             "date_joined",
         ]
         read_only_fields = [
             "id", "email", "username", "first_name", "last_name",
             "role", "school", "phone", "admission_number",
-            "is_active", "date_joined",
+            "current_class", "profile_completed", "is_active", "date_joined",
         ]
 
 
@@ -269,6 +286,48 @@ class OnboardStudentSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
     admission_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+
+
+class GenerateCredentialsSerializer(serializers.Serializer):
+    """Body for POST /api/v1/users/generate-credentials/ (MAIN_ADMIN only).
+
+    The Super Admin picks a school and a count; we mint that many blank STUDENT
+    logins (no names yet). `count` is bounded so a typo can't spin up thousands
+    of accounts — the same ceiling lives in onboarding.MAX_GENERATE.
+    """
+
+    school = serializers.PrimaryKeyRelatedField(
+        queryset=School.objects.all(), pk_field=serializers.UUIDField()
+    )
+    count = serializers.IntegerField(min_value=1, max_value=500)
+
+
+class CompleteProfileSerializer(serializers.Serializer):
+    """Body for POST /api/v1/auth/complete-profile/ — a student's one-time,
+    first-login profile. The school is NEVER taken from the body; it is read
+    from the authenticated user's account (see CompleteProfileView)."""
+
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, default="")
+    admission_number = serializers.CharField(max_length=50)  # roll number
+    grade = serializers.IntegerField(min_value=1, max_value=12)
+    section = serializers.CharField(max_length=4)
+
+    def validate_first_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Name is required.")
+        return value.strip()
+
+    def validate_admission_number(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Roll number is required.")
+        return value.strip()
+
+    def validate_section(self, value):
+        section = value.strip().upper()
+        if not section:
+            raise serializers.ValidationError("Section is required.")
+        return section
 
 
 class OnboardClassSerializer(serializers.Serializer):
