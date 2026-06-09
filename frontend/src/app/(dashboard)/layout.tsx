@@ -54,6 +54,10 @@ function getRoleForPath(pathname: string): UserRole | null {
 
 const ADMIN_SHELL_ROLES: UserRole[] = ["MAIN_ADMIN"];
 
+// First-login students are forced here until they fill in their profile. It
+// renders in a focused, sidebar-less layout so they can't wander off first.
+const COMPLETE_PROFILE_PATH = "/dashboard/student/complete-profile";
+
 // ── Role nav configs ──────────────────────────────────────────
 function icon(d: string) {
   const paths: Record<string, string> = {
@@ -172,6 +176,14 @@ export default function DashboardLayout({
     const requiredRole = getRoleForPath(pathname);
     if (requiredRole && user.role !== requiredRole && user.role !== "MAIN_ADMIN") {
       router.replace(getDefaultRouteForRole(user.role));
+      return;
+    }
+
+    // First-login students must finish their one-time profile before anything
+    // else. Only redirect when the flag is explicitly false (legacy accounts
+    // without the field are treated as already complete).
+    if (user.role === "STUDENT" && user.profile_completed === false && pathname !== COMPLETE_PROFILE_PATH) {
+      router.replace(COMPLETE_PROFILE_PATH);
     }
   }, [hasHydrated, isAuthenticated, accessToken, user, pathname, refreshAttempted, refreshAuth, router]);
 
@@ -189,6 +201,18 @@ export default function DashboardLayout({
   }
 
   if (!isAuthenticated || !user) return null;
+
+  // First-login profile setup renders without a sidebar/topbar — a focused,
+  // distraction-free screen the student must complete before they get the shell.
+  if (pathname === COMPLETE_PROFILE_PATH) {
+    return (
+      <div className="min-h-screen bg-[var(--muted)]/30">
+        <main id="main-content" className="p-4 md:p-6 lg:p-8">
+          <PageTransition pathname={pathname}>{children}</PageTransition>
+        </main>
+      </div>
+    );
+  }
 
   if (ADMIN_SHELL_ROLES.includes(user.role)) {
     return (

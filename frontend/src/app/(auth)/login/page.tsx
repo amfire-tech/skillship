@@ -141,8 +141,13 @@ function BrandPanel() {
 interface FormPanelProps { onLogin: (role: UserRole | "", email: string, password: string) => Promise<void>; error: string | null; submitting: boolean; }
 
 function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
-  // Role is OPTIONAL: school users may pick their card, platform staff just
-  // leave it unselected and sign in with credentials only.
+  // The UI only ever shows the three SCHOOL roles (Principal / Teacher /
+  // Student). Platform staff (Super Admin / Sub Admin) are never surfaced —
+  // school users must not see that an oversight layer exists. Admins sign in
+  // SILENTLY: they leave the role unpicked and submit with email + password
+  // only; the backend authenticates by credentials and returns their real
+  // role. So role is OPTIONAL — the Sign-in button is enabled on credentials
+  // alone, and a picked role is enforced server-side.
   const [role, setRole] = useState<UserRole | "">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -190,7 +195,9 @@ function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
         </motion.p>
 
         <form onSubmit={submit} className="mt-10 space-y-6" noValidate>
-          {/* Role grid — replaces the dropdown but stays a required gate */}
+          {/* School-role grid. Only Principal / Teacher / Student are ever
+              shown — platform admins are intentionally invisible here and sign
+              in silently with email + password (no role picked). */}
           <motion.fieldset
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

@@ -22,8 +22,13 @@ export interface User {
   last_name: string;
   role: UserRole;
   school: string | null;
+  school_name?: string | null;
   phone?: string;
   admission_number?: string;
+  // First-login profile lock. Blank-generated student accounts start `false`:
+  // the student fills in their own name/roll/class once, then it flips `true`
+  // and only the Super Admin can change it. Older accounts may omit the field.
+  profile_completed?: boolean;
 }
 
 export const displayName = (u: Pick<User, "first_name" | "last_name" | "username">) =>

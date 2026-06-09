@@ -366,6 +366,17 @@
     background-clip: border-box;
     color: #fff;
   }
+  /* Same problem when the `.text-white` lives on the WRAPPER (a coloured banner)
+     rather than the heading itself — e.g. the student/teacher "Hello, <name>"
+     hero. Any heading inside a text-white surface must follow that surface's
+     colour, not the orange clip, so it stays visible on the brand background in
+     both light and dark themes. */
+  .dashboard-shell main .text-white :is(h1, h2, h3) {
+    background-image: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: inherit;
+  }
 }
 
 @keyframes float-slow {

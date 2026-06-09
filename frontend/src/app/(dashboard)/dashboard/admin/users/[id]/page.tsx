@@ -17,6 +17,8 @@ interface ApiUser {
   school_name: string | null;
   phone: string | null;
   admission_number: string | null;
+  current_class: string | null;
+  profile_completed?: boolean;
   is_active: boolean;
   date_joined: string;
 }
@@ -53,9 +55,12 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", admission_number: "" });
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,7 +74,7 @@ export default function UserDetailPage() {
       if (!res.ok) { setFetchError(res.status === 404 ? "User not found." : "Failed to load user."); setLoading(false); return; }
       const data: ApiUser = await res.json();
       setUser(data);
-      setForm({ first_name: data.first_name, last_name: data.last_name, email: data.email, phone: data.phone ?? "" });
+      setForm({ first_name: data.first_name, last_name: data.last_name, email: data.email, phone: data.phone ?? "", admission_number: data.admission_number ?? "" });
     } catch {
       setFetchError("Network error. Is the server running?");
     } finally {
@@ -129,6 +134,42 @@ export default function UserDetailPage() {
     }
   }
 
+  function generatePassword() {
+    const cs = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    const buf = new Uint32Array(12);
+    crypto.getRandomValues(buf);
+    let out = "";
+    buf.forEach((n) => { out += cs[n % cs.length]; });
+    setNewPw(out);
+  }
+
+  async function resetPassword() {
+    if (newPw.length < 8) { toast("Password must be at least 8 characters.", "error"); return; }
+    setPwSaving(true);
+    const token = await getToken();
+    if (!token) { setPwSaving(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/users/${id}/set-password/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: newPw }),
+      });
+      if (res.ok || res.status === 204) {
+        toast("Password updated — share the new password with the user.", "success");
+        setPwOpen(false);
+        setNewPw("");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const msg = Object.values(data).flat().join(" ");
+        toast(msg || "Failed to reset password", "error");
+      }
+    } catch {
+      toast("Network error", "error");
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-sm text-[var(--muted-foreground)]">
@@ -169,7 +210,7 @@ export default function UserDetailPage() {
           </button>
           {editing ? (
             <>
-              <button type="button" onClick={() => { setEditing(false); setForm({ first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone ?? "" }); }}
+              <button type="button" onClick={() => { setEditing(false); setForm({ first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone ?? "", admission_number: user.admission_number ?? "" }); }}
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)]">Cancel</button>
               <button type="button" onClick={save} disabled={saving}
                 className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">
@@ -177,8 +218,12 @@ export default function UserDetailPage() {
               </button>
             </>
           ) : (
-            <button type="button" onClick={() => setEditing(true)}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Edit</button>
+            <>
+              <button type="button" onClick={() => { setNewPw(""); setPwOpen(true); }}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-primary">Reset password</button>
+              <button type="button" onClick={() => setEditing(true)}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Edit</button>
+            </>
           )}
         </div>
       </div>
@@ -204,10 +249,10 @@ export default function UserDetailPage() {
 
         {editing ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            {(["first_name", "last_name", "email", "phone"] as const).map((k) => (
+            {(["first_name", "last_name", "email", "phone", "admission_number"] as const).map((k) => (
               <div key={k} className="flex flex-col gap-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                  {k === "first_name" ? "First Name" : k === "last_name" ? "Last Name" : k === "email" ? "Email" : "Phone"}
+                  {k === "first_name" ? "First Name" : k === "last_name" ? "Last Name" : k === "email" ? "Email" : k === "phone" ? "Phone" : "Roll No."}
                 </label>
                 <input
                   value={form[k]}
@@ -222,9 +267,11 @@ export default function UserDetailPage() {
             <Field label="Email" value={user.email} />
             <Field label="Phone" value={user.phone ?? ""} />
             <Field label="School" value={user.school_name ?? (user.role === "MAIN_ADMIN" ? "Platform" : "—")} />
+            {user.role === "STUDENT" && <Field label="Roll No." value={user.admission_number ?? ""} />}
+            {user.role === "STUDENT" && <Field label="Class" value={user.current_class ?? "Not set up yet"} />}
+            {user.role === "STUDENT" && <Field label="Profile" value={user.profile_completed ? "Set up by student" : "Pending first login"} />}
             <Field label="Joined" value={new Date(user.date_joined).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} />
             <Field label="Username" value={user.username} />
-            {user.admission_number && <Field label="Admission No." value={user.admission_number} />}
           </div>
         )}
       </div>
@@ -247,6 +294,37 @@ export default function UserDetailPage() {
               <button type="button" onClick={toggleActive}
                 className={`rounded-xl px-4 py-2 text-sm font-medium text-white ${user.is_active ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:opacity-90"}`}>
                 {user.is_active ? "Suspend" : "Reactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset password dialog */}
+      {pwOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-bold text-[var(--foreground)]">Reset password</h3>
+            <p className="mt-1.5 text-sm text-[var(--muted-foreground)]">
+              Set a new password for <span className="font-semibold text-[var(--foreground)]">{fullName}</span>. They'll use it on their next login.
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">New password</label>
+              <input
+                type="text"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                placeholder="At least 8 characters"
+                className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              />
+              <button type="button" onClick={generatePassword} className="self-start text-xs font-semibold text-primary hover:underline">Generate secure password</button>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => { setPwOpen(false); setNewPw(""); }}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)]">Cancel</button>
+              <button type="button" onClick={resetPassword} disabled={pwSaving || newPw.length < 8}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">
+                {pwSaving ? "Saving…" : "Update password"}
               </button>
             </div>
           </div>

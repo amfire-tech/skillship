@@ -24,9 +24,14 @@ interface ApiUser {
   school_name: string | null;
   phone: string | null;
   admission_number: string | null;
+  profile_completed?: boolean;
   is_active: boolean;
   date_joined: string;
 }
+
+interface SchoolOpt { id: string; name: string }
+
+const PAGE_SIZE = 50;
 
 const roleColor: Record<UserRole, string> = {
   MAIN_ADMIN: "bg-primary/10 text-primary border-primary/20",
@@ -53,53 +58,85 @@ const roleTabDefs: { label: string; value: Role }[] = [
   { label: "Students", value: "STUDENT" },
 ];
 
+/** Page through a paginated DRF list (used only for the small /schools/ list). */
+async function fetchAll(url: string, token: string): Promise<any[]> {
+  const out: any[] = [];
+  let next: string | null = url;
+  for (let guard = 0; next && guard < 50; guard++) {
+    const res: Response = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) break;
+    const data = await res.json();
+    out.push(...(data.results ?? (Array.isArray(data) ? data : [])));
+    next = data.next ?? null;
+  }
+  return out;
+}
+
 export default function UserManagementPage() {
   const toast = useToast();
   const router = useRouter();
+
+  const [schools, setSchools] = useState<SchoolOpt[]>([]);
   const [users, setUsers] = useState<ApiUser[]>([]);
+  const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [activeRole, setActiveRole] = useState<Role>("all");
+
+  const [activeRole, setActiveRole] = useState<Role>("STUDENT");
+  const [schoolId, setSchoolId] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [confirmSuspend, setConfirmSuspend] = useState<ApiUser | null>(null);
+
+  useEffect(() => { document.title = "User Management — Skillship"; }, []);
+
+  // Load the (small) school list once for the filter dropdown.
+  useEffect(() => {
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const list = await fetchAll(`${API_BASE}/schools/`, token);
+        setSchools(list.map((s) => ({ id: s.id, name: s.name })));
+      } catch { /* leave empty */ }
+    })();
+  }, []);
+
+  // Debounce the search box → committed search term (and reset to page 1).
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput.trim()); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     const token = await getToken();
     if (!token) { setFetchError("Session expired. Please log in again."); setLoading(false); return; }
+    const qs = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+    if (activeRole !== "all") qs.set("role", activeRole);
+    if (schoolId) qs.set("school", schoolId);
+    if (search) qs.set("search", search);
     try {
-      const res = await fetch(`${API_BASE}/users/`, {
+      const res = await fetch(`${API_BASE}/users/?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) { setFetchError("Failed to load users."); setLoading(false); return; }
       const data = await res.json();
       setUsers(data.results ?? []);
+      setCount(data.count ?? (data.results?.length ?? 0));
     } catch {
       setFetchError("Network error. Is the server running?");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    document.title = "User Management — Skillship";
-  }, []);
+  }, [activeRole, schoolId, search, page]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  const tabs = roleTabDefs.map((t) => ({
-    ...t,
-    count: t.value === "all" ? users.length : users.filter((u) => u.role === t.value).length,
-  }));
-
-  const filtered = (activeRole === "all" ? users : users.filter((u) => u.role === activeRole)).filter((u) => {
-    const q = search.toLowerCase();
-    return !q
-      || `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
-      || u.email.toLowerCase().includes(q)
-      || (u.school_name ?? "").toLowerCase().includes(q);
-  });
+  function selectRole(value: Role) { setActiveRole(value); setPage(1); }
+  function selectSchool(value: string) { setSchoolId(value); setPage(1); }
 
   async function handleSuspend(user: ApiUser) {
     const token = await getToken();
@@ -110,12 +147,9 @@ export default function UserManagementPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ is_active: false }),
       });
-      if (!res.ok) {
-        toast("Failed to suspend user. Please try again.", "error");
-        return;
-      }
+      if (!res.ok) { toast("Failed to suspend user. Please try again.", "error"); return; }
       setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_active: false } : u));
-      toast(`${user.first_name} ${user.last_name} suspended`, "error");
+      toast(`${user.first_name} ${user.last_name}`.trim() + " suspended", "error");
     } catch {
       toast("Failed to suspend user", "error");
     } finally {
@@ -126,6 +160,12 @@ export default function UserManagementPage() {
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   }
+
+  const schoolName = schools.find((s) => s.id === schoolId)?.name;
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const firstRow = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastRow = Math.min(page * PAGE_SIZE, count);
+  const roleNoun = activeRole === "all" ? "user" : roleLabel[activeRole].toLowerCase();
 
   return (
     <div className="space-y-6">
@@ -146,78 +186,64 @@ export default function UserManagementPage() {
       />
 
       {/* Role tabs */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.1 }}
-        className="flex flex-wrap gap-2 rounded-2xl border border-[var(--border)] bg-white p-2"
-      >
-        {tabs.map((t) => {
+      <div className="flex flex-wrap gap-2 rounded-2xl border border-[var(--border)] bg-white p-2">
+        {roleTabDefs.map((t) => {
           const active = activeRole === t.value;
           return (
             <button
               key={t.value}
-              onClick={() => { setActiveRole(t.value); setSearch(""); }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+              onClick={() => selectRole(t.value)}
+              className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
                 active
                   ? "bg-gradient-to-r from-primary to-accent text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)]"
                   : "text-[var(--muted-foreground)] hover:bg-primary/5 hover:text-primary"
               }`}
             >
               {t.label}
-              <span className={`rounded-full px-1.5 py-0.5 text-xs ${active ? "bg-white/25" : "bg-[var(--muted)]"}`}>
-                {t.count}
-              </span>
             </button>
           );
         })}
-      </motion.div>
+      </div>
 
-      {/* Search */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.15 }}
-        className="relative"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-        </svg>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, email, school…"
-          className="h-11 w-full rounded-xl border border-[var(--border)] bg-white pl-11 pr-4 text-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10"
-        />
-      </motion.div>
+      {/* School filter + search */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={schoolId}
+          onChange={(e) => selectSchool(e.target.value)}
+          className="h-11 rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+        >
+          <option value="">All schools</option>
+          {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <div className="relative min-w-[260px] flex-1">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name, email, roll no…"
+            className="h-11 w-full rounded-xl border border-[var(--border)] bg-white pl-11 pr-4 text-sm outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-primary focus:ring-4 focus:ring-primary/10"
+          />
+        </div>
+      </div>
+
+      {/* Count summary */}
+      <p className="text-sm text-[var(--muted-foreground)]">
+        {loading ? "Loading…" : (
+          <>
+            <span className="font-semibold text-[var(--foreground)]">{count.toLocaleString("en-IN")}</span>{" "}
+            {roleNoun}{count === 1 ? "" : "s"}
+            {schoolName ? <> in <span className="font-semibold text-[var(--foreground)]">{schoolName}</span></> : " across all schools"}
+            {search ? <> matching “{search}”</> : null}
+          </>
+        )}
+      </p>
 
       {/* Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-        className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
-      >
-        {loading ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                  <th className="px-5 py-3">User</th>
-                  <th className="px-5 py-3">Role</th>
-                  <th className="px-5 py-3">School / Scope</th>
-                  <th className="px-5 py-3">Joined</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <TableRowSkeleton rows={6} columns={6} withAvatar />
-              </tbody>
-            </table>
-          </div>
-        ) : fetchError ? (
+      <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+        {fetchError ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <p className="text-sm text-red-500">{fetchError}</p>
             <button onClick={loadUsers} className="text-xs font-semibold text-primary underline">Retry</button>
@@ -230,45 +256,42 @@ export default function UserManagementPage() {
                   <th className="px-5 py-3">User</th>
                   <th className="px-5 py-3">Role</th>
                   <th className="px-5 py-3">School / Scope</th>
-                  <th className="px-5 py-3">Joined</th>
+                  <th className="px-5 py-3">Roll No.</th>
+                  <th className="px-5 py-3">Profile</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="px-5 py-8">
+                {loading ? (
+                  <TableRowSkeleton rows={8} columns={7} withAvatar />
+                ) : users.length === 0 ? (
+                  <tr><td colSpan={7} className="px-5 py-8">
                     <EmptyState
-                      title={users.length === 0 ? "No users yet" : "No users match"}
-                      description={users.length === 0 ? "Create the first user — Sub-Admins, Principals, Teachers, or Students. They'll receive credentials by email." : "Try clearing the search or role filter."}
-                      action={users.length === 0 ? { label: "Create user", href: "/dashboard/admin/users/new" } : undefined}
+                      title="No users found"
+                      description="Try a different role, school, or search — or generate student logins from Onboard Students."
                       icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
                     />
                   </td></tr>
                 ) : (
-                  filtered.map((u, i) => {
+                  users.map((u) => {
                     const fullName = `${u.first_name} ${u.last_name}`.trim() || u.username;
                     const initials = fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
                     const status = u.is_active ? "Active" : "Suspended";
                     const statusColor = u.is_active
                       ? "bg-primary/10 text-primary border-primary/20"
                       : "bg-red-50 text-red-600 border-red-200";
+                    const isStudent = u.role === "STUDENT";
                     return (
-                      <motion.tr
-                        key={u.id}
-                        initial={{ opacity: 0, x: 8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: 0.25 + i * 0.04 }}
-                        className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40"
-                      >
+                      <tr key={u.id} className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40">
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
-                              {initials}
+                              {initials || "U"}
                             </div>
                             <div>
                               <p className="font-semibold text-[var(--foreground)]">{fullName}</p>
-                              <p className="text-xs text-[var(--muted-foreground)]">{u.email}</p>
+                              <p className="text-xs text-[var(--muted-foreground)] font-mono">{u.email}</p>
                             </div>
                           </div>
                         </td>
@@ -280,7 +303,14 @@ export default function UserManagementPage() {
                         <td className="px-5 py-3.5 text-[var(--muted-foreground)]">
                           {u.school_name ?? (u.role === "MAIN_ADMIN" ? "Platform" : "—")}
                         </td>
-                        <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{formatDate(u.date_joined)}</td>
+                        <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.admission_number || "—"}</td>
+                        <td className="px-5 py-3.5">
+                          {isStudent ? (
+                            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${u.profile_completed ? "bg-primary/10 text-primary border-primary/20" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                              {u.profile_completed ? "Set up" : "Pending"}
+                            </span>
+                          ) : <span className="text-xs text-[var(--muted-foreground)]">—</span>}
+                        </td>
                         <td className="px-5 py-3.5">
                           <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}>
                             {status}
@@ -288,14 +318,14 @@ export default function UserManagementPage() {
                         </td>
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1 text-xs">
-                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-primary transition-colors hover:bg-primary/10 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary/20">View</button>
-                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20">Edit</button>
+                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-primary transition-colors hover:bg-primary/10">View</button>
+                            <button onClick={() => router.push(`/dashboard/admin/users/${u.id}`)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary">Edit</button>
                             {u.is_active && (
-                              <button onClick={() => setConfirmSuspend(u)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-300/40">Suspend</button>
+                              <button onClick={() => setConfirmSuspend(u)} className="inline-flex min-h-8 items-center rounded-md px-2.5 py-1.5 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-red-50 hover:text-red-600">Suspend</button>
                             )}
                           </div>
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                   })
                 )}
@@ -303,7 +333,33 @@ export default function UserManagementPage() {
             </table>
           </div>
         )}
-      </motion.div>
+
+        {/* Pagination */}
+        {!loading && !fetchError && count > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3 text-sm">
+            <span className="text-[var(--muted-foreground)]">
+              Showing <span className="font-semibold text-[var(--foreground)]">{firstRow.toLocaleString("en-IN")}–{lastRow.toLocaleString("en-IN")}</span> of {count.toLocaleString("en-IN")}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] disabled:opacity-40 hover:border-primary/40 hover:text-primary"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-[var(--muted-foreground)]">Page {page} of {totalPages}</span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] disabled:opacity-40 hover:border-primary/40 hover:text-primary"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Suspend confirmation dialog */}
       <AnimatePresence>
@@ -317,22 +373,15 @@ export default function UserManagementPage() {
             <motion.div
               role="alertdialog"
               aria-modal="true"
-              aria-labelledby="suspend-dialog-title"
-              aria-describedby="suspend-dialog-desc"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-white p-6 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)]"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
-              <h3 id="suspend-dialog-title" className="mt-4 text-base font-bold text-[var(--foreground)]">Suspend user?</h3>
-              <p id="suspend-dialog-desc" className="mt-1.5 text-sm text-[var(--muted-foreground)]">
-                <span className="font-semibold text-[var(--foreground)]">{confirmSuspend.first_name} {confirmSuspend.last_name}</span> will lose access to the platform immediately. You can reinstate them later.
+              <h3 className="text-base font-bold text-[var(--foreground)]">Suspend user?</h3>
+              <p className="mt-1.5 text-sm text-[var(--muted-foreground)]">
+                <span className="font-semibold text-[var(--foreground)]">{`${confirmSuspend.first_name} ${confirmSuspend.last_name}`.trim() || confirmSuspend.email}</span> will lose access to the platform immediately. You can reinstate them later.
               </p>
               <div className="mt-5 flex items-center gap-3">
                 <button
