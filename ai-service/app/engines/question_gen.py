@@ -36,7 +36,21 @@ _RETRIABLE_API_CODES = {500, 503}
 
 def _build_prompt(topic, grade, count, difficulty, q_types, course_context) -> str:
     type_labels = ", ".join(t.value.upper() for t in q_types)
-    context_block = f"\nAdditional course context:\n{course_context}\n" if course_context else ""
+    if course_context:
+        # PDF/document path: the supplied text is the authoritative source.
+        # Force the model to ground every question in it (NotebookLM-style) rather
+        # than generating generic questions about the topic.
+        context_block = (
+            "\nIMPORTANT — base every question STRICTLY on the SOURCE MATERIAL below. "
+            "Use only facts that appear in this text; do not rely on outside knowledge. "
+            "Each question and its correct answer MUST be answerable from this material, "
+            "and the distractors should be plausible given this material:\n"
+            "<<<SOURCE MATERIAL>>>\n"
+            f"{course_context}\n"
+            "<<<END SOURCE MATERIAL>>>\n"
+        )
+    else:
+        context_block = ""
     replacements = {
         "{topic}": topic,
         "{grade}": grade,

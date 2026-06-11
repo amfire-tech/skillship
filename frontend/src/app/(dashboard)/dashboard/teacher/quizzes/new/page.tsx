@@ -299,7 +299,7 @@ export default function QuizCreationWizard() {
           defaultSubject={basic.subject}
           defaultDifficulty={basic.difficulty}
           defaultGrade={basic.grade}
-          onGenerated={(qs) => setQuestions((cur) => [...cur, ...qs])}
+          onGenerated={(qs) => { setQuestions((cur) => [...cur, ...qs]); setStep((s) => (s < 2 ? 2 : s)); }}
         />
       </div>
 
@@ -659,9 +659,12 @@ function AIGeneratorPanel({
   useEffect(() => { if (defaultSubject) setSubject(defaultSubject); }, [defaultSubject]);
 
   const canGenerate = useMemo(() => {
-    if (loading || count < 1 || count > 30 || !subject) return false;
-    return mode === "topic" ? true : pdfFile !== null;
-  }, [mode, subject, count, loading, pdfFile]);
+    if (loading || count < 1 || count > 30) return false;
+    // PDF: only the file + class are needed (subject is taken from Basic Info).
+    // Topic: a subject must be chosen.
+    if (mode === "pdf") return pdfFile !== null && grade !== "";
+    return subject !== "";
+  }, [mode, subject, grade, count, loading, pdfFile]);
 
   const generate = useCallback(async () => {
     if (!canGenerate) return;
@@ -670,15 +673,20 @@ function AIGeneratorPanel({
     if (!token) { toast("Session expired", "error"); setLoading(false); return; }
     try {
       let res: Response;
-      // The generator topic is the chosen subject, optionally narrowed by a
-      // free-text topic the teacher types in.
-      const effectiveTopic = topic.trim() ? `${subject}: ${topic.trim()}` : subject;
+      // PDF mode doesn't ask for a subject — the document IS the source. We tag
+      // the questions with the quiz subject (from Basic Info) and pass a topic
+      // hint (the subject, or the file name) to the generator.
+      const genSubject = mode === "pdf" ? defaultSubject : subject;
+      const effectiveTopic =
+        mode === "pdf"
+          ? (defaultSubject || (pdfFile?.name ?? "Document").replace(/\.pdf$/i, ""))
+          : (topic.trim() ? `${subject}: ${topic.trim()}` : subject);
       if (mode === "pdf") {
-        // PDF mode: difficulty is inferred from the document, so we don't send it
-        // (the backend serializer defaults to "medium"). Class is still supplied.
+        // Difficulty is inferred from the document, so we don't send it
+        // (the backend serializer defaults to "medium"). Class is supplied.
         const form = new FormData();
         form.append("file", pdfFile as File);
-        form.append("topic", effectiveTopic.slice(0, 480));
+        form.append("topic", effectiveTopic.slice(0, 480) || "Document");
         form.append("grade", grade || "");
         form.append("count", String(count));
         res = await fetch(`${API_BASE}/ai/quiz/generate-from-pdf/`, {
@@ -705,7 +713,7 @@ function AIGeneratorPanel({
         return;
       }
       const data = await res.json();
-      const items = mapAiQuestions(data, subject, difficulty);
+      const items = mapAiQuestions(data, genSubject, difficulty);
       if (items.length === 0) {
         toast("Generator returned no usable questions.", "error");
         return;
@@ -718,7 +726,7 @@ function AIGeneratorPanel({
     } finally {
       setLoading(false);
     }
-  }, [canGenerate, mode, subject, topic, grade, difficulty, count, pdfFile, onGenerated, toast]);
+  }, [canGenerate, mode, subject, defaultSubject, topic, grade, difficulty, count, pdfFile, onGenerated, toast]);
 
   return (
     <motion.div
@@ -783,13 +791,7 @@ function AIGeneratorPanel({
           </>
         ) : (
           <>
-            <p className="text-xs text-[var(--muted-foreground)]">Upload a PDF — questions are generated from its content. Difficulty is inferred from the document.</p>
-            <Field label="Subject">
-              <select value={subject} onChange={(e) => setSubject(e.target.value)} className={inputCls}>
-                <option value="">Select Subject</option>
-                {QUIZ_SUBJECTS.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </Field>
+            <p className="text-xs text-[var(--muted-foreground)]">Upload a PDF — questions are generated from its content. Pick the class; difficulty is inferred from the document. The quiz subject comes from Basic Info on the left.</p>
             <Field label="PDF file (≤ 10 MB)">
               <input
                 type="file"
