@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Q, QuerySet
+from django.db.models import Avg, Count, Q, QuerySet
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
@@ -163,7 +163,7 @@ class QuizViewSet(TenantScopedViewSet):
     PUBLISHED quiz). Write actions check role inline.
     """
 
-    queryset = Quiz.objects.select_related("course", "bank").all()
+    queryset = Quiz.objects.select_related("course", "bank", "school", "created_by").all()
     serializer_class = QuizSerializer
     permission_classes = [IsAuthenticated, CanReadQuiz]
     lookup_field = "id"
@@ -188,6 +188,15 @@ class QuizViewSet(TenantScopedViewSet):
             wanted = status_param.upper()
             if wanted in Quiz.Status.values:
                 qs = qs.filter(status=wanted)
+        # Display annotations consumed by staff dashboards + analytics:
+        # question count, number of submitted attempts, and average score.
+        # distinct=True keeps the question/attempt joins from inflating counts.
+        submitted = Q(attempts__status=QuizAttempt.Status.SUBMITTED)
+        qs = qs.annotate(
+            question_count_ann=Count("bank__questions", distinct=True),
+            attempts_count_ann=Count("attempts", filter=submitted, distinct=True),
+            avg_score_ann=Avg("attempts__score_percent", filter=submitted),
+        )
         return qs
 
     # Writes (create / update / delete) are staff-only.

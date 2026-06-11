@@ -17,6 +17,7 @@ interface ApprovalItem {
   description?: string;
   subject?: string;
   grade?: string;
+  section?: string;
   created_by_name?: string;
   school_name?: string;
   created_at: string;
@@ -240,7 +241,7 @@ export default function QuizApprovalPage() {
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted-foreground)]">
                           {item.subject && <span>{item.subject}</span>}
                           {item.subject && item.grade && <span className="h-1 w-1 rounded-full bg-[var(--muted-foreground)]" />}
-                          {item.grade && <span>{item.grade}</span>}
+                          {item.grade && <span>{item.grade}{item.section ? ` · Sec ${item.section}` : ""}</span>}
                           {item.question_count != null && (
                             <>
                               <span className="h-1 w-1 rounded-full bg-[var(--muted-foreground)]" />

@@ -6,8 +6,9 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { API_BASE, getToken } from "@/lib/auth";
+import { QUIZ_SUBJECTS } from "@/lib/subjects";
 
-const subjects = ["Mathematics", "Science", "Physics", "Chemistry", "Biology", "History", "Geography", "English", "Computer Science", "Hindi"];
+const subjects = [...QUIZ_SUBJECTS];
 const grades = ["Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
 const durations = ["10 minutes", "15 minutes", "20 minutes", "30 minutes", "45 minutes", "60 minutes", "90 minutes"];
 
@@ -19,7 +20,7 @@ interface FormValues {
   instructions: string;
 }
 
-const initial: FormValues = { title: "", subject: "Mathematics", grade: "Class 9", duration: "30 minutes", instructions: "" };
+const initial: FormValues = { title: "", subject: subjects[0], grade: "Class 9", duration: "30 minutes", instructions: "" };
 
 export default function NewQuizPage() {
   const router = useRouter();

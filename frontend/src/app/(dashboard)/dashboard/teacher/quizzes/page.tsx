@@ -8,9 +8,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { API_BASE, getToken } from "@/lib/auth";
+import { API_BASE, apiFetch, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/Toast";
 
 type QuizStatus = "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 
@@ -47,9 +48,11 @@ function formatDate(iso: string): string {
 }
 
 export default function TeacherQuizzesPage() {
+  const toast = useToast();
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterOption>("ALL");
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -71,6 +74,45 @@ export default function TeacherQuizzesPage() {
       setQuizzes([]);
     }
   }, []);
+
+  const deleteQuiz = useCallback(async (q: Quiz) => {
+    if (!confirm(`Delete "${q.title}"? This permanently removes it from history.`)) return;
+    setBusyId(q.id);
+    try {
+      const res = await apiFetch(`/quizzes/${q.id}/`, { method: "DELETE" });
+      if (res.ok || res.status === 204) {
+        setQuizzes((prev) => (prev ? prev.filter((x) => x.id !== q.id) : prev));
+        toast("Quiz deleted", "success");
+      } else {
+        const body = await res.json().catch(() => ({}));
+        // Backend blocks deleting a quiz that already has attempts — offer Archive instead.
+        toast(body?.detail ?? "Couldn't delete this quiz. Archive it instead.", "error");
+      }
+    } catch {
+      toast("Network error", "error");
+    } finally {
+      setBusyId(null);
+    }
+  }, [toast]);
+
+  const archiveQuiz = useCallback(async (q: Quiz) => {
+    if (!confirm(`Archive "${q.title}"? Students can no longer take it, but the history is kept.`)) return;
+    setBusyId(q.id);
+    try {
+      const res = await apiFetch(`/quizzes/${q.id}/archive/`, { method: "POST" });
+      if (res.ok) {
+        setQuizzes((prev) => (prev ? prev.map((x) => (x.id === q.id ? { ...x, status: "ARCHIVED" } : x)) : prev));
+        toast("Quiz archived", "info");
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast(body?.detail ?? "Couldn't archive this quiz.", "error");
+      }
+    } catch {
+      toast("Network error", "error");
+    } finally {
+      setBusyId(null);
+    }
+  }, [toast]);
 
   useEffect(() => {
     document.title = "My Quizzes — Skillship";
@@ -189,6 +231,26 @@ export default function TeacherQuizzesPage() {
                         >
                           View
                         </Link>
+                        {q.status === "PUBLISHED" && (
+                          <button
+                            type="button"
+                            onClick={() => archiveQuiz(q)}
+                            disabled={busyId === q.id}
+                            className="text-xs font-medium text-amber-600 hover:underline disabled:opacity-50"
+                          >
+                            Archive
+                          </button>
+                        )}
+                        {q.status !== "PUBLISHED" && (
+                          <button
+                            type="button"
+                            onClick={() => deleteQuiz(q)}
+                            disabled={busyId === q.id}
+                            className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

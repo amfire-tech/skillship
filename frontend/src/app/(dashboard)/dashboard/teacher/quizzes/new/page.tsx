@@ -15,6 +15,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE, getToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
+import { QUIZ_SUBJECTS } from "@/lib/subjects";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type Difficulty = "EASY" | "MEDIUM" | "HARD";
@@ -25,6 +26,7 @@ interface DraftQuestion {
   difficulty?: Difficulty;
   options: string[];
   correct_answer_index: number;
+  points?: number;
 }
 
 interface BasicInfo {
@@ -72,9 +74,6 @@ export default function QuizCreationWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
-  // Real subjects fetched from question bank (unique values).
-  const [subjects, setSubjects] = useState<string[] | null>(null);
-
   useEffect(() => { document.title = "Create Quiz — Skillship"; }, []);
 
   // Pull questions seeded by Question Bank "Use →" button.
@@ -94,25 +93,6 @@ export default function QuizCreationWizard() {
     }
     // run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const token = await getToken();
-      if (!token) { setSubjects([]); return; }
-      try {
-        const res = await fetch(`${API_BASE}/quizzes/questions/`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) { if (!cancelled) setSubjects([]); return; }
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data?.results ?? []);
-        const uniq = Array.from(new Set(list.map((q: { subject?: string }) => q.subject).filter(Boolean))) as string[];
-        if (!cancelled) setSubjects(uniq.sort());
-      } catch {
-        if (!cancelled) setSubjects([]);
-      }
-    })();
-    return () => { cancelled = true; };
   }, []);
 
   function basicValid(): string | null {
@@ -150,6 +130,7 @@ export default function QuizCreationWizard() {
           title: basic.title.trim(),
           subject: basic.subject,
           grade: basic.grade,
+          section: basic.section === "All" ? "" : basic.section,
           instructions: basic.instructions.trim(),
           difficulty: basic.difficulty,
           duration_minutes: basic.duration,
@@ -162,6 +143,7 @@ export default function QuizCreationWizard() {
             options: q.options,
             correct_answer_index: q.correct_answer_index,
             difficulty: q.difficulty ?? basic.difficulty,
+            points: q.points && q.points > 0 ? q.points : 1,
           })),
         }),
       });
@@ -244,7 +226,7 @@ export default function QuizCreationWizard() {
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div key="s1" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <Step1BasicInfo basic={basic} onChange={setBasic} subjects={subjects} />
+                <Step1BasicInfo basic={basic} onChange={setBasic} />
               </motion.div>
             )}
             {step === 2 && (
@@ -332,9 +314,8 @@ export default function QuizCreationWizard() {
 }
 
 // ─── Step 1: Basic Info ─────────────────────────────────────────────────
-function Step1BasicInfo({ basic, onChange, subjects }: { basic: BasicInfo; onChange: (b: BasicInfo) => void; subjects: string[] | null }) {
+function Step1BasicInfo({ basic, onChange }: { basic: BasicInfo; onChange: (b: BasicInfo) => void }) {
   const set = <K extends keyof BasicInfo>(k: K, v: BasicInfo[K]) => onChange({ ...basic, [k]: v });
-  const [customSubject, setCustomSubject] = useState("");
   return (
     <div className="p-6 md:p-7">
       <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">Basic Quiz Information</h2>
@@ -344,21 +325,10 @@ function Step1BasicInfo({ basic, onChange, subjects }: { basic: BasicInfo; onCha
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Subject *">
-            {subjects === null ? (
-              <div className="h-10 animate-pulse rounded-xl bg-[var(--muted)]" />
-            ) : subjects.length === 0 ? (
-              <input
-                value={customSubject || basic.subject}
-                onChange={(e) => { setCustomSubject(e.target.value); set("subject", e.target.value); }}
-                placeholder="Type subject name (no questions yet)"
-                className={inputCls}
-              />
-            ) : (
-              <select value={basic.subject} onChange={(e) => set("subject", e.target.value)} className={inputCls}>
-                <option value="">Select Subject</option>
-                {subjects.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            )}
+            <select value={basic.subject} onChange={(e) => set("subject", e.target.value)} className={inputCls}>
+              <option value="">Select Subject</option>
+              {QUIZ_SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+            </select>
           </Field>
           <Field label="Difficulty *">
             <select value={basic.difficulty} onChange={(e) => set("difficulty", e.target.value as Difficulty)} className={inputCls}>
@@ -405,6 +375,7 @@ function Step2Questions({
   const [text, setText] = useState("");
   const [opts, setOpts] = useState(["", "", "", ""]);
   const [correct, setCorrect] = useState(0);
+  const [marks, setMarks] = useState(1);
 
   function addManual() {
     if (!text.trim()) return;
@@ -416,16 +387,19 @@ function Step2Questions({
       difficulty: defaultDifficulty,
       options: filledOpts,
       correct_answer_index: Math.min(correct, filledOpts.length - 1),
+      points: Math.max(1, marks),
     });
-    setText(""); setOpts(["", "", "", ""]); setCorrect(0);
+    setText(""); setOpts(["", "", "", ""]); setCorrect(0); setMarks(1);
   }
+
+  const totalMarks = questions.reduce((sum, q) => sum + (q.points && q.points > 0 ? q.points : 1), 0);
 
   return (
     <div className="space-y-5 p-6 md:p-7">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold tracking-tight text-[var(--foreground)]">Add Questions</h2>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {questions.length} added
+          {questions.length} added · {totalMarks} mark{totalMarks === 1 ? "" : "s"}
         </span>
       </div>
 
@@ -441,14 +415,27 @@ function Step2Questions({
             </label>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={addManual}
-          disabled={!text.trim() || opts.filter((o) => o.trim()).length < 2}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          + Add Question
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[var(--muted-foreground)]">
+            Marks
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={marks}
+              onChange={(e) => setMarks(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+              className="w-16 rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--foreground)] outline-none focus:border-primary dark:bg-[var(--background)]"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={addManual}
+            disabled={!text.trim() || opts.filter((o) => o.trim()).length < 2}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            + Add Question
+          </button>
+        </div>
       </div>
 
       {/* Added list */}
@@ -463,7 +450,12 @@ function Step2Questions({
             <div key={i} className="rounded-xl border border-[var(--border)] bg-white p-4 dark:bg-[var(--background)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[var(--foreground)]">{i + 1}. {q.text}</p>
+                  <p className="text-sm font-medium text-[var(--foreground)]">
+                    {i + 1}. {q.text}
+                    <span className="ml-2 rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                      {q.points && q.points > 0 ? q.points : 1} mark{(q.points ?? 1) === 1 ? "" : "s"}
+                    </span>
+                  </p>
                   <ul className="mt-2 space-y-1 text-xs text-[var(--muted-foreground)]">
                     {q.options.map((o, ix) => (
                       <li key={ix} className={ix === q.correct_answer_index ? "font-semibold text-primary" : ""}>
@@ -558,7 +550,7 @@ function Step4Review({
         {basic.instructions && <ReviewItem k="Instructions" v={basic.instructions} />}
       </ReviewCard>
 
-      <ReviewCard title={`Questions (${questions.length})`} onEdit={() => onJump(2)}>
+      <ReviewCard title={`Questions (${questions.length} · ${questions.reduce((s, q) => s + (q.points && q.points > 0 ? q.points : 1), 0)} marks)`} onEdit={() => onJump(2)}>
         {questions.length === 0 ? (
           <p className="text-sm text-red-600">No questions yet — add at least one before submitting.</p>
         ) : (
@@ -609,6 +601,41 @@ function ReviewItem({ k, v }: { k: string; v: string }) {
 }
 
 // ─── AI Generator Panel ─────────────────────────────────────────────────
+
+// The AI service returns options as [{id,text}] and the answer as
+// correct_option_ids (e.g. ["C"]). The wizard works with plain string options +
+// a correct_answer_index, so normalise both shapes here. Shared by topic + PDF.
+function mapAiQuestions(data: unknown, subject: string, difficulty: Difficulty): DraftQuestion[] {
+  const list = (data as { questions?: unknown[] })?.questions ?? (Array.isArray(data) ? data : []);
+  return (list as unknown[])
+    .map((raw): DraftQuestion => {
+      const q = (raw ?? {}) as Record<string, unknown>;
+      const rawOpts: unknown[] = (q.options as unknown[]) ?? (q.choices as unknown[]) ?? [];
+      const options: string[] = rawOpts.map((o) =>
+        typeof o === "string" ? o : ((o as { text?: string })?.text ?? ""),
+      );
+      let correct_answer_index = Number(
+        q.correct_answer_index ?? q.correct_index ?? q.answer_index ?? q.correct ?? 0,
+      ) || 0;
+      const correctIds = (q.correct_option_ids ?? q.correct_ids) as unknown[] | undefined;
+      if (Array.isArray(correctIds) && correctIds.length && rawOpts.length && typeof rawOpts[0] === "object") {
+        const idx = (rawOpts as { id?: string }[]).findIndex((o) => o?.id === correctIds[0]);
+        if (idx >= 0) correct_answer_index = idx;
+      }
+      return {
+        text: String(q.text ?? q.question_text ?? q.question ?? ""),
+        subject,
+        difficulty,
+        options,
+        correct_answer_index,
+        points: 1,
+      };
+    })
+    .filter((q) => q.text && q.options.length >= 2);
+}
+
+type GenMode = "topic" | "pdf";
+
 function AIGeneratorPanel({
   defaultSubject, defaultDifficulty, defaultGrade, onGenerated,
 }: {
@@ -618,16 +645,23 @@ function AIGeneratorPanel({
   onGenerated: (qs: DraftQuestion[]) => void;
 }) {
   const toast = useToast();
+  const [mode, setMode] = useState<GenMode>("topic");
+  const [subject, setSubject] = useState(defaultSubject);
   const [topic, setTopic] = useState("");
   const [grade, setGrade] = useState(defaultGrade);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaultDifficulty);
   const [count, setCount] = useState(10);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { setGrade(defaultGrade); }, [defaultGrade]);
   useEffect(() => { setDifficulty(defaultDifficulty); }, [defaultDifficulty]);
+  useEffect(() => { if (defaultSubject) setSubject(defaultSubject); }, [defaultSubject]);
 
-  const canGenerate = useMemo(() => topic.trim().length > 1 && count >= 1 && count <= 30 && !loading, [topic, count, loading]);
+  const canGenerate = useMemo(() => {
+    if (loading || count < 1 || count > 30 || !subject) return false;
+    return mode === "topic" ? true : pdfFile !== null;
+  }, [mode, subject, count, loading, pdfFile]);
 
   const generate = useCallback(async () => {
     if (!canGenerate) return;
@@ -635,62 +669,56 @@ function AIGeneratorPanel({
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setLoading(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/ai/quiz/generate/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic: topic.trim(),
-          subject: defaultSubject || topic.trim(),
-          grade: grade || undefined,
-          difficulty: difficulty.toLowerCase(),
-          count,
-        }),
-      });
+      let res: Response;
+      // The generator topic is the chosen subject, optionally narrowed by a
+      // free-text topic the teacher types in.
+      const effectiveTopic = topic.trim() ? `${subject}: ${topic.trim()}` : subject;
+      if (mode === "pdf") {
+        // PDF mode: difficulty is inferred from the document, so we don't send it
+        // (the backend serializer defaults to "medium"). Class is still supplied.
+        const form = new FormData();
+        form.append("file", pdfFile as File);
+        form.append("topic", effectiveTopic.slice(0, 480));
+        form.append("grade", grade || "");
+        form.append("count", String(count));
+        res = await fetch(`${API_BASE}/ai/quiz/generate-from-pdf/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+      } else {
+        res = await fetch(`${API_BASE}/ai/quiz/generate/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic: effectiveTopic,
+            subject,
+            grade: grade || undefined,
+            difficulty: difficulty.toLowerCase(),
+            count,
+          }),
+        });
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         toast(body?.detail ?? `Generation failed (${res.status})`, "error");
         return;
       }
       const data = await res.json();
-      // The AI service returns options as [{id,text}] and the answer as
-      // correct_option_ids (e.g. ["C"]). The wizard works with plain string
-      // options + a correct_answer_index, so normalise both here.
-      const items: DraftQuestion[] = (data?.questions ?? data ?? [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((q: any) => {
-          const rawOpts: unknown[] = q.options ?? q.choices ?? [];
-          const options: string[] = rawOpts.map((o) =>
-            typeof o === "string" ? o : ((o as { text?: string })?.text ?? ""),
-          );
-          let correct_answer_index =
-            q.correct_answer_index ?? q.correct_index ?? q.answer_index ?? q.correct ?? 0;
-          const correctIds = q.correct_option_ids ?? q.correct_ids;
-          if (Array.isArray(correctIds) && correctIds.length && rawOpts.length && typeof rawOpts[0] === "object") {
-            const idx = (rawOpts as { id?: string }[]).findIndex((o) => o?.id === correctIds[0]);
-            if (idx >= 0) correct_answer_index = idx;
-          }
-          return {
-            text: q.text ?? q.question_text ?? q.question ?? "",
-            subject: defaultSubject,
-            difficulty,
-            options,
-            correct_answer_index,
-          };
-        })
-        .filter((q: DraftQuestion) => q.text && q.options.length >= 2);
-
+      const items = mapAiQuestions(data, subject, difficulty);
       if (items.length === 0) {
         toast("Generator returned no usable questions.", "error");
         return;
       }
       onGenerated(items);
       toast(`Generated ${items.length} question${items.length === 1 ? "" : "s"}`, "success");
+      if (mode === "pdf") setPdfFile(null);
     } catch {
       toast("Network error", "error");
     } finally {
       setLoading(false);
     }
-  }, [canGenerate, topic, defaultSubject, grade, difficulty, count, onGenerated, toast]);
+  }, [canGenerate, mode, subject, topic, grade, difficulty, count, pdfFile, onGenerated, toast]);
 
   return (
     <motion.div
@@ -708,30 +736,82 @@ function AIGeneratorPanel({
       </div>
 
       <div className="space-y-4 p-5">
-        <p className="text-xs text-[var(--muted-foreground)]">Enter details to generate quiz questions automatically.</p>
-
-        <Field label="Topic / Subject">
-          <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g., Infrared Sensors, Python Loops" className={inputCls} />
-        </Field>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Class">
-            <select value={grade} onChange={(e) => setGrade(e.target.value)} className={inputCls}>
-              <option value="">Class</option>
-              {GRADES.map((g) => <option key={g}>{g}</option>)}
-            </select>
-          </Field>
-          <Field label="Difficulty">
-            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className={inputCls}>
-              <option value="EASY">Easy</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HARD">Hard</option>
-            </select>
-          </Field>
-          <Field label="Count">
-            <input type="number" min={1} max={30} value={count} onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value) || 10)))} className={inputCls} />
-          </Field>
+        {/* Topic | PDF mode toggle */}
+        <div className="flex gap-2 rounded-xl border border-primary/20 bg-white/60 p-1 dark:bg-[var(--background)]/40">
+          {(["topic", "pdf"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${mode === m ? "bg-gradient-to-r from-primary to-accent text-white shadow-sm" : "text-[var(--muted-foreground)] hover:text-primary"}`}
+            >
+              {m === "topic" ? "From topic" : "From PDF"}
+            </button>
+          ))}
         </div>
+
+        {mode === "topic" ? (
+          <>
+            <p className="text-xs text-[var(--muted-foreground)]">Pick a subject (and optionally a specific topic) to generate questions automatically.</p>
+            <Field label="Subject">
+              <select value={subject} onChange={(e) => setSubject(e.target.value)} className={inputCls}>
+                <option value="">Select Subject</option>
+                {QUIZ_SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Specific topic (optional)">
+              <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g., Infrared Sensors, Python Loops" className={inputCls} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Class">
+                <select value={grade} onChange={(e) => setGrade(e.target.value)} className={inputCls}>
+                  <option value="">Class</option>
+                  {GRADES.map((g) => <option key={g}>{g}</option>)}
+                </select>
+              </Field>
+              <Field label="Difficulty">
+                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className={inputCls}>
+                  <option value="EASY">Easy</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HARD">Hard</option>
+                </select>
+              </Field>
+              <Field label="Count">
+                <input type="number" min={1} max={30} value={count} onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value) || 10)))} className={inputCls} />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-[var(--muted-foreground)]">Upload a PDF — questions are generated from its content. Difficulty is inferred from the document.</p>
+            <Field label="Subject">
+              <select value={subject} onChange={(e) => setSubject(e.target.value)} className={inputCls}>
+                <option value="">Select Subject</option>
+                {QUIZ_SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="PDF file (≤ 10 MB)">
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-[var(--muted-foreground)] file:mr-3 file:rounded-full file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/15"
+              />
+            </Field>
+            {pdfFile && <p className="truncate text-[11px] text-[var(--muted-foreground)]">Selected: {pdfFile.name}</p>}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Class">
+                <select value={grade} onChange={(e) => setGrade(e.target.value)} className={inputCls}>
+                  <option value="">Class</option>
+                  {GRADES.map((g) => <option key={g}>{g}</option>)}
+                </select>
+              </Field>
+              <Field label="Count">
+                <input type="number" min={1} max={30} value={count} onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value) || 10)))} className={inputCls} />
+              </Field>
+            </div>
+          </>
+        )}
 
         <button
           type="button"
@@ -750,7 +830,7 @@ function AIGeneratorPanel({
         </button>
 
         <p className="text-[11px] leading-relaxed text-[var(--muted-foreground)]">
-          Generated via Skillship AI service · Gemini 1.5 Flash. Review every output before submitting.
+          Generated via Skillship AI service · Gemini. Review every output before submitting.
         </p>
       </div>
     </motion.div>

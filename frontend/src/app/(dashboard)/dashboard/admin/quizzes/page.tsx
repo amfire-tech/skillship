@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { PaginatedResponse } from "@/types";
 import { API_BASE, getToken } from "@/lib/auth";
+import { QUIZ_SUBJECTS } from "@/lib/subjects";
 
 async function apiFetch<T>(path: string): Promise<T> {
   const token = await getToken();
@@ -103,7 +104,7 @@ function SkeletonCard() {
 }
 
 // ── Filter option constants — extended dynamically from quizzes payload ──
-const STATIC_SUBJECTS = ["Mathematics", "Biology", "History", "Physics", "Chemistry", "English"];
+const STATIC_SUBJECTS = [...QUIZ_SUBJECTS];
 const STATIC_GRADES = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
 const statuses = ["All Status", "Published", "Review", "Draft"];
 
@@ -161,6 +162,29 @@ export default function GlobalQuizPage() {
     const matchStatus = status === "All Status" || getQuizStatus(q) === status;
     return matchSearch && matchSubject && matchGrade && matchStatus;
   });
+
+  async function deleteQuiz(q: Quiz) {
+    if (!confirm(`Delete "${q.title}"? This permanently removes it from history.`)) return;
+    const token = await getToken();
+    if (!token) { toast("Session expired", "error"); return; }
+    try {
+      const res = await fetch(`${API_BASE}/quizzes/${q.id}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      if (res.ok || res.status === 204) {
+        setQuizzes((prev) => (prev ? prev.filter((x) => x.id !== q.id) : prev));
+        toast("Quiz deleted", "success");
+      } else {
+        const body = await res.json().catch(() => ({}));
+        // Quizzes with attempts can't be deleted — they must be archived from the quiz page.
+        toast(body?.detail ?? "Couldn't delete this quiz (it may have attempts).", "error");
+      }
+    } catch {
+      toast("Network error", "error");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -274,6 +298,12 @@ export default function GlobalQuizPage() {
                       className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-primary"
                     >
                       Edit
+                    </button>
+                    <button
+                      onClick={() => deleteQuiz(q)}
+                      className="min-h-[44px] min-w-[44px] rounded-lg px-3 py-2 font-semibold text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>

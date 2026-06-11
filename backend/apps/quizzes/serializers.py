@@ -208,20 +208,50 @@ class QuizSerializer(serializers.ModelSerializer):
     )
     created_by = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
 
+    # Denormalised display fields for staff dashboards + approval panel + analytics.
+    subject = serializers.CharField(source="course.name", read_only=True)
+    school_name = serializers.CharField(source="school.name", read_only=True, default=None)
+    created_by_name = serializers.SerializerMethodField()
+    question_count = serializers.SerializerMethodField()
+    total_attempts = serializers.SerializerMethodField()
+    avg_score = serializers.SerializerMethodField()
+
     class Meta:
         model = Quiz
         fields = [
-            "id", "school", "course", "bank",
-            "title", "description", "status",
+            "id", "school", "school_name", "course", "subject", "bank",
+            "title", "description", "grade", "section", "status",
             "is_adaptive", "randomize_questions", "randomize_options",
             "duration_minutes", "total_questions", "pass_percentage", "attempts_allowed",
             "published_at", "archived_at",
-            "created_by", "created_at", "updated_at",
+            "created_by", "created_by_name", "question_count",
+            "total_attempts", "avg_score",
+            "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "school", "status", "published_at", "archived_at",
-            "created_by", "created_at", "updated_at",
+            "id", "school", "school_name", "subject", "status", "published_at", "archived_at",
+            "created_by", "created_by_name", "question_count", "total_attempts", "avg_score",
+            "created_at", "updated_at",
         ]
+
+    def get_created_by_name(self, obj) -> str | None:
+        u = obj.created_by
+        if not u:
+            return None
+        return u.get_full_name() or u.username
+
+    def get_question_count(self, obj) -> int:
+        # Prefer an annotation set by the viewset; fall back to a count.
+        ann = getattr(obj, "question_count_ann", None)
+        return ann if ann is not None else obj.bank.questions.count()
+
+    def get_total_attempts(self, obj):
+        # Annotated by QuizViewSet.get_queryset; None on un-annotated instances.
+        return getattr(obj, "attempts_count_ann", None)
+
+    def get_avg_score(self, obj):
+        v = getattr(obj, "avg_score_ann", None)
+        return round(float(v), 1) if v is not None else None
 
     def validate(self, attrs):
         target_school = _resolve_target_school_id(self)
@@ -259,6 +289,7 @@ class QuizAuthoringSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=200)
     subject = serializers.CharField(max_length=120, required=False, allow_blank=True, default="General")
     grade = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    section = serializers.CharField(max_length=10, required=False, allow_blank=True, default="")
     instructions = serializers.CharField(required=False, allow_blank=True, default="")
     difficulty = serializers.CharField(max_length=10, required=False, allow_blank=True, default="MEDIUM")
     duration_minutes = serializers.IntegerField(required=False, default=30, min_value=1, max_value=600)

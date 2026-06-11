@@ -57,6 +57,27 @@ interface Assignment {
   created_at?: string;
 }
 
+interface QuizQuestion {
+  id: string;
+  text: string;
+  type?: string;
+  difficulty?: string;
+  options?: { id: string; text: string }[];
+  correct_option_ids?: string[];
+  accepted_answers?: string[];
+  points?: number;
+}
+
+interface Ranking {
+  rank: number;
+  student_name: string;
+  score_percent: number | null;
+  points_earned: number;
+  points_total: number;
+  correct_count: number;
+  submitted_at?: string | null;
+}
+
 export default function TeacherQuizDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -64,6 +85,8 @@ export default function TeacherQuizDetailPage() {
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [rankings, setRankings] = useState<Ranking[] | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,6 +118,28 @@ export default function TeacherQuizDetailPage() {
     }
   }, [id]);
 
+  const loadQuestions = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/quizzes/${id}/questions/`);
+      if (!res.ok) { setQuestions([]); return; }
+      const data = await res.json();
+      setQuestions(asArray<QuizQuestion>(data));
+    } catch {
+      setQuestions([]);
+    }
+  }, [id]);
+
+  const loadRankings = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/quizzes/${id}/rankings/?limit=200`);
+      if (!res.ok) { setRankings([]); return; }
+      const data = await res.json();
+      setRankings(asArray<Ranking>(data?.results ?? data));
+    } catch {
+      setRankings([]);
+    }
+  }, [id]);
+
   async function revokeAssignment(assignmentId: string) {
     if (!confirm("Revoke this assignment?")) return;
     const res = await apiFetch(`/quizzes/assignments/${assignmentId}/`, { method: "DELETE" });
@@ -104,6 +149,8 @@ export default function TeacherQuizDetailPage() {
   useEffect(() => { document.title = "Quiz — Skillship"; }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadAssignments(); }, [loadAssignments]);
+  useEffect(() => { loadRankings(); }, [loadRankings]);
+  useEffect(() => { loadQuestions(); }, [loadQuestions]);
 
   const questionCount = quiz?.questions_count ?? quiz?.question_count ?? 0;
   const attempts = quiz?.total_attempts ?? null;
@@ -199,13 +246,97 @@ export default function TeacherQuizDetailPage() {
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
-        <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">Questions ({questionCount})</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">
-          Question editor available via the edit page.{" "}
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">
+            Questions {questions !== null && <span className="text-[var(--muted-foreground)]">({questions.length})</span>}
+          </h2>
           {quiz && (quiz.status === "DRAFT" || quiz.status === "REVIEW") && (
-            <Link href={`/dashboard/teacher/quizzes/${id}/edit`} className="font-medium text-primary hover:underline">Open editor →</Link>
+            <Link href={`/dashboard/teacher/quizzes/${id}/edit`} className="text-xs font-semibold text-primary hover:underline">Open editor →</Link>
           )}
-        </p>
+        </div>
+        {questions === null ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-[var(--muted)]" />)}
+          </div>
+        ) : questions.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-[var(--border)] py-6 text-center text-sm text-[var(--muted-foreground)]">
+            This quiz has no questions yet.
+          </p>
+        ) : (
+          <ol className="space-y-3">
+            {questions.map((q, qi) => (
+              <li key={q.id} className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{qi + 1}. {q.text}</p>
+                  <span className="shrink-0 rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                    {q.points ?? 1} mark{(q.points ?? 1) === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {q.options && q.options.length > 0 ? (
+                  <ul className="mt-2 space-y-1">
+                    {q.options.map((o) => {
+                      const correct = q.correct_option_ids?.includes(o.id);
+                      return (
+                        <li key={o.id} className={`flex items-center gap-2 text-xs ${correct ? "font-semibold text-primary" : "text-[var(--muted-foreground)]"}`}>
+                          <span className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] ${correct ? "border-primary bg-primary/10" : "border-[var(--border)]"}`}>{String(o.id).toUpperCase()}</span>
+                          {o.text}
+                          {correct && <span className="ml-1 text-[10px] uppercase tracking-wide">✓ correct</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs italic text-[var(--muted-foreground)]">
+                    {q.accepted_answers && q.accepted_answers.length > 0 ? `Short answer · accepted: ${q.accepted_answers.join(", ")}` : "Short-answer question"}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      {/* Student marks — every submitted attempt's best score per student. */}
+      <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">
+          Student Marks {rankings !== null && <span className="text-[var(--muted-foreground)]">({rankings.length})</span>}
+        </h2>
+        {rankings === null ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded-lg bg-[var(--muted)]" />)}
+          </div>
+        ) : rankings.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-[var(--border)] py-6 text-center text-sm text-[var(--muted-foreground)]">
+            No submissions yet. Marks will appear here once students complete this quiz.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">Student</th>
+                  <th className="px-3 py-2">Marks</th>
+                  <th className="px-3 py-2">Score</th>
+                  <th className="px-3 py-2">Correct</th>
+                  <th className="px-3 py-2">Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankings.map((r) => (
+                  <tr key={`${r.rank}-${r.student_name}`} className="border-b border-[var(--border)]/50 last:border-0">
+                    <td className="px-3 py-2.5 font-semibold text-[var(--muted-foreground)]">{r.rank}</td>
+                    <td className="px-3 py-2.5 font-medium text-[var(--foreground)]">{r.student_name}</td>
+                    <td className="px-3 py-2.5 font-semibold text-primary">{r.points_earned}/{r.points_total}</td>
+                    <td className="px-3 py-2.5">{r.score_percent != null ? `${Math.round(r.score_percent)}%` : "—"}</td>
+                    <td className="px-3 py-2.5 text-[var(--muted-foreground)]">{r.correct_count}</td>
+                    <td className="px-3 py-2.5 text-[var(--muted-foreground)]">{fmt(r.submitted_at ?? undefined)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Assignments — visible only for PUBLISHED quizzes since you can't assign drafts. */}

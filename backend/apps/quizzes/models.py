@@ -171,6 +171,12 @@ class Quiz(TenantModel):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
 
+    # Target class/section the quiz was authored for. Stored on the quiz itself
+    # (not derived from the shared Course) so the approval panel and analytics
+    # can show the exact class — e.g. grade="Class 8", section="A" (blank = all).
+    grade = models.CharField(max_length=20, blank=True)
+    section = models.CharField(max_length=10, blank=True)
+
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.DRAFT, db_index=True
     )

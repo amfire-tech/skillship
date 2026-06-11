@@ -203,6 +203,8 @@ def author_quiz(*, actor, school_id, data: dict) -> Quiz:
         bank=bank,
         title=data["title"],
         description=data.get("instructions", "") or "",
+        grade=(data.get("grade") or "").strip(),
+        section=(data.get("section") or "").strip(),
         randomize_questions=data.get("shuffle_questions", True),
         duration_minutes=data.get("duration_minutes") or 30,
         total_questions=max(len(questions), 1),
