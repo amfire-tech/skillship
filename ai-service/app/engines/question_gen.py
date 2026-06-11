@@ -3,12 +3,14 @@ File:    ai-service/app/engines/question_gen.py
 Purpose: Generate MCQ/TF/SHORT questions using Gemini JSON mode.
 """
 
+import asyncio
 import logging
 import uuid
 from pathlib import Path
 from typing import Optional
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.config import settings
@@ -20,6 +22,16 @@ logger = logging.getLogger(__name__)
 _PROMPT_TEMPLATE = (
     Path(__file__).parent.parent / "prompts" / "question_gen.md"
 ).read_text(encoding="utf-8")
+
+# gemini-2.5-flash occasionally emits malformed/incomplete JSON even in JSON
+# mode (a stray missing delimiter, or fewer questions than asked), and the model
+# intermittently returns a transient 503 ("high demand"). Both clear on a
+# re-prompt, so we regenerate up to this many times before surfacing the error.
+# Hard errors (429 quota, 4xx) are NOT retried — re-prompting can't fix them.
+_MAX_GEN_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS = 1.5
+# Gemini HTTP status codes worth retrying (transient server-side conditions).
+_RETRIABLE_API_CODES = {500, 503}
 
 
 def _build_prompt(topic, grade, count, difficulty, q_types, course_context) -> str:
@@ -153,12 +165,37 @@ async def generate(
 
     prompt = _build_prompt(topic, grade, count, difficulty, types_, course_context)
 
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
+    last_error: Exception | None = None
+    for attempt in range(1, _MAX_GEN_ATTEMPTS + 1):
+        try:
+            response = await client.aio.models.generate_content(
+                model=settings.MODEL_NAME,
+                contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            questions = _parse(response.text, requested_count=count)
+        except genai_errors.APIError as exc:
+            # Only transient server-side errors are worth retrying; quota (429)
+            # and client errors are surfaced immediately so the caller sees them.
+            if exc.code not in _RETRIABLE_API_CODES or attempt == _MAX_GEN_ATTEMPTS:
+                raise
+            last_error = exc
+            logger.warning(
+                "question_gen Gemini %s (attempt %d/%d) on '%s' — retrying",
+                exc.code, attempt, _MAX_GEN_ATTEMPTS, topic,
+            )
+            await asyncio.sleep(_RETRY_BACKOFF_SECONDS * attempt)
+            continue
+        except ValueError as exc:
+            # Malformed/short JSON — re-prompt rather than failing the request.
+            last_error = exc
+            logger.warning(
+                "question_gen parse failed (attempt %d/%d) on '%s': %s",
+                attempt, _MAX_GEN_ATTEMPTS, topic, exc,
+            )
+            continue
+        logger.info("Generated %d questions on '%s' (%s)", len(questions), topic, difficulty.value)
+        return questions
 
-    questions = _parse(response.text, requested_count=count)
-    logger.info("Generated %d questions on '%s' (%s)", len(questions), topic, difficulty.value)
-    return questions
+    # Exhausted retries — surface the last error (router maps it to 502).
+    raise last_error if last_error is not None else ValueError("Question generation failed.")
