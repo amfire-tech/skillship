@@ -362,6 +362,11 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
     quiz_title  = serializers.CharField(source="quiz.title", read_only=True)
     quiz_subject = serializers.CharField(source="quiz.course.code", read_only=True)
     quiz_total_questions = serializers.IntegerField(source="quiz.total_questions", read_only=True)
+    # score_percent is a model DecimalField — DRF would render it as a STRING
+    # ("60.00"), which breaks `typeof score === "number"` checks on the frontend.
+    # Expose it (and a `score` alias some dashboards read) as real numbers.
+    score_percent = serializers.FloatField(read_only=True)
+    score = serializers.SerializerMethodField()
     wrong_count = serializers.SerializerMethodField()
     passed = serializers.SerializerMethodField()
 
@@ -372,12 +377,15 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
             "quiz_title", "quiz_subject", "quiz_total_questions",
             "status", "attempt_number",
             "started_at", "expires_at", "submitted_at",
-            "score_percent", "points_earned", "points_total",
+            "score_percent", "score", "points_earned", "points_total",
             "correct_count", "wrong_count", "passed",
             "question_order", "last_difficulty",
             "created_at", "updated_at",
         ]
         read_only_fields = fields
+
+    def get_score(self, obj: QuizAttempt):
+        return float(obj.score_percent) if obj.score_percent is not None else None
 
     def get_wrong_count(self, obj: QuizAttempt) -> int:
         # Only meaningful for submitted attempts; answered ≠ correct → wrong.

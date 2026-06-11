@@ -342,15 +342,23 @@ class StudentRosterView(ListAPIView):
 
     @staticmethod
     def _stats_for(student_ids):
-        """One aggregate query → {student_id: {avg, quizzes}} for the page."""
-        from django.db.models import Avg, Sum
+        """One aggregate query → {student_id: {avg, quizzes}} for the page.
 
-        from apps.analytics.models import StudentDailyStats
+        Computed straight from submitted quiz attempts so a student's marks show
+        up the moment they finish a quiz (the analytics daily-rollup table is a
+        separate, nightly concern and may lag / be empty).
+        """
+        from django.db.models import Avg, Count
+
+        from apps.quizzes.models import QuizAttempt
 
         rows = (
-            StudentDailyStats.objects.filter(student_id__in=student_ids)
+            QuizAttempt.objects.filter(
+                student_id__in=student_ids,
+                status=QuizAttempt.Status.SUBMITTED,
+            )
             .values("student_id")
-            .annotate(avg=Avg("avg_score"), quizzes=Sum("quizzes_taken"))
+            .annotate(avg=Avg("score_percent"), quizzes=Count("id"))
         )
         return {r["student_id"]: r for r in rows}
 
