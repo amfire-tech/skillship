@@ -38,6 +38,8 @@ interface Quiz {
   created_by?: string;
 }
 
+interface RosterRow { class_label?: string | null; avg_score?: number | null }
+
 interface Stats {
   classes: number | null;
   students: number | null;
@@ -84,15 +86,14 @@ export default function TeacherHomePage() {
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [clRes, qRes] = await Promise.all([
-        fetch(`${API_BASE}/academics/classes/`, { headers }),
+      // The roster is auto-scoped to this teacher's assigned students; classes
+      // are derived from it (teachers can't hit /academics/classes/).
+      const [rRes, qRes] = await Promise.all([
+        fetch(`${API_BASE}/users/roster/?page_size=500`, { headers }),
         fetch(`${API_BASE}/quizzes/`, { headers }),
       ]);
-      const clData = clRes.ok ? await clRes.json() : null;
-      const qData  = qRes.ok  ? await qRes.json()  : null;
-
-      const classList = asArray<AcademicClass>(clData);
-      const quizList  = asArray<Quiz>(qData);
+      const roster = rRes.ok ? asArray<RosterRow>(await rRes.json()) : [];
+      const quizList = asArray<Quiz>(qRes.ok ? await qRes.json() : null);
 
       // Filter to current teacher's quizzes if backend returns created_by
       const myQuizzes = user?.id
@@ -102,27 +103,32 @@ export default function TeacherHomePage() {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
       const thisMonth = myQuizzes.filter((q) => new Date(q.created_at) >= monthStart);
       const lastMonth = myQuizzes.filter((q) => new Date(q.created_at) >= lastMonthStart && new Date(q.created_at) < monthStart);
 
-      const scored = myQuizzes.filter((q) => typeof q.avg_score === "number");
-      const avg = scored.length === 0 ? null : Math.round(scored.reduce((a, b) => a + (b.avg_score ?? 0), 0) / scored.length * 10) / 10;
+      // Group assigned students into classes + collect their scores.
+      const byClass = new Map<string, number>();
+      const studentScores: number[] = [];
+      roster.forEach((s: { class_label?: string | null; avg_score?: number | null }) => {
+        if (typeof s.avg_score === "number") studentScores.push(s.avg_score);
+        if (s.class_label) byClass.set(s.class_label, (byClass.get(s.class_label) ?? 0) + 1);
+      });
+      const classList: AcademicClass[] = Array.from(byClass.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([label, n]) => ({ id: label, class_name: label, student_count: n }));
 
-      const prevScored = lastMonth.filter((q) => typeof q.avg_score === "number");
-      const prevAvg = prevScored.length === 0 ? null : Math.round(prevScored.reduce((a, b) => a + (b.avg_score ?? 0), 0) / prevScored.length * 10) / 10;
-
-      // Aggregate students from classes
-      const studentTotal = classList.reduce((sum, c) => sum + (c.student_count ?? 0), 0);
+      const avg = studentScores.length === 0
+        ? null
+        : Math.round((studentScores.reduce((a, b) => a + b, 0) / studentScores.length) * 10) / 10;
 
       setClasses(classList);
       setQuizzes(myQuizzes);
       setStats({
         classes: classList.length,
-        students: studentTotal,
+        students: roster.length,
         quizzesThisMonth: thisMonth.length,
         avgScore: avg,
-        prevMonthAvg: prevAvg,
+        prevMonthAvg: null,
         prevMonthCount: lastMonth.length,
       });
     } catch {
@@ -286,8 +292,8 @@ export default function TeacherHomePage() {
             ) : classes.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-10 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BookIcon /></div>
-                <p className="text-sm font-medium text-[var(--foreground)]">No classes assigned yet</p>
-                <p className="text-xs text-[var(--muted-foreground)]">Ask your principal to assign you a class.</p>
+                <p className="text-sm font-medium text-[var(--foreground)]">No students assigned yet</p>
+                <p className="text-xs text-[var(--muted-foreground)]">Ask the Super Admin to assign you students — your classes appear here automatically.</p>
               </div>
             ) : (
               <ul className="space-y-2">

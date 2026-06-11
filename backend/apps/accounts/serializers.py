@@ -33,9 +33,17 @@ class UserSerializer(serializers.ModelSerializer):
     )
     school_name = serializers.SerializerMethodField()
     current_class = serializers.SerializerMethodField()
+    assigned_teacher = serializers.PrimaryKeyRelatedField(
+        read_only=True, pk_field=serializers.UUIDField()
+    )
+    assigned_teacher_name = serializers.SerializerMethodField()
 
     def get_school_name(self, obj):
         return obj.school.name if obj.school_id else None
+
+    def get_assigned_teacher_name(self, obj):
+        t = obj.assigned_teacher
+        return (t.get_full_name() or t.username) if t else None
 
     def get_current_class(self, obj):
         """The student's class as "Grade 6-A", resolved from their latest
@@ -65,6 +73,8 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "admission_number",
             "current_class",
+            "assigned_teacher",
+            "assigned_teacher_name",
             "profile_completed",
             "is_active",
             "date_joined",
@@ -72,7 +82,8 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "email", "username", "first_name", "last_name",
             "role", "school", "phone", "admission_number",
-            "current_class", "profile_completed", "is_active", "date_joined",
+            "current_class", "assigned_teacher", "assigned_teacher_name",
+            "profile_completed", "is_active", "date_joined",
         ]
 
 
@@ -237,6 +248,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     """
 
     school = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    assigned_teacher = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=User.Role.TEACHER),
+        required=False,
+        allow_null=True,
+        pk_field=serializers.UUIDField(),
+    )
 
     class Meta:
         model = User
@@ -250,6 +267,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "school",
             "phone",
             "admission_number",
+            "assigned_teacher",
             "is_active",
         ]
         read_only_fields = ["id", "role", "school"]
@@ -260,6 +278,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
             raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_assigned_teacher(self, value):
+        # The teacher must belong to the same school as the student being edited.
+        if value is not None and self.instance is not None and value.school_id != self.instance.school_id:
+            raise serializers.ValidationError("Teacher must belong to the same school as the student.")
         return value
 
 
@@ -300,6 +324,40 @@ class GenerateCredentialsSerializer(serializers.Serializer):
         queryset=School.objects.all(), pk_field=serializers.UUIDField()
     )
     count = serializers.IntegerField(min_value=1, max_value=500)
+
+
+class AssignTeacherSerializer(serializers.Serializer):
+    """Body for POST /api/v1/users/assign-teacher/ (MAIN_ADMIN only).
+
+    Bulk-assign a teacher to a set of students. `teacher=null` unassigns. Every
+    student must be a STUDENT in the SAME school as the teacher.
+    """
+
+    teacher = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=User.Role.TEACHER),
+        allow_null=True,
+        pk_field=serializers.UUIDField(),
+    )
+    students = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role=User.Role.STUDENT),
+        many=True,
+        pk_field=serializers.UUIDField(),
+    )
+
+    def validate_students(self, value):
+        if not value:
+            raise serializers.ValidationError("Select at least one student.")
+        return value
+
+    def validate(self, attrs):
+        teacher = attrs.get("teacher")
+        if teacher is not None:
+            bad = [str(s.id) for s in attrs["students"] if s.school_id != teacher.school_id]
+            if bad:
+                raise serializers.ValidationError(
+                    {"students": "All students must be in the same school as the teacher."}
+                )
+        return attrs
 
 
 class CompleteProfileSerializer(serializers.Serializer):
@@ -370,3 +428,59 @@ class OnboardClassSerializer(serializers.Serializer):
                 )
         attrs["course"] = course
         return attrs
+
+
+# ── Student roster (used by GET /api/v1/users/roster/) ──────────────────────
+
+
+class StudentRosterSerializer(serializers.ModelSerializer):
+    """A student row for the teacher / principal / admin roster. Class comes from
+    the student's latest enrolment (prefetched as `recent_enrollments` by the
+    view to avoid N+1); avg_score / quizzes_attempted come from a per-page stats
+    dict passed in `context["stats"]` (also one query, computed in the view)."""
+
+    roll_number = serializers.CharField(source="admission_number")
+    grade = serializers.SerializerMethodField()
+    section = serializers.SerializerMethodField()
+    class_label = serializers.SerializerMethodField()
+    assigned_teacher = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    assigned_teacher_name = serializers.SerializerMethodField()
+    avg_score = serializers.SerializerMethodField()
+    quizzes_attempted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id", "first_name", "last_name", "email", "roll_number",
+            "is_active", "profile_completed", "grade", "section", "class_label",
+            "assigned_teacher", "assigned_teacher_name", "avg_score", "quizzes_attempted",
+        ]
+
+    @staticmethod
+    def _klass(obj):
+        enr = getattr(obj, "recent_enrollments", None)
+        return enr[0].klass if enr else None
+
+    def get_grade(self, obj):
+        k = self._klass(obj)
+        return k.grade if k else None
+
+    def get_section(self, obj):
+        k = self._klass(obj)
+        return k.section if k else None
+
+    def get_class_label(self, obj):
+        k = self._klass(obj)
+        return f"Grade {k.grade}-{k.section}" if k else None
+
+    def get_assigned_teacher_name(self, obj):
+        t = obj.assigned_teacher
+        return (t.get_full_name() or t.username) if t else None
+
+    def get_avg_score(self, obj):
+        row = self.context.get("stats", {}).get(obj.id)
+        return float(row["avg"]) if row and row.get("avg") is not None else None
+
+    def get_quizzes_attempted(self, obj):
+        row = self.context.get("stats", {}).get(obj.id)
+        return row["quizzes"] if row else None

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
@@ -24,12 +24,14 @@ interface ApiUser {
   school_name: string | null;
   phone: string | null;
   admission_number: string | null;
+  assigned_teacher_name?: string | null;
   profile_completed?: boolean;
   is_active: boolean;
   date_joined: string;
 }
 
 interface SchoolOpt { id: string; name: string }
+interface TeacherOpt { id: string; name: string }
 
 const PAGE_SIZE = 50;
 
@@ -58,7 +60,7 @@ const roleTabDefs: { label: string; value: Role }[] = [
   { label: "Students", value: "STUDENT" },
 ];
 
-/** Page through a paginated DRF list (used only for the small /schools/ list). */
+/** Page through a paginated DRF list (used for the small /schools/ + teachers lists). */
 async function fetchAll(url: string, token: string): Promise<any[]> {
   const out: any[] = [];
   let next: string | null = url;
@@ -70,6 +72,10 @@ async function fetchAll(url: string, token: string): Promise<any[]> {
     next = data.next ?? null;
   }
   return out;
+}
+
+function displayName(u: { first_name: string; last_name: string; username: string }) {
+  return `${u.first_name} ${u.last_name}`.trim() || u.username;
 }
 
 export default function UserManagementPage() {
@@ -89,6 +95,14 @@ export default function UserManagementPage() {
   const [page, setPage] = useState(1);
   const [confirmSuspend, setConfirmSuspend] = useState<ApiUser | null>(null);
 
+  // Bulk teacher assignment (Students view, school selected).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [teachers, setTeachers] = useState<TeacherOpt[]>([]);
+  const [assignTo, setAssignTo] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
+  const bulkMode = activeRole === "STUDENT" && !!schoolId;
+
   useEffect(() => { document.title = "User Management — Skillship"; }, []);
 
   // Load the (small) school list once for the filter dropdown.
@@ -103,6 +117,19 @@ export default function UserManagementPage() {
     })();
   }, []);
 
+  // Load the selected school's teachers (for the assign dropdown).
+  useEffect(() => {
+    if (!bulkMode) { setTeachers([]); return; }
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const list = await fetchAll(`${API_BASE}/users/?role=TEACHER&school=${schoolId}&page_size=100`, token);
+        setTeachers(list.map((t) => ({ id: t.id, name: displayName(t) || t.email })));
+      } catch { setTeachers([]); }
+    })();
+  }, [bulkMode, schoolId]);
+
   // Debounce the search box → committed search term (and reset to page 1).
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput.trim()); setPage(1); }, 300);
@@ -112,6 +139,7 @@ export default function UserManagementPage() {
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
+    setSelected(new Set());
     const token = await getToken();
     if (!token) { setFetchError("Session expired. Please log in again."); setLoading(false); return; }
     const qs = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
@@ -138,6 +166,49 @@ export default function UserManagementPage() {
   function selectRole(value: Role) { setActiveRole(value); setPage(1); }
   function selectSchool(value: string) { setSchoolId(value); setPage(1); }
 
+  const studentIdsOnPage = useMemo(
+    () => users.filter((u) => u.role === "STUDENT").map((u) => u.id),
+    [users],
+  );
+  const allSelected = bulkMode && studentIdsOnPage.length > 0 && studentIdsOnPage.every((id) => selected.has(id));
+
+  function toggleRow(id: string) {
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  function toggleAll() {
+    setSelected((prev) => {
+      if (studentIdsOnPage.every((id) => prev.has(id))) return new Set();
+      return new Set(studentIdsOnPage);
+    });
+  }
+
+  async function assignTeacher() {
+    if (selected.size === 0) return;
+    setAssigning(true);
+    const token = await getToken();
+    if (!token) { toast("Session expired", "error"); setAssigning(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/users/assign-teacher/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ teacher: assignTo || null, students: Array.from(selected) }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast(body?.detail ?? body?.students?.[0] ?? `Assign failed (${res.status})`, "error");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      const who = assignTo ? teachers.find((t) => t.id === assignTo)?.name ?? "teacher" : "no teacher (unassigned)";
+      toast(`${data.updated_count ?? selected.size} student(s) → ${who}`, "success");
+      await loadUsers();
+    } catch {
+      toast("Network error", "error");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   async function handleSuspend(user: ApiUser) {
     const token = await getToken();
     if (!token) return;
@@ -149,7 +220,7 @@ export default function UserManagementPage() {
       });
       if (!res.ok) { toast("Failed to suspend user. Please try again.", "error"); return; }
       setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, is_active: false } : u));
-      toast(`${user.first_name} ${user.last_name}`.trim() + " suspended", "error");
+      toast(`${displayName(user)} suspended`, "error");
     } catch {
       toast("Failed to suspend user", "error");
     } finally {
@@ -157,15 +228,12 @@ export default function UserManagementPage() {
     }
   }
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  }
-
   const schoolName = schools.find((s) => s.id === schoolId)?.name;
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const firstRow = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const lastRow = Math.min(page * PAGE_SIZE, count);
   const roleNoun = activeRole === "all" ? "user" : roleLabel[activeRole].toLowerCase();
+  const colCount = 7 + (bulkMode ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -229,7 +297,7 @@ export default function UserManagementPage() {
         </div>
       </div>
 
-      {/* Count summary */}
+      {/* Count summary + bulk-assign hint */}
       <p className="text-sm text-[var(--muted-foreground)]">
         {loading ? "Loading…" : (
           <>
@@ -237,9 +305,34 @@ export default function UserManagementPage() {
             {roleNoun}{count === 1 ? "" : "s"}
             {schoolName ? <> in <span className="font-semibold text-[var(--foreground)]">{schoolName}</span></> : " across all schools"}
             {search ? <> matching “{search}”</> : null}
+            {activeRole === "STUDENT" && !schoolId ? <> · pick a school to assign a teacher</> : null}
           </>
         )}
       </p>
+
+      {/* Bulk assign toolbar */}
+      {bulkMode && selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3">
+          <span className="text-sm font-semibold text-[var(--foreground)]">{selected.size} selected</span>
+          <span className="text-sm text-[var(--muted-foreground)]">→ assign to</span>
+          <select
+            value={assignTo}
+            onChange={(e) => setAssignTo(e.target.value)}
+            className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+          >
+            <option value="">— Unassign (no teacher) —</option>
+            {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <button
+            onClick={assignTeacher} disabled={assigning}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-sm hover:-translate-y-0.5 disabled:opacity-60"
+          >
+            {assigning ? "Assigning…" : "Assign teacher"}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">Clear</button>
+          {teachers.length === 0 && <span className="text-xs text-amber-600">No teachers in this school yet — create one first.</span>}
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
@@ -250,23 +343,28 @@ export default function UserManagementPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[960px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                  {bulkMode && (
+                    <th className="px-4 py-3">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all students on this page" className="h-4 w-4 rounded border-[var(--border)] text-primary focus:ring-2 focus:ring-primary/30" />
+                    </th>
+                  )}
                   <th className="px-5 py-3">User</th>
                   <th className="px-5 py-3">Role</th>
-                  <th className="px-5 py-3">School / Scope</th>
+                  <th className="px-5 py-3">School</th>
                   <th className="px-5 py-3">Roll No.</th>
-                  <th className="px-5 py-3">Profile</th>
+                  <th className="px-5 py-3">Assigned Teacher</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <TableRowSkeleton rows={8} columns={7} withAvatar />
+                  <TableRowSkeleton rows={8} columns={colCount} withAvatar />
                 ) : users.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-8">
+                  <tr><td colSpan={colCount} className="px-5 py-8">
                     <EmptyState
                       title="No users found"
                       description="Try a different role, school, or search — or generate student logins from Onboard Students."
@@ -275,7 +373,7 @@ export default function UserManagementPage() {
                   </td></tr>
                 ) : (
                   users.map((u) => {
-                    const fullName = `${u.first_name} ${u.last_name}`.trim() || u.username;
+                    const fullName = displayName(u);
                     const initials = fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
                     const status = u.is_active ? "Active" : "Suspended";
                     const statusColor = u.is_active
@@ -284,6 +382,13 @@ export default function UserManagementPage() {
                     const isStudent = u.role === "STUDENT";
                     return (
                       <tr key={u.id} className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/40">
+                        {bulkMode && (
+                          <td className="px-4 py-3.5">
+                            {isStudent ? (
+                              <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleRow(u.id)} aria-label={`Select ${fullName}`} className="h-4 w-4 rounded border-[var(--border)] text-primary focus:ring-2 focus:ring-primary/30" />
+                            ) : null}
+                          </td>
+                        )}
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
@@ -305,11 +410,11 @@ export default function UserManagementPage() {
                         </td>
                         <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{u.admission_number || "—"}</td>
                         <td className="px-5 py-3.5">
-                          {isStudent ? (
-                            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${u.profile_completed ? "bg-primary/10 text-primary border-primary/20" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                              {u.profile_completed ? "Set up" : "Pending"}
-                            </span>
-                          ) : <span className="text-xs text-[var(--muted-foreground)]">—</span>}
+                          {isStudent
+                            ? (u.assigned_teacher_name
+                                ? <span className="text-[var(--foreground)]">{u.assigned_teacher_name}</span>
+                                : <span className="text-xs text-amber-600">Unassigned</span>)
+                            : <span className="text-xs text-[var(--muted-foreground)]">—</span>}
                         </td>
                         <td className="px-5 py-3.5">
                           <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}>
@@ -381,7 +486,7 @@ export default function UserManagementPage() {
             >
               <h3 className="text-base font-bold text-[var(--foreground)]">Suspend user?</h3>
               <p className="mt-1.5 text-sm text-[var(--muted-foreground)]">
-                <span className="font-semibold text-[var(--foreground)]">{`${confirmSuspend.first_name} ${confirmSuspend.last_name}`.trim() || confirmSuspend.email}</span> will lose access to the platform immediately. You can reinstate them later.
+                <span className="font-semibold text-[var(--foreground)]">{displayName(confirmSuspend)}</span> will lose access to the platform immediately. You can reinstate them later.
               </p>
               <div className="mt-5 flex items-center gap-3">
                 <button

@@ -62,6 +62,20 @@ class User(AbstractUser):
     # they are never sent to the first-login screen.
     profile_completed = models.BooleanField(default=False)
 
+    # The teacher who manages this student, set by MAIN_ADMIN. This is the
+    # source of truth for "this student's teacher" — direct and independent of
+    # the class the student self-selects at first login (a teacher is assigned
+    # before/regardless of class). Must be a TEACHER in the SAME school; that
+    # invariant is enforced in the serializer / assign endpoint, not the DB.
+    assigned_teacher = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_students",
+        limit_choices_to={"role": "TEACHER"},
+    )
+
     objects = UserManager()
 
     class Meta:

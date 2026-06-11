@@ -30,8 +30,8 @@ from django.db import transaction
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.generics import RetrieveAPIView
+from rest_framework.exceptions import PermissionDenied, ValidationError as DRFValidationError
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -269,6 +269,102 @@ class CompleteProfileView(APIView):
         return year
 
 
+class StudentRosterView(ListAPIView):
+    """GET /api/v1/users/roster/ — the student roster, role-scoped.
+
+    - TEACHER    → students assigned to them (assigned_teacher == self).
+    - PRINCIPAL  → every student in their own school.
+    - MAIN_ADMIN → all students, optional ?school= / ?teacher= / ?search=.
+    - anyone else → 403.
+
+    Each row carries the student's class (from their latest enrolment) + assigned
+    teacher + best-effort avg_score / quizzes (from analytics.StudentDailyStats).
+    Both the class and the stats are batched (a prefetch + one aggregate query)
+    so the list stays free of N+1s. Paginated via StandardPagination.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        from .serializers import StudentRosterSerializer
+        return StudentRosterSerializer
+
+    def get_queryset(self):
+        from django.db.models import Prefetch
+
+        from apps.academics.models import Enrollment
+
+        actor = self.request.user
+        qs = (
+            User.objects.filter(role=User.Role.STUDENT)
+            .select_related("assigned_teacher")
+            .prefetch_related(
+                Prefetch(
+                    "enrollments",
+                    queryset=Enrollment.objects.select_related("klass").order_by("-enrolled_on"),
+                    to_attr="recent_enrollments",
+                )
+            )
+            .order_by("first_name", "last_name", "email")
+        )
+
+        if actor.role == Role.TEACHER:
+            return qs.filter(assigned_teacher_id=actor.id)
+        if actor.role == Role.PRINCIPAL:
+            return qs.filter(school_id=actor.school_id)
+        if actor.role == Role.MAIN_ADMIN:
+            params = self.request.query_params
+            school = params.get("school")
+            if school:
+                try:
+                    uuid.UUID(str(school))
+                except (ValueError, TypeError):
+                    return qs.none()
+                qs = qs.filter(school_id=school)
+            teacher = params.get("teacher")
+            if teacher:
+                try:
+                    uuid.UUID(str(teacher))
+                except (ValueError, TypeError):
+                    return qs.none()
+                qs = qs.filter(assigned_teacher_id=teacher)
+            search = (params.get("search") or "").strip()
+            if search:
+                qs = qs.filter(
+                    Q(first_name__icontains=search)
+                    | Q(last_name__icontains=search)
+                    | Q(email__icontains=search)
+                    | Q(admission_number__icontains=search)
+                )
+            return qs
+
+        raise PermissionDenied("Only teachers, principals, and the super admin can view the roster.")
+
+    @staticmethod
+    def _stats_for(student_ids):
+        """One aggregate query → {student_id: {avg, quizzes}} for the page."""
+        from django.db.models import Avg, Sum
+
+        from apps.analytics.models import StudentDailyStats
+
+        rows = (
+            StudentDailyStats.objects.filter(student_id__in=student_ids)
+            .values("student_id")
+            .annotate(avg=Avg("avg_score"), quizzes=Sum("quizzes_taken"))
+        )
+        return {r["student_id"]: r for r in rows}
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        rows = page if page is not None else list(queryset)
+        context = {**self.get_serializer_context(), "stats": self._stats_for([s.id for s in rows])}
+        serializer = self.get_serializer(rows, many=True, context=context)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+
 # ── /api/v1/users/ — user management surface ────────────────────────────────
 
 
@@ -451,3 +547,29 @@ class UsersViewSet(ModelViewSet):
         )
         code = status.HTTP_200_OK if result["error_count"] == 0 else status.HTTP_207_MULTI_STATUS
         return Response(result, status=code)
+
+    # ── Bulk assign students to a teacher ────────────────────────────────────
+
+    @action(detail=False, methods=["post"], url_path="assign-teacher")
+    def assign_teacher(self, request):
+        """
+        POST /api/v1/users/assign-teacher/   (MAIN_ADMIN only)
+
+        Body (JSON): {"teacher": "<uuid>|null", "students": ["<uuid>", ...]}
+
+        Sets each student's assigned_teacher (null = unassign). The teacher and
+        every student must belong to the same school (validated). The teacher
+        then sees these students on their dashboard (GET /users/roster/).
+
+        Response: {updated_count}
+        """
+        from .serializers import AssignTeacherSerializer
+
+        serializer = AssignTeacherSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        teacher = serializer.validated_data["teacher"]
+        students = serializer.validated_data["students"]
+        updated = User.objects.filter(id__in=[s.id for s in students]).update(
+            assigned_teacher=teacher
+        )
+        return Response({"updated_count": updated}, status=status.HTTP_200_OK)

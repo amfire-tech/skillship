@@ -7,13 +7,18 @@ Owner:   Prashant
 
 from __future__ import annotations
 
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import UsersViewSet
+from .views import StudentRosterView, UsersViewSet
 
 app_name = "accounts-users"
 
 router = DefaultRouter()
 router.register(r"", UsersViewSet, basename="user")
 
-urlpatterns = router.urls
+# `roster/` is listed BEFORE the router so the router's `<id>/` detail route
+# (which would otherwise treat "roster" as a user id) never shadows it.
+urlpatterns = [
+    path("roster/", StudentRosterView.as_view(), name="student-roster"),
+] + router.urls

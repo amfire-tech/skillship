@@ -18,10 +18,14 @@ interface ApiUser {
   phone: string | null;
   admission_number: string | null;
   current_class: string | null;
+  assigned_teacher: string | null;
+  assigned_teacher_name: string | null;
   profile_completed?: boolean;
   is_active: boolean;
   date_joined: string;
 }
+
+interface TeacherOpt { id: string; name: string }
 
 const roleColors: Record<string, string> = {
   MAIN_ADMIN: "bg-violet-100 text-violet-700",
@@ -55,7 +59,8 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", admission_number: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", admission_number: "", assigned_teacher: "" });
+  const [teachers, setTeachers] = useState<TeacherOpt[]>([]);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -74,7 +79,17 @@ export default function UserDetailPage() {
       if (!res.ok) { setFetchError(res.status === 404 ? "User not found." : "Failed to load user."); setLoading(false); return; }
       const data: ApiUser = await res.json();
       setUser(data);
-      setForm({ first_name: data.first_name, last_name: data.last_name, email: data.email, phone: data.phone ?? "", admission_number: data.admission_number ?? "" });
+      setForm({ first_name: data.first_name, last_name: data.last_name, email: data.email, phone: data.phone ?? "", admission_number: data.admission_number ?? "", assigned_teacher: data.assigned_teacher ?? "" });
+      // For students, load their school's teachers for the assignment dropdown.
+      if (data.role === "STUDENT" && data.school) {
+        try {
+          const tRes = await fetch(`${API_BASE}/users/?role=TEACHER&school=${data.school}&page_size=100`, { headers: { Authorization: `Bearer ${token}` } });
+          if (tRes.ok) {
+            const td = await tRes.json();
+            setTeachers((td.results ?? []).map((t: any) => ({ id: t.id, name: `${t.first_name} ${t.last_name}`.trim() || t.username || t.email })));
+          }
+        } catch { /* leave empty */ }
+      }
     } catch {
       setFetchError("Network error. Is the server running?");
     } finally {
@@ -93,7 +108,8 @@ export default function UserDetailPage() {
       const res = await fetch(`${API_BASE}/users/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        // Empty assigned_teacher → null (unassign), not "".
+        body: JSON.stringify({ ...form, assigned_teacher: form.assigned_teacher || null }),
       });
       if (res.ok) {
         const updated: ApiUser = await res.json();
@@ -210,7 +226,7 @@ export default function UserDetailPage() {
           </button>
           {editing ? (
             <>
-              <button type="button" onClick={() => { setEditing(false); setForm({ first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone ?? "", admission_number: user.admission_number ?? "" }); }}
+              <button type="button" onClick={() => { setEditing(false); setForm({ first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone ?? "", admission_number: user.admission_number ?? "", assigned_teacher: user.assigned_teacher ?? "" }); }}
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)]">Cancel</button>
               <button type="button" onClick={save} disabled={saving}
                 className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">
@@ -261,6 +277,19 @@ export default function UserDetailPage() {
                 />
               </div>
             ))}
+            {user.role === "STUDENT" && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Assigned Teacher</label>
+                <select
+                  value={form.assigned_teacher}
+                  onChange={(e) => setForm((f) => ({ ...f, assigned_teacher: e.target.value }))}
+                  className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                >
+                  <option value="">— Unassigned —</option>
+                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -269,6 +298,7 @@ export default function UserDetailPage() {
             <Field label="School" value={user.school_name ?? (user.role === "MAIN_ADMIN" ? "Platform" : "—")} />
             {user.role === "STUDENT" && <Field label="Roll No." value={user.admission_number ?? ""} />}
             {user.role === "STUDENT" && <Field label="Class" value={user.current_class ?? "Not set up yet"} />}
+            {user.role === "STUDENT" && <Field label="Assigned Teacher" value={user.assigned_teacher_name ?? "Unassigned"} />}
             {user.role === "STUDENT" && <Field label="Profile" value={user.profile_completed ? "Set up by student" : "Pending first login"} />}
             <Field label="Joined" value={new Date(user.date_joined).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} />
             <Field label="Username" value={user.username} />

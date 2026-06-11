@@ -74,12 +74,24 @@ export default function StudentPerformancePage() {
     if (!token) { setError("Session expired."); return; }
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [stRes, clRes] = await Promise.all([
-        fetch(`${API_BASE}/users/?role=STUDENT`, { headers }),
-        fetch(`${API_BASE}/academics/classes/`, { headers }),
-      ]);
-      setStudents(stRes.ok ? asArray<Student>(await stRes.json()) : []);
-      setClasses(clRes.ok ? asArray<AcademicClass>(await clRes.json()) : []);
+      // Auto-scoped to this teacher's assigned students (backend role-scopes /roster/).
+      const res = await fetch(`${API_BASE}/users/roster/?page_size=200`, { headers });
+      if (!res.ok) { setError(res.status === 403 ? "You don't have access to the roster." : "Failed to load students."); setStudents([]); setClasses([]); return; }
+      const rows = asArray<any>(await res.json());
+      setStudents(rows.map((r) => ({
+        id: r.id,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        email: r.email,
+        is_active: r.is_active,
+        class_name: r.class_label ?? undefined,
+        grade: r.grade != null ? String(r.grade) : undefined,
+        section: r.section ?? undefined,
+        roll_number: r.roll_number ?? undefined,
+        quizzes_attempted: r.quizzes_attempted ?? undefined,
+        avg_score: r.avg_score ?? undefined,
+      })));
+      setClasses([]);
     } catch {
       setError("Network error.");
     }
@@ -188,7 +200,7 @@ export default function StudentPerformancePage() {
                 <tr><td colSpan={6} className="px-6 py-8">
                   <EmptyState
                     title={students?.length === 0 ? "No students yet" : "No students match"}
-                    description={students?.length === 0 ? "Once your principal assigns students to your classes, they'll appear here with quiz stats and performance trends." : "Try clearing the filters or search."}
+                    description={students?.length === 0 ? "Once the Super Admin assigns students to you, they'll appear here with their class and performance." : "Try clearing the filters or search."}
                     icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
                   />
                 </td></tr>

@@ -30,6 +30,7 @@ interface Student {
   quizzes_attempted?: number;
   avg_score?: number;
   career_path?: string;
+  assigned_teacher_name?: string | null;
 }
 
 interface AcademicClass {
@@ -79,13 +80,26 @@ export default function StudentManagementPage() {
     if (!token) { setError("Session expired."); setStudents([]); return; }
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [stRes, clRes] = await Promise.all([
-        fetch(`${API_BASE}/users/?role=STUDENT`, { headers }),
-        fetch(`${API_BASE}/academics/classes/`, { headers }),
-      ]);
-      if (!stRes.ok) { setError(`Failed to load students (${stRes.status}).`); setStudents([]); return; }
-      setStudents(asArray<Student>(await stRes.json()));
-      setClasses(clRes.ok ? asArray<AcademicClass>(await clRes.json()) : []);
+      // /roster/ is auto-scoped to the principal's own school.
+      const res = await fetch(`${API_BASE}/users/roster/?page_size=500`, { headers });
+      if (!res.ok) { setError(`Failed to load students (${res.status}).`); setStudents([]); return; }
+      const rows = asArray<any>(await res.json());
+      setStudents(rows.map((r) => ({
+        id: r.id,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        email: r.email,
+        is_active: r.is_active,
+        admission_number: r.roll_number ?? undefined,
+        roll_number: r.roll_number ?? undefined,
+        grade: r.grade != null ? String(r.grade) : undefined,
+        class_name: r.class_label ?? undefined,
+        section: r.section ?? undefined,
+        quizzes_attempted: r.quizzes_attempted ?? undefined,
+        avg_score: r.avg_score ?? undefined,
+        assigned_teacher_name: r.assigned_teacher_name ?? undefined,
+      })));
+      setClasses([]);
     } catch {
       setError("Network error.");
       setStudents([]);
@@ -169,6 +183,7 @@ export default function StudentManagementPage() {
                 <th className="px-6 py-3">Class</th>
                 <th className="px-6 py-3">Section</th>
                 <th className="px-6 py-3">Roll No.</th>
+                <th className="px-6 py-3">Assigned Teacher</th>
                 <th className="px-6 py-3">Quizzes Attempted</th>
                 <th className="px-6 py-3">Avg Score</th>
                 <th className="px-6 py-3">Career Path</th>
@@ -178,13 +193,13 @@ export default function StudentManagementPage() {
               {filtered === null ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-[var(--border)]/60 last:border-0">
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <td key={j} className="px-6 py-3.5"><div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-8">
+                <tr><td colSpan={8} className="px-6 py-8">
                   <EmptyState
                     title={students?.length === 0 ? "No students yet" : "No students match"}
                     description={students?.length === 0 ? "Students appear here once the Super Admin generates their logins and they complete first-login setup." : "Try clearing filters or search."}
@@ -205,6 +220,11 @@ export default function StudentManagementPage() {
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.class_name ?? s.grade ?? "—"}</td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.section ? `Section ${s.section}` : "—"}</td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.roll_number ?? s.admission_number ?? "—"}</td>
+                      <td className="px-6 py-3.5">
+                        {s.assigned_teacher_name
+                          ? <span className="text-[var(--foreground)]">{s.assigned_teacher_name}</span>
+                          : <span className="text-xs text-amber-600">Unassigned</span>}
+                      </td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.quizzes_attempted ?? "—"}</td>
                       <td className="px-6 py-3.5"><ScoreBar value={s.avg_score} /></td>
                       <td className="px-6 py-3.5">
