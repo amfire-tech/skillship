@@ -10,6 +10,8 @@ from django.urls import path
 from .views import (
     AdaptiveNextView,
     CareerAskView,
+    CareerRecommendationsView,
+    CareerRoadmapView,
     CollegeFinderView,
     ContentSearchView,
     GenerateQuestionsFromPdfView,
@@ -24,6 +26,8 @@ _nr = transaction.non_atomic_requests
 urlpatterns = [
     path("career/ask/",              _nr(CareerAskView.as_view()),                name="ai-career-ask"),
     path("career/college-finder/",   _nr(CollegeFinderView.as_view()),            name="ai-career-college-finder"),
+    path("career/roadmap/",          _nr(CareerRoadmapView.as_view()),            name="ai-career-roadmap"),
+    path("career/recommendations/",  _nr(CareerRecommendationsView.as_view()),    name="ai-career-recommendations"),
     path("quiz/generate/",           _nr(GenerateQuestionsView.as_view()),        name="ai-quiz-generate"),
     path("quiz/generate-from-pdf/",  _nr(GenerateQuestionsFromPdfView.as_view()), name="ai-quiz-generate-pdf"),
     path("quiz/adaptive-next/",      _nr(AdaptiveNextView.as_view()),             name="ai-adaptive-next"),

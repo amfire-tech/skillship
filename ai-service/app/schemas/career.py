@@ -59,3 +59,48 @@ class CollegeFinderResponse(BaseModel):
         default="",
         description="Caveats — e.g. data freshness, sub-discipline overlaps.",
     )
+
+
+# ── Career Roadmap ─────────────────────────────────────────────────────────────
+
+
+class CareerPlanRequest(BaseModel):
+    """Shared body for the roadmap + recommendations agents — the student's
+    real profile (grade, subject performance, strengths) stamped server-side."""
+
+    student_context: dict
+
+
+class RoadmapStage(BaseModel):
+    id: str
+    stage: str
+    badge: str | None = None
+    description: str
+    tone: str = Field(description="primary | violet | emerald | amber | rose")
+
+
+class CareerRoadmapResponse(BaseModel):
+    headline: str = ""
+    stages: list[RoadmapStage]
+
+
+# ── Recommended Careers ─────────────────────────────────────────────────────────
+
+
+class RecommendedWorkshop(BaseModel):
+    id: str
+    title: str
+    difficulty: str | None = None
+    duration: str | None = None
+
+
+class CareerRecommendation(BaseModel):
+    id: str
+    title: str
+    match_pct: int | None = None
+    reason: str | None = None
+    workshops: list[RecommendedWorkshop] = Field(default_factory=list)
+
+
+class CareerRecommendationsResponse(BaseModel):
+    recommendations: list[CareerRecommendation]

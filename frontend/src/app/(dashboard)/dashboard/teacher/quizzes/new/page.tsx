@@ -24,8 +24,10 @@ interface DraftQuestion {
   text: string;
   subject?: string;
   difficulty?: Difficulty;
-  options: string[];
-  correct_answer_index: number;
+  type?: "MCQ" | "SHORT";          // defaults to MCQ when options are present
+  options: string[];               // [] for short-answer
+  correct_answer_index: number;    // ignored for short-answer
+  accepted_answers?: string[];     // short-answer only — teacher's model answer(s)
   points?: number;
 }
 
@@ -142,6 +144,7 @@ export default function QuizCreationWizard() {
             text: q.text,
             options: q.options,
             correct_answer_index: q.correct_answer_index,
+            accepted_answers: q.accepted_answers ?? [],
             difficulty: q.difficulty ?? basic.difficulty,
             points: q.points && q.points > 0 ? q.points : 1,
           })),
@@ -372,26 +375,50 @@ function Step2Questions({
   onAdd: (q: DraftQuestion) => void;
   onRemove: (i: number) => void;
 }) {
+  const [qType, setQType] = useState<"MCQ" | "SHORT">("MCQ");
   const [text, setText] = useState("");
   const [opts, setOpts] = useState(["", "", "", ""]);
   const [correct, setCorrect] = useState(0);
+  const [accepted, setAccepted] = useState("");
   const [marks, setMarks] = useState(1);
+
+  function resetForm() {
+    setText(""); setOpts(["", "", "", ""]); setCorrect(0); setAccepted(""); setMarks(1);
+  }
 
   function addManual() {
     if (!text.trim()) return;
+    if (qType === "SHORT") {
+      onAdd({
+        text: text.trim(),
+        subject: defaultSubject,
+        difficulty: defaultDifficulty,
+        type: "SHORT",
+        options: [],
+        correct_answer_index: 0,
+        // Optional model answer(s) — used for a provisional auto-score; the
+        // teacher always reviews short answers in the Feedback queue.
+        accepted_answers: accepted.split(",").map((a) => a.trim()).filter(Boolean),
+        points: Math.max(1, marks),
+      });
+      resetForm();
+      return;
+    }
     const filledOpts = opts.map((o) => o.trim()).filter(Boolean);
     if (filledOpts.length < 2) return;
     onAdd({
       text: text.trim(),
       subject: defaultSubject,
       difficulty: defaultDifficulty,
+      type: "MCQ",
       options: filledOpts,
       correct_answer_index: Math.min(correct, filledOpts.length - 1),
       points: Math.max(1, marks),
     });
-    setText(""); setOpts(["", "", "", ""]); setCorrect(0); setMarks(1);
+    resetForm();
   }
 
+  const canAdd = text.trim().length > 0 && (qType === "SHORT" || opts.filter((o) => o.trim()).length >= 2);
   const totalMarks = questions.reduce((sum, q) => sum + (q.points && q.points > 0 ? q.points : 1), 0);
 
   return (
@@ -405,16 +432,41 @@ function Step2Questions({
 
       {/* Manual add */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/30 p-4 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Add manually</p>
-        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Enter question text…" className={inputCls} />
-        <div className="space-y-2">
-          {opts.map((o, i) => (
-            <label key={i} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-sm ${correct === i ? "border-primary bg-primary/5" : "border-[var(--border)] bg-white dark:bg-[var(--background)]"}`}>
-              <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} className="h-4 w-4 accent-[color:var(--primary)]" />
-              <input value={o} onChange={(e) => setOpts((cur) => cur.map((c, ix) => ix === i ? e.target.value : c))} placeholder={`Option ${i + 1}`} className="flex-1 bg-transparent outline-none placeholder:text-[var(--muted-foreground)]" />
-            </label>
-          ))}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Add manually</p>
+          {/* Question type toggle */}
+          <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-white p-0.5 dark:bg-[var(--background)]">
+            {([["MCQ", "Multiple choice"], ["SHORT", "Short answer"]] as const).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setQType(val)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${qType === val ? "bg-gradient-to-r from-primary to-accent text-white" : "text-[var(--muted-foreground)] hover:text-primary"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
+        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Enter question text…" className={inputCls} />
+
+        {qType === "MCQ" ? (
+          <div className="space-y-2">
+            {opts.map((o, i) => (
+              <label key={i} className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-sm ${correct === i ? "border-primary bg-primary/5" : "border-[var(--border)] bg-white dark:bg-[var(--background)]"}`}>
+                <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} className="h-4 w-4 accent-[color:var(--primary)]" />
+                <input value={o} onChange={(e) => setOpts((cur) => cur.map((c, ix) => ix === i ? e.target.value : c))} placeholder={`Option ${i + 1}`} className="flex-1 bg-transparent outline-none placeholder:text-[var(--muted-foreground)]" />
+              </label>
+            ))}
+            <p className="text-[11px] text-[var(--muted-foreground)]">Select the radio next to the correct option. At least 2 options required.</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <input value={accepted} onChange={(e) => setAccepted(e.target.value)} placeholder="Model answer / accepted keywords (optional, comma-separated)" className={inputCls} />
+            <p className="text-[11px] text-[var(--muted-foreground)]">Students type a written answer. You&apos;ll grade it in the Feedback queue; accepted answers (if any) just give a provisional auto-score.</p>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-xs font-semibold text-[var(--muted-foreground)]">
             Marks
@@ -430,7 +482,7 @@ function Step2Questions({
           <button
             type="button"
             onClick={addManual}
-            disabled={!text.trim() || opts.filter((o) => o.trim()).length < 2}
+            disabled={!canAdd}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             + Add Question
@@ -455,14 +507,25 @@ function Step2Questions({
                     <span className="ml-2 rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">
                       {q.points && q.points > 0 ? q.points : 1} mark{(q.points ?? 1) === 1 ? "" : "s"}
                     </span>
+                    {(q.type === "SHORT" || q.options.length === 0) && (
+                      <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">Short answer</span>
+                    )}
                   </p>
-                  <ul className="mt-2 space-y-1 text-xs text-[var(--muted-foreground)]">
-                    {q.options.map((o, ix) => (
-                      <li key={ix} className={ix === q.correct_answer_index ? "font-semibold text-primary" : ""}>
-                        {String.fromCharCode(65 + ix)}. {o} {ix === q.correct_answer_index && "✓"}
-                      </li>
-                    ))}
-                  </ul>
+                  {q.type === "SHORT" || q.options.length === 0 ? (
+                    <p className="mt-2 text-xs italic text-[var(--muted-foreground)]">
+                      {q.accepted_answers && q.accepted_answers.length > 0
+                        ? `Written answer · accepted: ${q.accepted_answers.join(", ")}`
+                        : "Written answer · graded by teacher in Feedback"}
+                    </p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-xs text-[var(--muted-foreground)]">
+                      {q.options.map((o, ix) => (
+                        <li key={ix} className={ix === q.correct_answer_index ? "font-semibold text-primary" : ""}>
+                          {String.fromCharCode(65 + ix)}. {o} {ix === q.correct_answer_index && "✓"}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <button type="button" onClick={() => onRemove(i)} aria-label="Remove" className="shrink-0 rounded-full p-1 text-[var(--muted-foreground)] hover:bg-red-50 hover:text-red-600">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="M6 6l12 12" /></svg>

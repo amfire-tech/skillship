@@ -12,7 +12,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { API_BASE, getToken } from "@/lib/auth";
-import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 interface Student {
@@ -31,6 +30,15 @@ interface Student {
   avg_score?: number;
   career_path?: string;
   assigned_teacher_name?: string | null;
+  last_attempt_at?: string | null;
+}
+
+// One roster row as the API returns it (snake_case, partial).
+interface RosterRow {
+  id: string; first_name: string; last_name: string; email: string; is_active: boolean;
+  roll_number?: string | null; grade?: number | string | null; class_label?: string | null;
+  section?: string | null; quizzes_attempted?: number | null; avg_score?: number | null;
+  assigned_teacher_name?: string | null; last_attempt_at?: string | null;
 }
 
 interface AcademicClass {
@@ -68,6 +76,7 @@ function ScoreBar({ value }: { value?: number }) {
 
 export default function StudentManagementPage() {
   const [students, setStudents] = useState<Student[] | null>(null);
+  const [studentTotal, setStudentTotal] = useState<number | null>(null);
   const [classes, setClasses] = useState<AcademicClass[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -80,11 +89,24 @@ export default function StudentManagementPage() {
     if (!token) { setError("Session expired."); setStudents([]); return; }
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      // /roster/ is auto-scoped to the principal's own school.
-      const res = await fetch(`${API_BASE}/users/roster/?page_size=500`, { headers });
-      if (!res.ok) { setError(`Failed to load students (${res.status}).`); setStudents([]); return; }
-      const rows = asArray<any>(await res.json());
-      setStudents(rows.map((r) => ({
+      // /roster/ is auto-scoped to the principal's own school but page-capped at
+      // 100, so walk every page to get the whole school (filters + count need it).
+      const all: RosterRow[] = [];
+      let total = 0;
+      for (let page = 1; page <= 50; page++) {
+        const res = await fetch(`${API_BASE}/users/roster/?page=${page}&page_size=100`, { headers });
+        if (!res.ok) {
+          if (all.length === 0) { setError(`Failed to load students (${res.status}).`); setStudents([]); return; }
+          break;
+        }
+        const data = await res.json();
+        total = typeof data?.count === "number" ? data.count : total;
+        const rows: RosterRow[] = Array.isArray(data) ? data : (data?.results ?? []);
+        all.push(...rows);
+        if (!data?.next || rows.length === 0) break;
+      }
+
+      const mapped: Student[] = all.map((r) => ({
         id: r.id,
         first_name: r.first_name,
         last_name: r.last_name,
@@ -98,7 +120,22 @@ export default function StudentManagementPage() {
         quizzes_attempted: r.quizzes_attempted ?? undefined,
         avg_score: r.avg_score ?? undefined,
         assigned_teacher_name: r.assigned_teacher_name ?? undefined,
-      })));
+        last_attempt_at: r.last_attempt_at ?? null,
+      }));
+
+      // Most recent quiz activity first; then most quizzes; then name. Students
+      // who have actually attempted quizzes surface at the top.
+      mapped.sort((a, b) => {
+        const ta = a.last_attempt_at ? Date.parse(a.last_attempt_at) : -1;
+        const tb = b.last_attempt_at ? Date.parse(b.last_attempt_at) : -1;
+        if (tb !== ta) return tb - ta;
+        const qa = a.quizzes_attempted ?? 0, qb = b.quizzes_attempted ?? 0;
+        if (qb !== qa) return qb - qa;
+        return `${a.first_name} ${a.last_name}`.trim().localeCompare(`${b.first_name} ${b.last_name}`.trim());
+      });
+
+      setStudents(mapped);
+      setStudentTotal(total || mapped.length);
       setClasses([]);
     } catch {
       setError("Network error.");
@@ -138,7 +175,7 @@ export default function StudentManagementPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Students</h1>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            {students === null ? "Loading…" : `${students.length} student${students.length === 1 ? "" : "s"} registered`}
+            {students === null ? "Loading…" : `${studentTotal ?? students.length} student${(studentTotal ?? students.length) === 1 ? "" : "s"} registered`}
           </p>
         </div>
         <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--muted)]/40 px-4 py-2 text-xs font-medium text-[var(--muted-foreground)]">

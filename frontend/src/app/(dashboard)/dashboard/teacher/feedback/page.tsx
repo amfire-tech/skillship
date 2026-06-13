@@ -9,7 +9,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_BASE, apiFetch, getToken } from "@/lib/auth";
+import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 
@@ -19,12 +19,13 @@ interface Attempt {
   quiz_title?: string;
   student_id?: string;
   student_name?: string;
+  student_class?: string | null;
+  student_roll?: string | null;
   question_text?: string;
   answer_text?: string;
   expected_answer?: string;
-  score?: number;
-  ai_score?: number;
-  ai_feedback?: string;
+  max_marks?: number;        // marks this question is worth
+  score?: number;            // marks the teacher awarded (null until graded)
   feedback?: string;
   status?: "PENDING" | "REVIEWED" | "FINALISED";
   submitted_at?: string;
@@ -38,9 +39,8 @@ export default function FeedbackSystemPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("PENDING");
   const [active, setActive] = useState<Attempt | null>(null);
-  const [draftScore, setDraftScore] = useState(0);
+  const [draftMarks, setDraftMarks] = useState(0);
   const [draftFeedback, setDraftFeedback] = useState("");
-  const [grading, setGrading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -68,62 +68,33 @@ export default function FeedbackSystemPage() {
 
   function openAttempt(a: Attempt) {
     setActive(a);
-    setDraftScore(a.score ?? a.ai_score ?? 0);
-    setDraftFeedback(a.feedback ?? a.ai_feedback ?? "");
-  }
-
-  async function aiGrade() {
-    if (!active) return;
-    setGrading(true);
-    const token = await getToken();
-    if (!token) { toast("Session expired", "error"); setGrading(false); return; }
-    try {
-      const res = await apiFetch(`/ai/quiz/grade-short/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question_text:  active.question_text,
-          rubric:         active.expected_answer,
-          student_answer: active.answer_text,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast(body?.detail ?? `AI grading failed (${res.status})`, "error");
-        return;
-      }
-      const data = await res.json();
-      const score = typeof data?.score === "number" ? data.score : draftScore;
-      const fb = data?.feedback ?? data?.explanation ?? draftFeedback;
-      setDraftScore(score);
-      setDraftFeedback(fb);
-      toast("AI suggestion loaded — review and finalise", "success");
-    } catch {
-      toast("Network error", "error");
-    } finally {
-      setGrading(false);
-    }
+    setDraftMarks(a.score ?? 0);
+    setDraftFeedback(a.feedback ?? "");
   }
 
   async function finalize() {
     if (!active) return;
+    const max = active.max_marks ?? 1;
     setSaving(true);
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); setSaving(false); return; }
     try {
-      const res = await fetch(`${API_BASE}/quizzes/attempts/${active.id}/feedback/`, {
+      // Each queue item is one short-answer Answer (id = answer id); grading it
+      // recomputes the parent attempt's score server-side.
+      const marks = Math.max(0, Math.min(max, draftMarks));
+      const res = await fetch(`${API_BASE}/quizzes/answers/${active.id}/feedback/`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ score: draftScore, feedback: draftFeedback, status: "FINALISED" }),
+        body: JSON.stringify({ marks, feedback: draftFeedback, status: "FINALISED" }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         toast(body?.detail ?? `Save failed (${res.status})`, "error");
         return;
       }
-      setAttempts((prev) => (prev ?? []).map((x) => x.id === active.id ? { ...x, score: draftScore, feedback: draftFeedback, status: "FINALISED" } : x));
+      setAttempts((prev) => (prev ?? []).map((x) => x.id === active.id ? { ...x, score: marks, feedback: draftFeedback, status: "FINALISED" } : x));
       setActive(null);
-      toast("Feedback sent to student", "success");
+      toast("Marks saved — student can now see their result", "success");
     } catch {
       toast("Network error", "error");
     } finally {
@@ -135,7 +106,7 @@ export default function FeedbackSystemPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Feedback System</h1>
-        <p className="mt-1 text-sm text-[var(--muted-foreground)]">Review short-answer submissions, get AI suggestions, send personalised feedback</p>
+        <p className="mt-1 text-sm text-[var(--muted-foreground)]">Review students&apos; written answers and award marks out of each question&apos;s total. Students see their result once every written answer is graded.</p>
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -189,13 +160,20 @@ export default function FeedbackSystemPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[var(--foreground)]">{a.student_name ?? "Unknown student"}</p>
-                  <p className="text-xs text-[var(--muted-foreground)]">{a.quiz_title ?? "—"}</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {[a.student_class, a.student_roll ? `Roll ${a.student_roll}` : null].filter(Boolean).join(" · ") || "Class not set"}
+                    {" · "}{a.quiz_title ?? "—"}
+                  </p>
                   <p className="mt-2 line-clamp-2 text-sm text-[var(--foreground)]">{a.question_text ?? "—"}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  {typeof a.score === "number" && (
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${a.score >= 80 ? "bg-emerald-50 text-emerald-700" : a.score >= 65 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600"}`}>
-                      {Math.round(a.score)}%
+                  {typeof a.score === "number" ? (
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                      {a.score} / {a.max_marks ?? "—"} marks
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                      / {a.max_marks ?? "—"} marks
                     </span>
                   )}
                   <button type="button" onClick={() => openAttempt(a)} className="inline-flex h-8 items-center gap-1 rounded-full bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20">
@@ -217,7 +195,10 @@ export default function FeedbackSystemPage() {
               <div className="space-y-5 p-6">
                 <div>
                   <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">{active.student_name}</h3>
-                  <p className="text-xs text-[var(--muted-foreground)]">{active.quiz_title}</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {[active.student_class, active.student_roll ? `Roll ${active.student_roll}` : null].filter(Boolean).join(" · ") || "Class not set"}
+                    {" · "}{active.quiz_title}
+                  </p>
                 </div>
 
                 <div>
@@ -237,21 +218,24 @@ export default function FeedbackSystemPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 rounded-xl border-2 border-primary/30 bg-primary/5 px-4 py-3">
-                  <span aria-hidden="true">✨</span>
-                  <button type="button" onClick={aiGrade} disabled={grading || active.status === "FINALISED"} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-accent px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60">
-                    {grading ? "Asking AI…" : "Get AI suggestion"}
-                  </button>
-                  <p className="text-xs text-[var(--muted-foreground)]">Calls /quizzes/grade-short/ via Gemini bridge</p>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
+                <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Score</p>
-                    <input type="number" min={0} max={100} value={draftScore} onChange={(e) => setDraftScore(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} disabled={active.status === "FINALISED"} className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-60 dark:bg-[var(--background)]" />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                      Marks (out of {active.max_marks ?? 1})
+                    </p>
+                    <input
+                      type="number"
+                      min={0}
+                      max={active.max_marks ?? 1}
+                      value={draftMarks}
+                      onChange={(e) => setDraftMarks(Math.max(0, Math.min(active.max_marks ?? 1, Number(e.target.value) || 0)))}
+                      disabled={active.status === "FINALISED"}
+                      className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-60 dark:bg-[var(--background)]"
+                    />
+                    <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">You decide the marks by reviewing the answer.</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Feedback</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Feedback (optional)</p>
                     <textarea rows={4} value={draftFeedback} onChange={(e) => setDraftFeedback(e.target.value)} disabled={active.status === "FINALISED"} placeholder="Personalised feedback for the student…" className="mt-1 w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-60 dark:bg-[var(--background)]" />
                   </div>
                 </div>
@@ -259,8 +243,8 @@ export default function FeedbackSystemPage() {
                 <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] pt-4">
                   <button type="button" onClick={() => setActive(null)} className="h-10 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)]">Close</button>
                   {active.status !== "FINALISED" && (
-                    <button type="button" onClick={finalize} disabled={saving || draftFeedback.trim().length < 5} className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-6 text-sm font-semibold text-white shadow-sm hover:-translate-y-0.5 disabled:opacity-60">
-                      {saving ? "Sending…" : "Send Feedback"}
+                    <button type="button" onClick={finalize} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-6 text-sm font-semibold text-white shadow-sm hover:-translate-y-0.5 disabled:opacity-60">
+                      {saving ? "Saving…" : "Save Marks"}
                     </button>
                   )}
                 </div>

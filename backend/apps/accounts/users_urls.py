@@ -10,15 +10,16 @@ from __future__ import annotations
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import StudentRosterView, UsersViewSet
+from .views import StudentRosterView, TeacherDirectoryView, UsersViewSet
 
 app_name = "accounts-users"
 
 router = DefaultRouter()
 router.register(r"", UsersViewSet, basename="user")
 
-# `roster/` is listed BEFORE the router so the router's `<id>/` detail route
-# (which would otherwise treat "roster" as a user id) never shadows it.
+# `roster/` and `teachers/` are listed BEFORE the router so the router's `<id>/`
+# detail route (which would otherwise treat them as a user id) never shadows them.
 urlpatterns = [
     path("roster/", StudentRosterView.as_view(), name="student-roster"),
+    path("teachers/", TeacherDirectoryView.as_view(), name="teacher-directory"),
 ] + router.urls

@@ -198,6 +198,44 @@ class ClassSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class ClassReadSerializer(serializers.ModelSerializer):
+    """Read-only, display-enriched class row for list/detail.
+
+    Adds the human label, academic-year name, class-teacher name, and a live
+    `student_count` (active enrolments, annotated by the viewset) so the teacher
+    quiz-assign picker, class analytics, and reports can render without N+1s.
+    Writes go through ClassSerializer (which validates cross-school FKs).
+    """
+
+    school = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    academic_year = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    academic_year_name = serializers.CharField(source="academic_year.name", read_only=True, default=None)
+    class_teacher = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    class_teacher_name = serializers.SerializerMethodField()
+    class_name = serializers.SerializerMethodField()
+    student_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Class
+        fields = [
+            "id", "school", "academic_year", "academic_year_name",
+            "grade", "section", "class_name",
+            "class_teacher", "class_teacher_name", "student_count",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_class_name(self, obj) -> str:
+        return f"Grade {obj.grade}-{obj.section}"
+
+    def get_class_teacher_name(self, obj):
+        t = obj.class_teacher
+        return (t.get_full_name() or t.username) if t else None
+
+    def get_student_count(self, obj):
+        return getattr(obj, "student_count_ann", None)
+
+
 # ── Enrollment ──────────────────────────────────────────────────────────────
 
 

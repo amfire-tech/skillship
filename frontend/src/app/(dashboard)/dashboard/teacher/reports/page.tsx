@@ -23,7 +23,6 @@ type Fmt = "pdf" | "xlsx";
 interface AcademicClass {
   id: string;
   class_name: string;
-  subject: string;
 }
 
 interface Quiz {
@@ -181,7 +180,7 @@ export default function TeacherReportsPage() {
               >
                 {classes.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.class_name} — {c.subject}
+                    {c.class_name}
                   </option>
                 ))}
               </select>

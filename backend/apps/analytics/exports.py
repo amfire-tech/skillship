@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Avg, Sum
+from django.db.models import Avg, Count, Max, Q, Sum
 
 from apps.academics.models import Class
 from apps.accounts.models import User
@@ -61,6 +61,12 @@ def assemble_student_report(
         .order_by("date")
         .values("date", "quizzes_taken", "avg_score", "time_spent_seconds")
     )
+    # Daily rollup is a nightly Celery concern — fall back to live attempts so the
+    # student report isn't an empty page before/without the rollup job.
+    if not rows:
+        live = _student_report_from_attempts(school_id=school_id, student=student, date_range=date_range)
+        if live is not None:
+            return live
     agg = StudentDailyStats.objects.filter(
         school_id=school_id, student=student,
         date__gte=date_range.start, date__lte=date_range.end,
@@ -110,6 +116,13 @@ def assemble_class_report(
         .order_by("week_start_date")
         .values("week_start_date", "avg_score", "at_risk_count")
     )
+    # The weekly rollup is a nightly Celery concern and is usually empty in dev /
+    # before the job runs. Fall back to live submitted attempts so the report
+    # carries real per-student data instead of an all-zero "No data" page.
+    if not rows:
+        live = _class_report_from_attempts(school_id=school_id, klass=klass, date_range=date_range)
+        if live is not None:
+            return live
     agg = ClassWeeklyStats.objects.filter(
         school_id=school_id, klass=klass,
         week_start_date__gte=date_range.start, week_start_date__lte=date_range.end,
@@ -138,6 +151,180 @@ def assemble_class_report(
     }
 
 
+def _student_report_from_attempts(
+    *, school_id, student: User, date_range: DateRange
+) -> dict[str, Any] | None:
+    """Live student report from their submitted attempts in the window."""
+    from apps.quizzes.models import QuizAttempt
+
+    qs = (
+        QuizAttempt.objects.filter(
+            school_id=school_id, student=student,
+            status=QuizAttempt.Status.SUBMITTED,
+            submitted_at__date__gte=date_range.start,
+            submitted_at__date__lte=date_range.end,
+        )
+        .select_related("quiz")
+        .order_by("submitted_at")
+    )
+    if not qs.exists():
+        return None
+
+    overall_avg = qs.aggregate(avg=Avg("score_percent"))["avg"]
+    best = qs.aggregate(m=Max("score_percent"))["m"]
+    return {
+        "kind": "student",
+        "title": f"Student Progress — {student.get_full_name() or student.username}",
+        "subtitle": f"{student.email} · {date_range.start} → {date_range.end}",
+        "summary": [
+            ("Total quizzes taken", f"{qs.count()}"),
+            ("Average score",       f"{(_to_float(overall_avg) or 0):.2f}%"),
+            ("Best score",          f"{(_to_float(best) or 0):.2f}%"),
+        ],
+        "table": {
+            "headers": ["Date", "Quiz", "Score (%)", "Result"],
+            "rows": [
+                [
+                    a.submitted_at.date().isoformat() if a.submitted_at else "—",
+                    a.quiz.title,
+                    f"{_to_float(a.score_percent) or 0:.2f}",
+                    "Pass" if (_to_float(a.score_percent) or 0) >= a.quiz.pass_percentage else "Fail",
+                ]
+                for a in qs
+            ],
+        },
+    }
+
+
+def _class_report_from_attempts(
+    *, school_id, klass: Class, date_range: DateRange
+) -> dict[str, Any] | None:
+    """Live class report from submitted attempts by the class's enrolled students.
+
+    Returns None when the class has no students or no attempts in the window, so
+    the caller can keep the empty rollup shape.
+    """
+    from apps.academics.models import Enrollment
+    from apps.quizzes.models import QuizAttempt
+
+    student_ids = list(
+        Enrollment.objects.filter(
+            school_id=school_id, klass=klass, withdrawn_on__isnull=True,
+        ).values_list("student_id", flat=True)
+    )
+    if not student_ids:
+        return None
+
+    qs = QuizAttempt.objects.filter(
+        school_id=school_id,
+        student_id__in=student_ids,
+        status=QuizAttempt.Status.SUBMITTED,
+        submitted_at__date__gte=date_range.start,
+        submitted_at__date__lte=date_range.end,
+    )
+    if not qs.exists():
+        return None
+
+    overall_avg = qs.aggregate(avg=Avg("score_percent"))["avg"]
+    per_student = list(
+        qs.values(
+            "student_id", "student__first_name", "student__last_name", "student__admission_number",
+        )
+        .annotate(quizzes=Count("id"), avg=Avg("score_percent"))
+        .order_by("student__first_name", "student__last_name")
+    )
+    at_risk = sum(1 for r in per_student if (_to_float(r["avg"]) or 0) < 40)
+
+    def _name(r) -> str:
+        n = f"{r['student__first_name'] or ''} {r['student__last_name'] or ''}".strip()
+        return n or "—"
+
+    return {
+        "kind": "class",
+        "title": f"Class Report — Grade {klass.grade}-{klass.section}",
+        "subtitle": f"Academic year {klass.academic_year.name} · {date_range.start} → {date_range.end}",
+        "summary": [
+            ("Average score (window)",   f"{(_to_float(overall_avg) or 0):.2f}%"),
+            ("Quizzes attempted",        f"{qs.count()}"),
+            ("Students active",          f"{len(per_student)}"),
+            ("At-risk students (<40%)",  f"{at_risk}"),
+        ],
+        "table": {
+            "headers": ["Student", "Roll", "Quizzes", "Avg Score (%)"],
+            "rows": [
+                [
+                    _name(r),
+                    r["student__admission_number"] or "—",
+                    int(r["quizzes"]),
+                    f"{_to_float(r['avg']) or 0:.2f}",
+                ]
+                for r in per_student
+            ],
+        },
+    }
+
+
+def _school_report_from_attempts(
+    school: School, date_range: DateRange
+) -> dict[str, Any] | None:
+    """Live school report straight from submitted quiz attempts in the window.
+
+    Returns None when there are no attempts (so the caller can keep the empty
+    rollup shape). Groups by the quiz's class (grade + section); 'at-risk' is a
+    submitted attempt scoring below 40%.
+    """
+    from apps.quizzes.models import QuizAttempt
+
+    qs = QuizAttempt.objects.filter(
+        school=school,
+        status=QuizAttempt.Status.SUBMITTED,
+        submitted_at__date__gte=date_range.start,
+        submitted_at__date__lte=date_range.end,
+    )
+    if not qs.exists():
+        return None
+
+    overall_avg = qs.aggregate(avg=Avg("score_percent"))["avg"]
+    per_class = list(
+        qs.values("quiz__grade", "quiz__section")
+        .annotate(
+            avg=Avg("score_percent"),
+            attempts=Count("id"),
+            risk=Count("id", filter=Q(score_percent__lt=40)),
+        )
+        .order_by("quiz__grade", "quiz__section")
+    )
+
+    def _label(r) -> str:
+        grade = (r["quiz__grade"] or "").strip() or "Unspecified"
+        section = (r["quiz__section"] or "").strip()
+        return f"{grade}{(' · Sec ' + section) if section else ''}"
+
+    return {
+        "kind": "school",
+        "title": f"School Report — {school.name}",
+        "subtitle": f"{school.board} · {school.city}, {school.state} · {date_range.start} → {date_range.end}",
+        "summary": [
+            ("Overall average",          f"{(_to_float(overall_avg) or 0):.2f}%"),
+            ("Quizzes attempted",        f"{qs.count()}"),
+            ("Classes covered",          f"{len(per_class)}"),
+            ("At-risk attempts (<40%)",  f"{sum(int(r['risk'] or 0) for r in per_class)}"),
+        ],
+        "table": {
+            "headers": ["Class", "Attempts", "Avg Score (%)", "At-Risk (<40%)"],
+            "rows": [
+                [
+                    _label(r),
+                    int(r["attempts"]),
+                    f"{_to_float(r['avg']) or 0:.2f}",
+                    int(r["risk"] or 0),
+                ]
+                for r in per_class
+            ],
+        },
+    }
+
+
 def assemble_school_report(
     *, school: School, date_range: DateRange
 ) -> dict[str, Any]:
@@ -153,6 +340,15 @@ def assemble_school_report(
         .annotate(avg=Avg("avg_score"), risk=Sum("at_risk_count"))
         .order_by("klass__grade", "klass__section")
     )
+    # The weekly rollup (ClassWeeklyStats) is a nightly Celery concern and is
+    # often empty/lagging in dev. When there's nothing rolled up for the window,
+    # fall back to live submitted attempts so the report matches the dashboard
+    # instead of showing a misleading all-zero "No data" page.
+    if not per_class:
+        live = _school_report_from_attempts(school, date_range)
+        if live is not None:
+            return live
+
     overall_avg = (
         ClassWeeklyStats.objects.filter(
             school=school,

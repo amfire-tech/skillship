@@ -20,12 +20,13 @@ import csv
 import io
 
 from django.db import IntegrityError, transaction
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.models import User
@@ -36,6 +37,7 @@ from .models import AcademicYear, Class, Course, Enrollment
 from .serializers import (
     AcademicYearSerializer,
     BulkEnrollmentUploadSerializer,
+    ClassReadSerializer,
     ClassSerializer,
     CourseSerializer,
     EnrollmentSerializer,
@@ -61,6 +63,24 @@ class CanManageAcademics(BasePermission):
         return actor.school_id is not None and obj.school_id == actor.school_id
 
 
+class CanReadClassesOrManage(CanManageAcademics):
+    """Same as CanManageAcademics, but TEACHERs may READ classes in their own
+    school. Teachers need the class list to assign quizzes, build class
+    analytics, and export class reports; writes stay MAIN_ADMIN / PRINCIPAL.
+    """
+
+    def has_permission(self, request, view):
+        u = request.user
+        if (
+            request.method in SAFE_METHODS
+            and u and u.is_authenticated
+            and u.role == Role.TEACHER
+            and u.school_id is not None
+        ):
+            return True
+        return super().has_permission(request, view)
+
+
 class _AcademicsBaseViewSet(TenantScopedViewSet):
     """Common knobs for every academics viewset — auth + role gate + lookup."""
 
@@ -82,10 +102,27 @@ class CourseViewSet(_AcademicsBaseViewSet):
 
 
 class ClassViewSet(_AcademicsBaseViewSet):
-    queryset = Class.objects.select_related("academic_year", "class_teacher").order_by(
-        "grade", "section"
+    queryset = (
+        Class.objects.select_related("academic_year", "class_teacher")
+        .annotate(
+            student_count_ann=Count(
+                "enrollments",
+                filter=Q(enrollments__withdrawn_on__isnull=True),
+                distinct=True,
+            )
+        )
+        .order_by("grade", "section")
     )
     serializer_class = ClassSerializer
+    # Teachers get read-only access (assign quizzes / analytics / reports).
+    permission_classes = [IsAuthenticated, CanReadClassesOrManage]
+
+    def get_serializer_class(self):
+        # List/detail use the enriched read serializer (class_name, student_count,
+        # academic_year_name); writes use the validating ClassSerializer.
+        if self.action in ("list", "retrieve"):
+            return ClassReadSerializer
+        return ClassSerializer
 
 
 class EnrollmentViewSet(_AcademicsBaseViewSet):

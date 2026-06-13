@@ -14,7 +14,6 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
-import { useToast } from "@/components/ui/Toast";
 
 interface AcademicClass {
   id: string;
@@ -39,6 +38,16 @@ interface Quiz {
 }
 
 interface RosterRow { class_label?: string | null; avg_score?: number | null }
+
+interface ExamAlert {
+  id: string;
+  title: string;
+  category_display?: string;
+  mode_display?: string;
+  exam_date?: string;
+  class_name?: string;
+  venue?: string;
+}
 
 interface Stats {
   classes: number | null;
@@ -71,15 +80,16 @@ function classInitials(name: string) {
 
 export default function TeacherHomePage() {
   const router = useRouter();
-  const toast = useToast();
   const { user, displayName } = useAuth();
 
   const [classes, setClasses] = useState<AcademicClass[] | null>(null);
+  // Students assigned to this teacher but not yet enrolled in any class. They
+  // count toward "Students I Teach" but belong to no class, so we surface them
+  // as a separate row to keep the breakdown reconciling to the head-count.
+  const [unassigned, setUnassigned] = useState<number>(0);
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
+  const [examAlerts, setExamAlerts] = useState<ExamAlert[] | null>(null);
   const [stats, setStats] = useState<Stats>({ classes: null, students: null, quizzesThisMonth: null, avgScore: null, prevMonthAvg: null, prevMonthCount: null });
-
-  const [aiPrompt, setAiPrompt] = useState("");
-  const [generating, setGenerating] = useState(false);
 
   const load = useCallback(async () => {
     const token = await getToken();
@@ -87,11 +97,13 @@ export default function TeacherHomePage() {
     const headers = { Authorization: `Bearer ${token}` };
     try {
       // The roster is auto-scoped to this teacher's assigned students; classes
-      // are derived from it (teachers can't hit /academics/classes/).
-      const [rRes, qRes] = await Promise.all([
+      // are derived from it. Exam alerts the teacher scheduled show below.
+      const [rRes, qRes, eRes] = await Promise.all([
         fetch(`${API_BASE}/users/roster/?page_size=500`, { headers }),
         fetch(`${API_BASE}/quizzes/`, { headers }),
+        fetch(`${API_BASE}/exam-alerts/`, { headers }),
       ]);
+      setExamAlerts(eRes.ok ? asArray<ExamAlert>(await eRes.json()) : []);
       const roster = rRes.ok ? asArray<RosterRow>(await rRes.json()) : [];
       const quizList = asArray<Quiz>(qRes.ok ? await qRes.json() : null);
 
@@ -106,12 +118,16 @@ export default function TeacherHomePage() {
       const thisMonth = myQuizzes.filter((q) => new Date(q.created_at) >= monthStart);
       const lastMonth = myQuizzes.filter((q) => new Date(q.created_at) >= lastMonthStart && new Date(q.created_at) < monthStart);
 
-      // Group assigned students into classes + collect their scores.
+      // Group assigned students into classes + collect their scores. Students
+      // with no enrolment yet (no class_label) are tracked separately so they
+      // still reconcile against "Students I Teach" without faking a class.
       const byClass = new Map<string, number>();
       const studentScores: number[] = [];
+      let unassignedCount = 0;
       roster.forEach((s: { class_label?: string | null; avg_score?: number | null }) => {
         if (typeof s.avg_score === "number") studentScores.push(s.avg_score);
         if (s.class_label) byClass.set(s.class_label, (byClass.get(s.class_label) ?? 0) + 1);
+        else unassignedCount += 1;
       });
       const classList: AcademicClass[] = Array.from(byClass.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
@@ -122,6 +138,7 @@ export default function TeacherHomePage() {
         : Math.round((studentScores.reduce((a, b) => a + b, 0) / studentScores.length) * 10) / 10;
 
       setClasses(classList);
+      setUnassigned(unassignedCount);
       setQuizzes(myQuizzes);
       setStats({
         classes: classList.length,
@@ -151,61 +168,19 @@ export default function TeacherHomePage() {
 
   const recent = useMemo(() => (quizzes ?? []).slice(0, 5), [quizzes]);
 
-  async function generateWithAI() {
-    const prompt = aiPrompt.trim();
-    if (prompt.length < 10) { toast("Describe the quiz in more detail.", "error"); return; }
-    setGenerating(true);
-    const token = await getToken();
-    if (!token) { toast("Session expired", "error"); setGenerating(false); return; }
-    try {
-      const res = await fetch(`${API_BASE}/ai/quiz/generate/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        // Quick free-text box: the whole prompt is the topic; the AI infers
-        // count/grade/difficulty from it. The full wizard sends them explicitly.
-        body: JSON.stringify({ topic: prompt }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast(body?.detail ?? `Generation failed (${res.status})`, "error");
-        return;
-      }
-      const data = await res.json();
-      // AI returns options as [{id,text}] + correct_option_ids (["C"]); the
-      // wizard expects string options + a correct_answer_index. Normalise both.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const items = (data?.questions ?? data ?? [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((q: any) => {
-          const rawOpts: unknown[] = q.options ?? q.choices ?? [];
-          const options: string[] = rawOpts.map((o) =>
-            typeof o === "string" ? o : ((o as { text?: string })?.text ?? ""),
-          );
-          let correct_answer_index = q.correct_answer_index ?? q.correct_index ?? 0;
-          const correctIds = q.correct_option_ids ?? q.correct_ids;
-          if (Array.isArray(correctIds) && correctIds.length && rawOpts.length && typeof rawOpts[0] === "object") {
-            const idx = (rawOpts as { id?: string }[]).findIndex((o) => o?.id === correctIds[0]);
-            if (idx >= 0) correct_answer_index = idx;
-          }
-          return {
-            text: q.text ?? q.question_text ?? q.question ?? "",
-            subject: data?.subject,
-            difficulty: (q.difficulty ?? data?.difficulty ?? "MEDIUM").toString().toUpperCase(),
-            options,
-            correct_answer_index,
-          };
-        })
-        .filter((q: { text: string; options: string[] }) => q.text && q.options.length >= 2);
+  const upcomingExams = useMemo(() => {
+    if (!examAlerts) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return examAlerts
+      .filter((a) => a.exam_date && new Date(`${a.exam_date}T00:00:00`) >= today)
+      .sort((a, b) => new Date(a.exam_date ?? "").getTime() - new Date(b.exam_date ?? "").getTime())
+      .slice(0, 5);
+  }, [examAlerts]);
 
-      if (items.length === 0) { toast("Generator returned no usable questions.", "error"); return; }
-      sessionStorage.setItem("skillship-quiz-draft-questions", JSON.stringify(items));
-      toast(`${items.length} question${items.length === 1 ? "" : "s"} generated — opening wizard`, "success");
-      router.push("/dashboard/teacher/quizzes/new");
-    } catch {
-      toast("Network error", "error");
-    } finally {
-      setGenerating(false);
-    }
+  // This banner is just an entry point — the full AI Question Generator lives
+  // inside the Create Quiz wizard (Quiz Management → New Quiz).
+  function startWithAI() {
+    router.push("/dashboard/teacher/quizzes/new");
   }
 
   return (
@@ -237,31 +212,25 @@ export default function TeacherHomePage() {
           </div>
           <span className="rounded-full border border-primary/30 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary dark:bg-[var(--background)]">AI Powered</span>
         </div>
-        <div className="space-y-4 p-6">
-          <p className="text-sm text-[var(--foreground)]">Describe the quiz you want and our AI will generate quality MCQ questions instantly.</p>
-          <textarea
-            rows={4}
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="Create 10 MCQ questions for Class 8 on Robotics Sensors, medium difficulty"
-            className="w-full rounded-xl border border-[var(--border)] bg-white/70 px-4 py-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]/60"
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-[var(--muted-foreground)]">Tip: Specify class, subject, number of questions &amp; difficulty level for best results.</p>
-            <button
-              type="button"
-              onClick={generateWithAI}
-              disabled={generating || aiPrompt.trim().length < 10}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-6 py-2.5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0"
-            >
-              {generating ? (
-                <>
-                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-                  Generating…
-                </>
-              ) : <>✨ Generate with AI</>}
-            </button>
+        <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2.5">
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              Build a quiz from a topic or a PDF — our AI drafts quality MCQs for you to review and publish.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">✨ From a topic</span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">📄 From a PDF</span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">⚡ Ready in seconds</span>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={startWithAI}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-6 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
+          >
+            ✨ Create Quiz with AI
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          </button>
         </div>
       </motion.div>
 
@@ -289,7 +258,7 @@ export default function TeacherHomePage() {
                   </div>
                 ))}
               </div>
-            ) : classes.length === 0 ? (
+            ) : classes.length === 0 && unassigned === 0 ? (
               <div className="flex flex-col items-center gap-2 py-10 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><BookIcon /></div>
                 <p className="text-sm font-medium text-[var(--foreground)]">No students assigned yet</p>
@@ -318,6 +287,27 @@ export default function TeacherHomePage() {
                     </li>
                   );
                 })}
+
+                {/* Students assigned to this teacher but not yet placed in a
+                    class. Shown so the per-class counts add up to "Students I
+                    Teach" instead of silently dropping the difference. */}
+                {unassigned > 0 && (
+                  <li className="flex items-center gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted)]/20 p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--muted)] text-[var(--muted-foreground)]">
+                      <UsersIcon />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--foreground)]">Not in a class yet</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        {unassigned} {unassigned === 1 ? "student" : "students"} · assigned to you but not enrolled in a class
+                      </p>
+                    </div>
+                    <Link href="/dashboard/teacher/students" className="inline-flex h-8 items-center gap-1 rounded-full border border-[var(--border)] bg-white px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary dark:bg-[var(--background)]">
+                      View
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                    </Link>
+                  </li>
+                )}
               </ul>
             )}
           </div>
@@ -379,6 +369,45 @@ export default function TeacherHomePage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Upcoming Exams (alerts this teacher scheduled) */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.4 }}
+        className="rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
+          <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Upcoming Exams</h2>
+          <Link href="/dashboard/teacher/exam-alerts" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+            Manage
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          </Link>
+        </div>
+        <div className="p-4">
+          {upcomingExams === null ? (
+            <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-[var(--muted)]/40" />)}</div>
+          ) : upcomingExams.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <p className="text-sm font-medium text-[var(--foreground)]">No upcoming exams scheduled</p>
+              <Link href="/dashboard/teacher/exam-alerts" className="text-xs font-semibold text-primary hover:underline">Schedule an exam →</Link>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {upcomingExams.map((a) => (
+                <li key={a.id} className="flex items-center gap-3 rounded-xl bg-[var(--muted)]/30 p-3.5">
+                  <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <span className="text-sm font-bold leading-none">{a.exam_date ? new Date(`${a.exam_date}T00:00:00`).getDate() : "—"}</span>
+                    <span className="text-[9px] font-semibold uppercase">{a.exam_date ? new Date(`${a.exam_date}T00:00:00`).toLocaleString("en-IN", { month: "short" }) : ""}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">{a.title}</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">{a.category_display ?? ""} · {a.mode_display ?? ""}{a.class_name ? ` · ${a.class_name}` : ""}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }

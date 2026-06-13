@@ -58,6 +58,12 @@ class AiClient:
     def college_finder(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/api/career/college-finder", payload)
 
+    def career_roadmap(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/api/career/roadmap", payload)
+
+    def career_recommendations(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/api/career/recommendations", payload)
+
     def generate_questions(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/api/quiz/generate", payload)
 

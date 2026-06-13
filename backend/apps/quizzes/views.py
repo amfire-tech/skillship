@@ -7,13 +7,16 @@ Surface map:
 
   /api/v1/quizzes/banks/                 (CRUD — staff)
   /api/v1/quizzes/questions/             (CRUD — staff)
-  /api/v1/quizzes/quizzes/               (CRUD — staff; STUDENT sees PUBLISHED only)
-  /api/v1/quizzes/quizzes/{id}/submit-for-review/    (TEACHER+)
-  /api/v1/quizzes/quizzes/{id}/return-to-draft/      (REVIEW gate)
-  /api/v1/quizzes/quizzes/{id}/publish/              (PRINCIPAL/SUB_ADMIN)
-  /api/v1/quizzes/quizzes/{id}/archive/              (TEACHER+)
-  /api/v1/quizzes/quizzes/{id}/start/                (STUDENT — start/resume attempt)
+  /api/v1/quizzes/                       (Quiz CRUD — staff; STUDENT sees PUBLISHED only)
+  /api/v1/quizzes/rankings/              (student class/school leaderboard — ?scope=CLASS|SCHOOL)
+  /api/v1/quizzes/{id}/submit-for-review/            (TEACHER+)
+  /api/v1/quizzes/{id}/return-to-draft/              (REVIEW gate)
+  /api/v1/quizzes/{id}/publish/                      (PRINCIPAL/SUB_ADMIN)
+  /api/v1/quizzes/{id}/archive/                      (TEACHER+)
+  /api/v1/quizzes/{id}/start/                        (STUDENT — start/resume attempt)
+  /api/v1/quizzes/{id}/rankings/                     (per-quiz leaderboard)
   /api/v1/quizzes/attempts/              (read — owner student or staff)
+  /api/v1/quizzes/attempts/summary/                  (STUDENT — dashboard hero stats)
   /api/v1/quizzes/attempts/{id}/next/                (STUDENT — next question)
   /api/v1/quizzes/attempts/{id}/answer/              (STUDENT — submit one answer)
   /api/v1/quizzes/attempts/{id}/submit/              (STUDENT — finalise)
@@ -27,15 +30,16 @@ from __future__ import annotations
 import logging
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Avg, Count, Q, QuerySet
+from django.db.models import Avg, Count, F, Q, QuerySet
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from apps.common.permissions import Role
@@ -55,6 +59,7 @@ from .serializers import (
     QuestionStudentSerializer,
     QuestionBankSerializer,
     QuizAssignmentSerializer,
+    QuizAttemptDetailSerializer,
     QuizAttemptReadSerializer,
     QuizAuthoringSerializer,
     QuizSerializer,
@@ -192,10 +197,12 @@ class QuizViewSet(TenantScopedViewSet):
         # question count, number of submitted attempts, and average score.
         # distinct=True keeps the question/attempt joins from inflating counts.
         submitted = Q(attempts__status=QuizAttempt.Status.SUBMITTED)
+        passed = submitted & Q(attempts__score_percent__gte=F("pass_percentage"))
         qs = qs.annotate(
             question_count_ann=Count("bank__questions", distinct=True),
             attempts_count_ann=Count("attempts", filter=submitted, distinct=True),
             avg_score_ann=Avg("attempts__score_percent", filter=submitted),
+            pass_count_ann=Count("attempts", filter=passed, distinct=True),
         )
         return qs
 
@@ -277,8 +284,19 @@ class QuizViewSet(TenantScopedViewSet):
             )
         except DjangoValidationError as exc:
             raise ValidationError({"detail": _err(exc)}) from exc
+        # If the quiz has descriptive questions, marks aren't final until the
+        # teacher grades them — withhold the provisional score from the student.
+        awaiting = attempt.answers.filter(
+            feedback_status=Answer.FeedbackStatus.PENDING
+        ).exists()
+        if awaiting:
+            return Response(
+                {"id": str(attempt.id), "awaiting_review": True},
+                status=status.HTTP_201_CREATED,
+            )
         return Response({
             "id": str(attempt.id),
+            "awaiting_review": False,
             "score_percent": float(attempt.score_percent),
             "points_earned": attempt.points_earned,
             "points_total": attempt.points_total,
@@ -353,7 +371,7 @@ class QuizViewSet(TenantScopedViewSet):
     @action(detail=True, methods=["get"], url_path="rankings")
     def rankings(self, request, id=None):
         """
-        GET /api/v1/quizzes/quizzes/{id}/rankings/?limit=20
+        GET /api/v1/quizzes/{id}/rankings/?limit=20
 
         One row per student — their **best submitted attempt** for this quiz.
         Tie-breaker on equal scores is earlier submission time.
@@ -429,6 +447,40 @@ class QuizViewSet(TenantScopedViewSet):
 
         return Response(body)
 
+    # ── Student leaderboard (class / school) ────────────────────────────────
+
+    @extend_schema(responses={200: OpenApiResponse(description="Ranked student leaderboard.")})
+    @action(detail=False, methods=["get"], url_path="rankings",
+            permission_classes=[IsAuthenticated])
+    def student_rankings(self, request):
+        """GET /api/v1/quizzes/rankings/?scope=CLASS|SCHOOL
+
+        One ranked row per student (by average score) for the caller's class or
+        whole school. Powers the student Rankings page. Tenant-scoped: a caller
+        only ever sees their own school; CLASS scope narrows to the student's
+        current class. Returns a plain list the frontend's `asArray` consumes.
+        """
+        from apps.academics.models import Enrollment
+
+        u = request.user
+        if u.school_id is None:
+            return Response([])  # MAIN_ADMIN has no school / class context.
+
+        scope = (request.query_params.get("scope") or "CLASS").upper()
+        klass_id = None
+        if scope == "CLASS":
+            enr = (
+                Enrollment.objects.filter(student=u, withdrawn_on__isnull=True)
+                .order_by("-enrolled_on")
+                .first()
+            )
+            # A staff caller (or an unenrolled student) has no class → fall back
+            # to a school-wide board rather than an empty one.
+            klass_id = enr.klass_id if enr is not None else None
+
+        rows = services.student_leaderboard(school_id=u.school_id, klass_id=klass_id)
+        return Response(rows)
+
     # ── Student: start an attempt ───────────────────────────────────────────
 
     @extend_schema(
@@ -468,6 +520,12 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, CanTakeQuiz]
     lookup_field = "id"
 
+    def get_serializer_class(self):
+        # The detail view adds the per-question review (correct answers + marks).
+        if self.action == "retrieve":
+            return QuizAttemptDetailSerializer
+        return QuizAttemptReadSerializer
+
     def get_queryset(self) -> QuerySet[QuizAttempt]:
         u = self.request.user
         qs = super().get_queryset()
@@ -481,6 +539,15 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
         quiz_id = self.request.query_params.get("quiz")
         if quiz_id:
             qs = qs.filter(quiz_id=quiz_id)
+        # Count short answers still awaiting a teacher's grade — drives
+        # `awaiting_review` so a student's marks stay hidden until grading is done.
+        qs = qs.annotate(
+            pending_feedback_count_ann=Count(
+                "answers",
+                filter=Q(answers__feedback_status=Answer.FeedbackStatus.PENDING),
+                distinct=True,
+            )
+        )
         return qs
 
     # ── Self-healing read ───────────────────────────────────────────────────
@@ -548,6 +615,61 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
         except DjangoValidationError as exc:
             raise ValidationError({"detail": _err(exc)}) from exc
         return Response(self.get_serializer(attempt).data)
+
+    # ── STUDENT: dashboard summary ──────────────────────────────────────────
+
+    @extend_schema(responses={200: OpenApiResponse(description="Attempt summary for the dashboard hero.")})
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """GET /api/v1/quizzes/attempts/summary/
+
+        Aggregates the requesting user's own quiz activity — completed count,
+        average score, and the prior-month figures the dashboard uses for the
+        "vs last month" deltas. Drives the student My Learning hero cards.
+        """
+        return Response(services.attempt_summary(request.user))
+
+    # ── Staff: short-answer feedback queue ──────────────────────────────────
+
+    @extend_schema(responses={200: OpenApiResponse(description="Short-answer responses awaiting / done review.")})
+    @action(detail=False, methods=["get"], url_path="pending-feedback")
+    def pending_feedback(self, request):
+        """
+        GET /api/v1/quizzes/attempts/pending-feedback/
+
+        Short-answer responses in submitted attempts that a teacher reviews.
+        - TEACHER     → only their assigned students' answers.
+        - PRINCIPAL / SUB_ADMIN → every short answer in their school.
+        - MAIN_ADMIN  → all schools.
+        Returns both PENDING and FINALISED so the UI can tab between them.
+        """
+        u = request.user
+        if u.role == Role.STUDENT:
+            raise PermissionDenied("Students cannot view the feedback queue.")
+
+        from django.db.models import Prefetch
+        from apps.academics.models import Enrollment
+
+        answers = (
+            Answer.objects
+            .filter(
+                question__type=Question.Type.SHORT_ANSWER,
+                attempt__status=QuizAttempt.Status.SUBMITTED,
+            )
+            .select_related("attempt", "attempt__quiz", "attempt__student", "question")
+            .prefetch_related(Prefetch(
+                "attempt__student__enrollments",
+                queryset=Enrollment.objects.select_related("klass").order_by("-enrolled_on"),
+                to_attr="recent_enrollments",
+            ))
+        )
+        if u.role != Role.MAIN_ADMIN:
+            answers = answers.filter(school_id=u.school_id)
+            if u.role == Role.TEACHER:
+                answers = answers.filter(attempt__student__assigned_teacher_id=u.id)
+        # PENDING first, then most-recently submitted.
+        answers = answers.order_by("feedback_status", "-attempt__submitted_at")
+        return Response([_feedback_item(a) for a in answers])
 
     # ── Internals ───────────────────────────────────────────────────────────
 
@@ -632,6 +754,89 @@ class QuizAssignmentViewSet(TenantScopedViewSet):
         if u.role not in {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN, Role.MAIN_ADMIN}:
             raise ValidationError({"detail": "Only staff can revoke assignments."})
         instance.delete()
+
+
+# ── Short-answer feedback (teacher grades one Answer) ───────────────────────
+
+
+_STAFF_FEEDBACK_ROLES = {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN, Role.MAIN_ADMIN}
+
+
+def _student_class_label(student) -> str | None:
+    """'Grade 9-A' from the student's latest enrolment, or None.
+
+    Uses the view's prefetch (`recent_enrollments`) when present so the queue
+    stays N+1-free; falls back to a single query for the one-off PATCH path.
+    """
+    from apps.academics.models import Enrollment
+
+    enr = getattr(student, "recent_enrollments", None)
+    if enr is None:
+        enr = list(
+            Enrollment.objects.filter(student=student)
+            .select_related("klass").order_by("-enrolled_on")
+        )
+    klass = next((e.klass for e in enr if e.klass_id), None)
+    return f"Grade {klass.grade}-{klass.section}" if klass else None
+
+
+def _feedback_item(a: Answer) -> dict:
+    """Flatten one short-answer Answer into the shape the Feedback UI expects."""
+    q = a.question
+    student = a.attempt.student
+    return {
+        "id":              str(a.id),
+        "quiz_id":         str(a.attempt.quiz_id),
+        "quiz_title":      a.attempt.quiz.title,
+        "student_id":      str(a.attempt.student_id),
+        "student_name":    student.get_full_name() or student.username,
+        "student_class":   _student_class_label(student),
+        "student_roll":    student.admission_number or None,
+        "question_text":   q.text,
+        "answer_text":     a.text_response,
+        "expected_answer": "; ".join(str(x) for x in (q.accepted_answers or [])),
+        "max_marks":       q.points,            # the question is worth this many marks
+        "score":           a.teacher_score,     # marks the teacher awarded (null until graded)
+        "feedback":        a.teacher_feedback,
+        "status":          a.feedback_status,
+        "submitted_at":    a.attempt.submitted_at,
+    }
+
+
+class AnswerFeedbackView(APIView):
+    """PATCH /api/v1/quizzes/answers/{id}/feedback/
+
+    A teacher (or principal / sub-admin / main-admin) records a score + written
+    feedback for one short-answer response. The parent attempt's aggregate
+    score is recomputed so the student's result reflects the human grade.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, id=None):
+        u = request.user
+        if u.role not in _STAFF_FEEDBACK_ROLES:
+            raise PermissionDenied("Only staff can grade short answers.")
+
+        qs = Answer.objects.select_related("question", "attempt", "attempt__student", "attempt__quiz")
+        if u.role != Role.MAIN_ADMIN:
+            qs = qs.filter(school_id=u.school_id)
+            if u.role == Role.TEACHER:
+                qs = qs.filter(attempt__student__assigned_teacher_id=u.id)
+        answer = qs.filter(id=id).first()
+        if answer is None:
+            raise NotFound("Short-answer response not found in your scope.")
+
+        try:
+            answer = services.finalise_short_answer_feedback(
+                answer=answer,
+                actor=u,
+                marks=request.data.get("marks", request.data.get("score", 0)),
+                feedback=request.data.get("feedback", ""),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": _err(exc)}) from exc
+        return Response(_feedback_item(answer))
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────

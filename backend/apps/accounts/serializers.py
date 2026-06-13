@@ -37,6 +37,14 @@ class UserSerializer(serializers.ModelSerializer):
         read_only=True, pk_field=serializers.UUIDField()
     )
     assigned_teacher_name = serializers.SerializerMethodField()
+    # Student dashboard hero fields — only populated on /auth/me/ (context["me"]),
+    # never on the paginated user list / login body, so they cost no extra
+    # queries on the hot paths.
+    class_name = serializers.SerializerMethodField()
+    roll_number = serializers.SerializerMethodField()
+    rank_in_class = serializers.SerializerMethodField()
+    class_size = serializers.SerializerMethodField()
+    certificates_count = serializers.SerializerMethodField()
 
     def get_school_name(self, obj):
         return obj.school.name if obj.school_id else None
@@ -44,6 +52,46 @@ class UserSerializer(serializers.ModelSerializer):
     def get_assigned_teacher_name(self, obj):
         t = obj.assigned_teacher
         return (t.get_full_name() or t.username) if t else None
+
+    def _is_me_student(self, obj):
+        """True only when this is the authenticated student's own /auth/me/ —
+        guards the dashboard stat queries so they never run on list/login."""
+        return bool(self.context.get("me")) and obj.role == User.Role.STUDENT
+
+    def _ensure_rank(self, obj):
+        """Compute (rank, class_size) once per serialisation and cache it."""
+        if not hasattr(self, "_rank_cache"):
+            from apps.quizzes.services import rank_in_class
+            self._rank_cache = rank_in_class(obj)
+        return self._rank_cache
+
+    def get_class_name(self, obj):
+        if not self._is_me_student(obj):
+            return None
+        enr = (
+            Enrollment.objects.filter(student=obj)
+            .select_related("klass").order_by("-enrolled_on").first()
+        )
+        return f"Grade {enr.klass.grade}-{enr.klass.section}" if enr and enr.klass_id else None
+
+    def get_roll_number(self, obj):
+        return obj.admission_number or None if self._is_me_student(obj) else None
+
+    def get_rank_in_class(self, obj):
+        if not self._is_me_student(obj):
+            return None
+        return self._ensure_rank(obj)[0]
+
+    def get_class_size(self, obj):
+        if not self._is_me_student(obj):
+            return None
+        return self._ensure_rank(obj)[1]
+
+    def get_certificates_count(self, obj):
+        if not self._is_me_student(obj):
+            return None
+        from apps.quizzes.services import certificates_count
+        return certificates_count(obj)
 
     def get_current_class(self, obj):
         """The student's class as "Grade 6-A", resolved from their latest
@@ -73,6 +121,11 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "admission_number",
             "current_class",
+            "class_name",
+            "roll_number",
+            "rank_in_class",
+            "class_size",
+            "certificates_count",
             "assigned_teacher",
             "assigned_teacher_name",
             "profile_completed",
@@ -82,7 +135,9 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "email", "username", "first_name", "last_name",
             "role", "school", "phone", "admission_number",
-            "current_class", "assigned_teacher", "assigned_teacher_name",
+            "current_class", "class_name", "roll_number", "rank_in_class",
+            "class_size", "certificates_count",
+            "assigned_teacher", "assigned_teacher_name",
             "profile_completed", "is_active", "date_joined",
         ]
 
@@ -447,6 +502,7 @@ class StudentRosterSerializer(serializers.ModelSerializer):
     assigned_teacher_name = serializers.SerializerMethodField()
     avg_score = serializers.SerializerMethodField()
     quizzes_attempted = serializers.SerializerMethodField()
+    last_attempt_at = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -454,6 +510,7 @@ class StudentRosterSerializer(serializers.ModelSerializer):
             "id", "first_name", "last_name", "email", "roll_number",
             "is_active", "profile_completed", "grade", "section", "class_label",
             "assigned_teacher", "assigned_teacher_name", "avg_score", "quizzes_attempted",
+            "last_attempt_at",
         ]
 
     @staticmethod
@@ -484,3 +541,32 @@ class StudentRosterSerializer(serializers.ModelSerializer):
     def get_quizzes_attempted(self, obj):
         row = self.context.get("stats", {}).get(obj.id)
         return row["quizzes"] if row else None
+
+    def get_last_attempt_at(self, obj):
+        row = self.context.get("stats", {}).get(obj.id)
+        last = row.get("last") if row else None
+        return last.isoformat() if last else None
+
+
+class TeacherDirectorySerializer(serializers.ModelSerializer):
+    """A read-only teacher row for the principal / sub-admin / admin directory.
+
+    `student_count` (students assigned to this teacher) is annotated by the view
+    so the list stays free of N+1s. Account creation/edits are NOT exposed here —
+    those stay on the MAIN_ADMIN-only /users/ surface (CanManageUsers policy).
+    """
+
+    name = serializers.SerializerMethodField()
+    student_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id", "name", "first_name", "last_name", "email", "phone",
+            "is_active", "date_joined", "student_count",
+        ]
+        read_only_fields = fields
+
+    def get_name(self, obj):
+        full = f"{obj.first_name} {obj.last_name}".strip()
+        return full or obj.username or obj.email

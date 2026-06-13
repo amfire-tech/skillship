@@ -297,9 +297,18 @@ class Answer(TenantModel):
     """One answer to one question within an attempt.
 
     `is_correct` is denormalised and graded server-side by services.grade_answer.
-    For SHORT_ANSWER, a Plan 02 path will hit the AI service for fuzzy grading;
-    for now we do a normalised string-match against `Question.accepted_answers`.
+    SHORT_ANSWER is auto-graded by a normalised string-match against
+    `Question.accepted_answers`, then a teacher reviews it through the Feedback
+    queue (`feedback_status`, `teacher_score`, `teacher_feedback`) and the
+    attempt score is recomputed from the teacher's marks.
     """
+
+    class FeedbackStatus(models.TextChoices):
+        # MCQ / TF are objective → no human review needed (NOT_REQUIRED).
+        # SHORT_ANSWER lands in PENDING until a teacher finalises it.
+        NOT_REQUIRED = "NOT_REQUIRED", "Not required"
+        PENDING      = "PENDING",      "Pending review"
+        FINALISED    = "FINALISED",    "Finalised"
 
     attempt = models.ForeignKey(
         QuizAttempt, on_delete=models.CASCADE, related_name="answers"
@@ -317,6 +326,23 @@ class Answer(TenantModel):
     points_awarded = models.PositiveSmallIntegerField(default=0)
     time_spent_seconds = models.PositiveIntegerField(default=0)
     answered_at = models.DateTimeField(auto_now=True)
+
+    # ── Teacher short-answer review (Feedback System) ───────────────────────
+    feedback_status = models.CharField(
+        max_length=12,
+        choices=FeedbackStatus.choices,
+        default=FeedbackStatus.NOT_REQUIRED,
+        db_index=True,
+        help_text="PENDING for short answers awaiting a teacher; FINALISED once graded.",
+    )
+    # Teacher's grade for this answer, 0–100. Mapped to points_awarded on finalise.
+    teacher_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    teacher_feedback = models.TextField(blank=True, default="")
+    feedback_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+",
+    )
+    feedback_at = models.DateTimeField(null=True, blank=True)
 
     class Meta(TenantModel.Meta):
         constraints = [

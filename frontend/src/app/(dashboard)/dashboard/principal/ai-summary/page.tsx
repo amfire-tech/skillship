@@ -48,6 +48,8 @@ interface AcademicClass {
 export default function AISummaryPage() {
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
   const [students, setStudents] = useState<User[] | null>(null);
+  // Roster is page-capped (100/page); keep the true school-wide total separately.
+  const [studentCount, setStudentCount] = useState<number | null>(null);
   const [teachers, setTeachers] = useState<User[] | null>(null);
   const [classes, setClasses] = useState<AcademicClass[] | null>(null);
   const [schoolName, setSchoolName] = useState("Your School");
@@ -58,20 +60,23 @@ export default function AISummaryPage() {
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [qRes, sRes, tRes, cRes, schRes] = await Promise.all([
-        fetch(`${API_BASE}/quizzes/`,             { headers }),
-        fetch(`${API_BASE}/users/?role=STUDENT`,  { headers }),
-        fetch(`${API_BASE}/users/?role=TEACHER`,  { headers }),
-        fetch(`${API_BASE}/academics/classes/`,   { headers }),
-        fetch(`${API_BASE}/schools/`,             { headers }),
+      // Principal-allowed sources: roster (students, scoped), teachers directory,
+      // /auth/me (school name). /users/ & /schools/ are MAIN_ADMIN-only (403 here).
+      const [qRes, sRes, tRes, cRes, meRes] = await Promise.all([
+        fetch(`${API_BASE}/quizzes/`,                    { headers }),
+        fetch(`${API_BASE}/users/roster/?page_size=500`, { headers }),
+        fetch(`${API_BASE}/users/teachers/`,             { headers }),
+        fetch(`${API_BASE}/academics/classes/`,          { headers }),
+        fetch(`${API_BASE}/auth/me/`,                    { headers }),
       ]);
+      const sData = sRes.ok ? await sRes.json() : null;
       setQuizzes(qRes.ok ? asArray<Quiz>(await qRes.json()) : []);
-      setStudents(sRes.ok ? asArray<User>(await sRes.json()) : []);
+      setStudents(asArray<User>(sData));
+      setStudentCount(typeof sData?.count === "number" ? sData.count : null);
       setTeachers(tRes.ok ? asArray<User>(await tRes.json()) : []);
       setClasses(cRes.ok ? asArray<AcademicClass>(await cRes.json()) : []);
-      const sd = schRes.ok ? await schRes.json() : null;
-      const first = (sd?.results ?? sd ?? [])[0];
-      if (first?.name) setSchoolName(first.name);
+      const me = meRes.ok ? await meRes.json() : null;
+      if (me?.school_name) setSchoolName(me.school_name);
     } catch {
       // empty arrays — UI shows "not enough data"
     }
@@ -143,10 +148,10 @@ export default function AISummaryPage() {
       strongestSubject,
       inactiveTeachers,
       teachersTotal: teachers.length,
-      studentsTotal: students.length,
+      studentsTotal: studentCount ?? students.length,
       volumeDelta,
     };
-  }, [quizzes, students, teachers, classes, schoolName]);
+  }, [quizzes, students, studentCount, teachers, classes, schoolName]);
 
   const recs = useMemo(() => {
     if (!insights) return [];

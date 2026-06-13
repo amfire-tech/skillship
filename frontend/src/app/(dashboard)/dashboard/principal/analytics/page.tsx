@@ -81,18 +81,29 @@ export default function PerformanceAnalyticsPage() {
     if (!token) { setError("Session expired."); return; }
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [qRes, stRes, clRes, schRes] = await Promise.all([
+      // School name from /auth/me; quizzes/classes scoped. /users/ & /schools/
+      // are MAIN_ADMIN-only and would 403 for a principal.
+      const [qRes, clRes, meRes] = await Promise.all([
         fetch(`${API_BASE}/quizzes/`, { headers }),
-        fetch(`${API_BASE}/users/?role=STUDENT`, { headers }),
         fetch(`${API_BASE}/academics/classes/`, { headers }),
-        fetch(`${API_BASE}/schools/`, { headers }),
+        fetch(`${API_BASE}/auth/me/`, { headers }),
       ]);
       setQuizzes(qRes.ok ? asArray<Quiz>(await qRes.json()) : []);
-      setStudents(stRes.ok ? asArray<Student>(await stRes.json()) : []);
       setClasses(clRes.ok ? asArray<AcademicClass>(await clRes.json()) : []);
-      const sd = schRes.ok ? await schRes.json() : null;
-      const first = (sd?.results ?? sd ?? [])[0];
-      if (first?.name) setSchoolName(first.name);
+      const me = meRes.ok ? await meRes.json() : null;
+      if (me?.school_name) setSchoolName(me.school_name);
+
+      // Roster is page-capped at 100 and name-sorted, so the few scored students
+      // can sit beyond page 1. Walk every page so the leaderboard is complete.
+      const allStudents: Student[] = [];
+      for (let page = 1; page <= 50; page++) {
+        const r = await fetch(`${API_BASE}/users/roster/?page=${page}&page_size=100`, { headers });
+        if (!r.ok) break;
+        const d = await r.json();
+        allStudents.push(...(Array.isArray(d) ? d : (d?.results ?? [])));
+        if (!d?.next) break;
+      }
+      setStudents(allStudents);
     } catch {
       setError("Network error.");
     }

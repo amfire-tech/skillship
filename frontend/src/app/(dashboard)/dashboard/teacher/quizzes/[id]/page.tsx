@@ -444,8 +444,11 @@ function AssignModal({
     setLoadingTargets(true);
     (async () => {
       try {
+        // Teachers can't hit the MAIN_ADMIN-only /users/ surface — the roster is
+        // the role-scoped student list (their assigned students). Classes are now
+        // teacher-readable for their own school.
         const [sRes, cRes] = await Promise.all([
-          apiFetch(`/users/?role=STUDENT`),
+          apiFetch(`/users/roster/?page_size=500`),
           apiFetch(`/academics/classes/`),
         ]);
         setStudents(sRes.ok ? asArray<Student>(await sRes.json()) : []);

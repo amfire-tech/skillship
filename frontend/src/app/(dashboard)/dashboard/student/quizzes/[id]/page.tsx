@@ -26,6 +26,7 @@ interface Question {
   // Backend returns `text`; older mocks used `question_text` — accept both.
   text?: string;
   question_text?: string;
+  type?: string; // "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER"
   options?: { id: string; text: string }[];
   choices?: string[];
 }
@@ -43,6 +44,7 @@ export default function StudentQuizTakerPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [current, setCurrent] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [awaitingReview, setAwaitingReview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
@@ -111,6 +113,8 @@ export default function StudentQuizTakerPage() {
         body: JSON.stringify({ answers }),
       });
       if (!res.ok) throw new Error("Submission failed");
+      const data = await res.json().catch(() => ({}));
+      setAwaitingReview(!!data?.awaiting_review);
       setSubmitted(true);
       toast("Quiz submitted", "success");
     } catch {
@@ -128,7 +132,11 @@ export default function StudentQuizTakerPage() {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           </div>
           <h2 className="mt-4 text-xl font-bold text-[var(--foreground)]">Submitted!</h2>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Your answers have been recorded.</p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+            {awaitingReview
+              ? "Your written answers will be graded by your teacher — your result will appear once grading is done."
+              : "Your answers have been recorded."}
+          </p>
           <div className="mt-6 flex justify-center gap-3">
             <Link href="/dashboard/student/quizzes" className="rounded-full border border-[var(--border)] bg-white px-5 py-2 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">All Quizzes</Link>
             <button onClick={() => router.push("/dashboard/student")} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white hover:opacity-90">Dashboard</button>
@@ -189,29 +197,43 @@ export default function StudentQuizTakerPage() {
             <h2 className="text-base font-semibold leading-relaxed text-[var(--foreground)]">{q.text ?? q.question_text}</h2>
 
             <div className="mt-6 space-y-2">
-              {(q.options ?? q.choices?.map((c, i) => ({ id: String(i), text: c })) ?? []).map((opt) => {
-                const optId = typeof opt === "string" ? opt : opt.id;
-                const optText = typeof opt === "string" ? opt : opt.text;
-                const checked = answers[q.id] === optId;
-                return (
-                  <label
-                    key={optId}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors ${
-                      checked ? "border-primary bg-primary/5" : "border-[var(--border)] bg-white hover:border-primary/40 hover:bg-[var(--muted)]/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`q-${q.id}`}
-                      value={optId}
-                      checked={checked}
-                      onChange={() => setAnswers((a) => ({ ...a, [q.id]: optId }))}
-                      className="mt-0.5 h-4 w-4 accent-[color:var(--primary)]"
-                    />
-                    <span className={checked ? "font-medium text-[var(--foreground)]" : "text-[var(--foreground)]"}>{optText}</span>
-                  </label>
-                );
-              })}
+              {q.type === "SHORT_ANSWER" || ((q.options ?? q.choices ?? []).length === 0) ? (
+                // Free-text answer — graded by the teacher in the Feedback queue.
+                <div className="space-y-2">
+                  <textarea
+                    value={answers[q.id] ?? ""}
+                    onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                    rows={5}
+                    placeholder="Type your answer here…"
+                    className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+                  />
+                  <p className="text-xs text-[var(--muted-foreground)]">Your teacher will review and grade this written answer.</p>
+                </div>
+              ) : (
+                (q.options ?? q.choices?.map((c, i) => ({ id: String(i), text: c })) ?? []).map((opt) => {
+                  const optId = typeof opt === "string" ? opt : opt.id;
+                  const optText = typeof opt === "string" ? opt : opt.text;
+                  const checked = answers[q.id] === optId;
+                  return (
+                    <label
+                      key={optId}
+                      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition-colors ${
+                        checked ? "border-primary bg-primary/5" : "border-[var(--border)] bg-white hover:border-primary/40 hover:bg-[var(--muted)]/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`q-${q.id}`}
+                        value={optId}
+                        checked={checked}
+                        onChange={() => setAnswers((a) => ({ ...a, [q.id]: optId }))}
+                        className="mt-0.5 h-4 w-4 accent-[color:var(--primary)]"
+                      />
+                      <span className={checked ? "font-medium text-[var(--foreground)]" : "text-[var(--foreground)]"}>{optText}</span>
+                    </label>
+                  );
+                })
+              )}
             </div>
 
             <div className="mt-6 flex items-center justify-between">

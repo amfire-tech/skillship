@@ -178,27 +178,28 @@ export default function PrincipalSchoolOverview() {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const [studentsRes, teachersRes, classesRes, quizzesRes, schoolsRes] = await Promise.all([
-        fetch(`${API_BASE}/users/?role=STUDENT`,  { headers }),
-        fetch(`${API_BASE}/users/?role=TEACHER`,  { headers }),
+      // Principal-allowed sources only: roster (students, scoped), the read-only
+      // teachers directory, and /auth/me for the school name (/users/ & /schools/
+      // are MAIN_ADMIN-only and would 403 here).
+      const [rosterRes, teachersRes, classesRes, quizzesRes, meRes] = await Promise.all([
+        fetch(`${API_BASE}/users/roster/?page_size=1`, { headers }),
+        fetch(`${API_BASE}/users/teachers/`,      { headers }),
         fetch(`${API_BASE}/academics/classes/`,   { headers }),
         fetch(`${API_BASE}/quizzes/`,             { headers }),
-        fetch(`${API_BASE}/schools/`,             { headers }),
+        fetch(`${API_BASE}/auth/me/`,             { headers }),
       ]);
 
-      const studentsData = studentsRes.ok ? await studentsRes.json() : null;
+      const rosterData   = rosterRes.ok   ? await rosterRes.json()   : null;
       const teachersData = teachersRes.ok ? await teachersRes.json() : null;
       const classesData  = classesRes.ok  ? await classesRes.json()  : null;
       const quizzesData  = quizzesRes.ok  ? await quizzesRes.json()  : null;
-      const schoolsData  = schoolsRes.ok  ? await schoolsRes.json()  : null;
+      const meData       = meRes.ok       ? await meRes.json()       : null;
 
       const teacherList: Teacher[] = asArray<Teacher>(teachersData);
       const classList: AcademicClass[] = asArray<AcademicClass>(classesData);
       const quizList: Quiz[] = asArray<Quiz>(quizzesData);
 
-      // School name (principal sees own school — first row in scoped /schools/ result)
-      const firstSchool = (schoolsData?.results ?? schoolsData ?? [])[0];
-      if (firstSchool?.name) setSchoolName(firstSchool.name);
+      if (meData?.school_name) setSchoolName(meData.school_name);
 
       // Quizzes this month
       const now = new Date();
@@ -213,7 +214,7 @@ export default function PrincipalSchoolOverview() {
 
       setStats({
         teachers: teachersData?.count ?? teacherList.length,
-        students: studentsData?.count ?? asArray(studentsData).length,
+        students: rosterData?.count ?? 0,
         quizzesThisMonth: thisMonth.length,
         avgScore: avg,
       });

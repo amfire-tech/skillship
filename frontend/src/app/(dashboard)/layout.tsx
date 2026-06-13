@@ -111,6 +111,8 @@ const TEACHER_NAV: SidebarNavItem[] = [
   { label: "Student Performance", href: "/dashboard/teacher/students", icon: icon("users")     },
   { label: "Feedback System",     href: "/dashboard/teacher/feedback", icon: icon("content")   },
   { label: "Class Analytics",     href: "/dashboard/teacher/analytics", icon: icon("analytics") },
+  { label: "Exam Alerts",         href: "/dashboard/teacher/exam-alerts", icon: icon("reports")  },
+  { label: "Reports",             href: "/dashboard/teacher/reports",  icon: icon("reports")   },
   { label: "AI Tools",            href: "/dashboard/teacher/ai-tools", icon: icon("career")    },
 ];
 

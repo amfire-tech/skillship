@@ -29,6 +29,7 @@ interface Quiz {
 }
 
 interface AcademicClass { id: string; name?: string; class_name?: string; subject?: string; student_count?: number; avg_score?: number }
+interface RosterRow { class_label?: string | null; grade?: number | null; avg_score?: number | null }
 
 type Range = "1M" | "3M" | "6M" | "12M";
 const MONTHS: Record<Range, number> = { "1M": 1, "3M": 3, "6M": 6, "12M": 12 };
@@ -47,14 +48,36 @@ export default function ClassAnalyticsPage() {
     if (!token) { setError("Session expired."); return; }
     const headers = { Authorization: `Bearer ${token}` };
     try {
-      const [qRes, cRes] = await Promise.all([
+      // Quizzes drive the KPIs/charts; the roster (teacher-scoped) drives the
+      // per-class breakdown — class_label + each student's avg_score. We avoid
+      // /academics/classes/ here because it has no per-student score data.
+      const [qRes, rRes] = await Promise.all([
         fetch(`${API_BASE}/quizzes/`, { headers }),
-        fetch(`${API_BASE}/academics/classes/`, { headers }),
+        fetch(`${API_BASE}/users/roster/?page_size=500`, { headers }),
       ]);
       const all = qRes.ok ? asArray<Quiz>(await qRes.json()) : [];
       // Scope to teacher's quizzes if backend tags created_by
       setQuizzes(user?.id ? all.filter((q) => !q.created_by || q.created_by === user.id) : all);
-      setClasses(cRes.ok ? asArray<AcademicClass>(await cRes.json()) : []);
+
+      const roster = rRes.ok ? asArray<RosterRow>(await rRes.json()) : [];
+      const byClass = new Map<string, { count: number; scores: number[] }>();
+      roster.forEach((s) => {
+        const label = s.class_label ?? (s.grade != null ? `Grade ${s.grade}` : null);
+        if (!label) return;
+        const cur = byClass.get(label) ?? { count: 0, scores: [] };
+        cur.count += 1;
+        if (typeof s.avg_score === "number") cur.scores.push(s.avg_score);
+        byClass.set(label, cur);
+      });
+      const classList: AcademicClass[] = Array.from(byClass.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([label, v]) => ({
+          id: label,
+          class_name: label,
+          student_count: v.count,
+          avg_score: v.scores.length ? Math.round(v.scores.reduce((a, b) => a + b, 0) / v.scores.length) : undefined,
+        }));
+      setClasses(classList);
     } catch {
       setError("Network error.");
     }
@@ -63,10 +86,12 @@ export default function ClassAnalyticsPage() {
   useEffect(() => { document.title = "Class Analytics — Skillship"; }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Filter options come from the quizzes themselves (their grade tag) so the
+  // dropdown values actually match the quiz-filter comparison below.
   const classNames = useMemo(() => {
-    if (!classes) return [];
-    return Array.from(new Set(classes.map((c) => c.class_name ?? c.name).filter(Boolean))) as string[];
-  }, [classes]);
+    if (!quizzes) return [];
+    return Array.from(new Set(quizzes.map((q) => q.class_name ?? q.grade).filter(Boolean))) as string[];
+  }, [quizzes]);
 
   const filteredQuizzes = useMemo(() => {
     if (!quizzes) return null;
@@ -195,7 +220,6 @@ export default function ClassAnalyticsPage() {
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                 <th className="px-6 py-3">Class</th>
-                <th className="px-6 py-3">Subject</th>
                 <th className="px-6 py-3">Students</th>
                 <th className="px-6 py-3">Avg Score</th>
               </tr>
@@ -203,14 +227,13 @@ export default function ClassAnalyticsPage() {
             <tbody>
               {classes === null ? Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i} className="border-b border-[var(--border)]/60 last:border-0">
-                  {Array.from({ length: 4 }).map((__, j) => <td key={j} className="px-6 py-3.5"><div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} /></td>)}
+                  {Array.from({ length: 3 }).map((__, j) => <td key={j} className="px-6 py-3.5"><div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} /></td>)}
                 </tr>
               )) : classes.length === 0 ? (
-                <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[var(--muted-foreground)]">No classes assigned.</td></tr>
+                <tr><td colSpan={3} className="px-6 py-12 text-center text-sm text-[var(--muted-foreground)]">No students assigned yet — once the Super Admin assigns you students, their classes appear here.</td></tr>
               ) : classes.map((c) => (
                 <tr key={c.id} className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/30">
                   <td className="px-6 py-3.5 font-medium text-[var(--foreground)]">{c.class_name ?? c.name}</td>
-                  <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{c.subject ?? "—"}</td>
                   <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{c.student_count ?? "—"}</td>
                   <td className="px-6 py-3.5">
                     {typeof c.avg_score === "number"

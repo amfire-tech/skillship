@@ -8,12 +8,12 @@
 
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
-import { API_BASE, apiFetch, getToken } from "@/lib/auth";
+import { apiFetch } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 
@@ -33,16 +33,6 @@ interface RoadmapStage {
   badge?: string;
   description: string;
   tone: "primary" | "violet" | "emerald" | "amber" | "rose";
-}
-
-interface College {
-  id: string;
-  name: string;
-  city?: string;
-  state?: string;
-  programs?: string[];
-  nirf_rank?: number;
-  fees?: string;
 }
 
 interface CareerRecommendation {
@@ -83,9 +73,7 @@ export default function CareerPilotPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const [roadmap, setRoadmap] = useState<RoadmapStage[] | null>(null);
-  const [colleges, setColleges] = useState<College[] | null>(null);
   const [recommendations, setRecommendations] = useState<CareerRecommendation[] | null>(null);
-  const [collegeQuery, setCollegeQuery] = useState("");
 
   useEffect(() => { document.title = "AI Career Pilot — Skillship"; }, []);
 
@@ -103,25 +91,32 @@ export default function CareerPilotPage() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, thinking]);
 
-  const loadAll = useCallback(async () => {
-    const token = await getToken();
-    if (!token) return;
-    const headers = { Authorization: `Bearer ${token}` };
+  // Roadmap + recommendations are real Gemini calls (slow, quota-bound), so we
+  // fetch each lazily: roadmap on mount (the default tab), recommendations the
+  // first time the Careers tab opens. The backend stamps the student's real
+  // grade + quiz performance into the prompt — the body stays empty.
+  const loadRoadmap = useCallback(async () => {
     try {
-      const [rm, col, rec] = await Promise.all([
-        fetch(`${API_BASE}/career/roadmap/`, { headers }),
-        fetch(`${API_BASE}/career/colleges/`, { headers }),
-        fetch(`${API_BASE}/career/recommendations/`, { headers }),
-      ]);
-      setRoadmap(rm.ok ? asArray<RoadmapStage>(await rm.json()) : []);
-      setColleges(col.ok ? asArray<College>(await col.json()) : []);
-      setRecommendations(rec.ok ? asArray<CareerRecommendation>(await rec.json()) : []);
-    } catch {
-      setRoadmap([]); setColleges([]); setRecommendations([]);
-    }
+      const res = await apiFetch(`/ai/career/roadmap/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (!res.ok) { setRoadmap([]); return; }
+      const data = await res.json();
+      setRoadmap(asArray<RoadmapStage>(data?.stages ?? data));
+    } catch { setRoadmap([]); }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  const loadRecommendations = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/ai/career/recommendations/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (!res.ok) { setRecommendations([]); return; }
+      const data = await res.json();
+      setRecommendations(asArray<CareerRecommendation>(data?.recommendations ?? data));
+    } catch { setRecommendations([]); }
+  }, []);
+
+  useEffect(() => { loadRoadmap(); }, [loadRoadmap]);
+  useEffect(() => {
+    if (tab === "careers" && recommendations === null) loadRecommendations();
+  }, [tab, recommendations, loadRecommendations]);
 
   async function send(question?: string) {
     const q = (question ?? input).trim();
@@ -153,13 +148,6 @@ export default function CareerPilotPage() {
       setThinking(false);
     }
   }
-
-  const filteredColleges = useMemo(() => {
-    if (!colleges) return null;
-    const q = collegeQuery.trim().toLowerCase();
-    if (!q) return colleges;
-    return colleges.filter((c) => c.name.toLowerCase().includes(q) || (c.city ?? "").toLowerCase().includes(q) || (c.programs ?? []).some((p) => p.toLowerCase().includes(q)));
-  }, [colleges, collegeQuery]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(360px,1fr)_minmax(0,1.4fr)]">

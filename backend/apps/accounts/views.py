@@ -173,6 +173,12 @@ class MeView(RetrieveAPIView):
     def get_object(self):
         return self.request.user
 
+    def get_serializer_context(self):
+        # Flag this as the self-profile call so UserSerializer computes the
+        # student dashboard stats (rank, class, certificates) — they are skipped
+        # on the user list / login body to avoid per-row queries.
+        return {**super().get_serializer_context(), "me": True}
+
 
 class CompleteProfileView(APIView):
     """POST /api/v1/auth/complete-profile/ — a student's one-time first-login setup.
@@ -348,7 +354,7 @@ class StudentRosterView(ListAPIView):
         up the moment they finish a quiz (the analytics daily-rollup table is a
         separate, nightly concern and may lag / be empty).
         """
-        from django.db.models import Avg, Count
+        from django.db.models import Avg, Count, Max
 
         from apps.quizzes.models import QuizAttempt
 
@@ -358,7 +364,7 @@ class StudentRosterView(ListAPIView):
                 status=QuizAttempt.Status.SUBMITTED,
             )
             .values("student_id")
-            .annotate(avg=Avg("score_percent"), quizzes=Count("id"))
+            .annotate(avg=Avg("score_percent"), quizzes=Count("id"), last=Max("submitted_at"))
         )
         return {r["student_id"]: r for r in rows}
 
@@ -371,6 +377,60 @@ class StudentRosterView(ListAPIView):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+
+class TeacherDirectoryView(ListAPIView):
+    """GET /api/v1/users/teachers/ — read-only teacher directory, role-scoped.
+
+    - PRINCIPAL / SUB_ADMIN → teachers in their own school.
+    - MAIN_ADMIN            → all teachers, optional ?school= / ?search=.
+    - anyone else           → 403.
+
+    Read-only by design: creating/editing teacher accounts stays on the
+    MAIN_ADMIN-only /users/ surface (see permissions.CanManageUsers). This view
+    only lets a principal SEE the teachers in their own school (and how many
+    students each one has), which is not a privilege-escalation risk.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        from .serializers import TeacherDirectorySerializer
+        return TeacherDirectorySerializer
+
+    def get_queryset(self):
+        from django.db.models import Count
+
+        actor = self.request.user
+        qs = (
+            User.objects.filter(role=User.Role.TEACHER)
+            .annotate(student_count=Count("assigned_students", distinct=True))
+            .order_by("first_name", "last_name", "email")
+        )
+
+        if actor.role in (Role.PRINCIPAL, Role.SUB_ADMIN):
+            return qs.filter(school_id=actor.school_id)
+        if actor.role == Role.MAIN_ADMIN:
+            params = self.request.query_params
+            school = params.get("school")
+            if school:
+                try:
+                    uuid.UUID(str(school))
+                except (ValueError, TypeError):
+                    return qs.none()
+                qs = qs.filter(school_id=school)
+            search = (params.get("search") or "").strip()
+            if search:
+                qs = qs.filter(
+                    Q(first_name__icontains=search)
+                    | Q(last_name__icontains=search)
+                    | Q(email__icontains=search)
+                )
+            return qs
+
+        raise PermissionDenied(
+            "Only principals, sub-admins, and the super admin can view the teacher directory."
+        )
 
 
 # ── /api/v1/users/ — user management surface ────────────────────────────────

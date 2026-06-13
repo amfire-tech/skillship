@@ -215,6 +215,7 @@ class QuizSerializer(serializers.ModelSerializer):
     question_count = serializers.SerializerMethodField()
     total_attempts = serializers.SerializerMethodField()
     avg_score = serializers.SerializerMethodField()
+    pass_rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Quiz
@@ -225,13 +226,13 @@ class QuizSerializer(serializers.ModelSerializer):
             "duration_minutes", "total_questions", "pass_percentage", "attempts_allowed",
             "published_at", "archived_at",
             "created_by", "created_by_name", "question_count",
-            "total_attempts", "avg_score",
+            "total_attempts", "avg_score", "pass_rate",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "school", "school_name", "subject", "status", "published_at", "archived_at",
             "created_by", "created_by_name", "question_count", "total_attempts", "avg_score",
-            "created_at", "updated_at",
+            "pass_rate", "created_at", "updated_at",
         ]
 
     def get_created_by_name(self, obj) -> str | None:
@@ -252,6 +253,14 @@ class QuizSerializer(serializers.ModelSerializer):
     def get_avg_score(self, obj):
         v = getattr(obj, "avg_score_ann", None)
         return round(float(v), 1) if v is not None else None
+
+    def get_pass_rate(self, obj):
+        # Share of submitted attempts that met the quiz's pass_percentage.
+        total = getattr(obj, "attempts_count_ann", None)
+        passed = getattr(obj, "pass_count_ann", None)
+        if not total:
+            return None
+        return round(passed / total * 100, 1)
 
     def validate(self, attrs):
         target_school = _resolve_target_school_id(self)
@@ -276,6 +285,11 @@ class _AuthoringQuestionSerializer(serializers.Serializer):
         child=serializers.CharField(allow_blank=True), required=False, default=list,
     )
     correct_answer_index = serializers.IntegerField(required=False, default=0)
+    # Short-answer questions send no options; accepted_answers (if any) seed a
+    # provisional auto-score before the teacher grades in the Feedback queue.
+    accepted_answers = serializers.ListField(
+        child=serializers.CharField(allow_blank=True), required=False, default=list,
+    )
     difficulty = serializers.CharField(required=False, allow_blank=True, default="")
     explanation = serializers.CharField(required=False, allow_blank=True, default="")
     points = serializers.IntegerField(required=False, default=1, min_value=1)
@@ -369,6 +383,7 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
     score = serializers.SerializerMethodField()
     wrong_count = serializers.SerializerMethodField()
     passed = serializers.SerializerMethodField()
+    awaiting_review = serializers.SerializerMethodField()
 
     class Meta:
         model = QuizAttempt
@@ -378,11 +393,34 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
             "status", "attempt_number",
             "started_at", "expires_at", "submitted_at",
             "score_percent", "score", "points_earned", "points_total",
-            "correct_count", "wrong_count", "passed",
+            "correct_count", "wrong_count", "passed", "awaiting_review",
             "question_order", "last_difficulty",
             "created_at", "updated_at",
         ]
         read_only_fields = fields
+
+    # Marks for a quiz with descriptive questions aren't final until the teacher
+    # has graded every short answer. While any remain PENDING this attempt is
+    # "awaiting review" — and a STUDENT must not see provisional marks yet.
+    _GATED_FIELDS = (
+        "score_percent", "score", "points_earned", "points_total",
+        "correct_count", "wrong_count", "passed",
+    )
+
+    def get_awaiting_review(self, obj: QuizAttempt) -> bool:
+        cnt = getattr(obj, "pending_feedback_count_ann", None)
+        if cnt is not None:
+            return cnt > 0
+        return obj.answers.filter(feedback_status=Answer.FeedbackStatus.PENDING).exists()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        req = self.context.get("request")
+        is_student = bool(req and getattr(req.user, "role", None) == Role.STUDENT)
+        if data.get("awaiting_review") and is_student:
+            for key in self._GATED_FIELDS:
+                data[key] = None
+        return data
 
     def get_score(self, obj: QuizAttempt):
         return float(obj.score_percent) if obj.score_percent is not None else None
@@ -400,6 +438,60 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
             return None
         pass_pct = getattr(obj.quiz, "pass_percentage", 50)
         return float(obj.score_percent) >= float(pass_pct)
+
+
+class QuizAttemptDetailSerializer(QuizAttemptReadSerializer):
+    """Attempt + a per-question review for the result screen.
+
+    The review reveals the correct option (MCQ/TF) / expected answer (descriptive)
+    plus the marks earned per question — appropriate POST-submission so students
+    can learn from mistakes. Withheld while `awaiting_review` (teacher still
+    grading) and for non-submitted attempts. Parent `to_representation` still
+    gates the aggregate score for students until grading is done.
+    """
+
+    questions = serializers.SerializerMethodField()
+
+    class Meta(QuizAttemptReadSerializer.Meta):
+        fields = QuizAttemptReadSerializer.Meta.fields + ["questions"]
+        read_only_fields = fields
+
+    def get_questions(self, obj: QuizAttempt):
+        if obj.status != QuizAttempt.Status.SUBMITTED or self.get_awaiting_review(obj):
+            return []
+        answers = {str(a.question_id): a for a in obj.answers.select_related("question").all()}
+        order = [str(x) for x in (obj.question_order or [])] or list(answers.keys())
+        review = []
+        for qid in order:
+            a = answers.get(qid)
+            q = a.question if a else None
+            if q is None:
+                continue
+            item = {
+                "id": str(q.id),
+                "text": q.text,
+                "type": q.type,
+                "points": q.points,
+                "points_awarded": a.points_awarded if a else 0,
+                "is_correct": bool(a.is_correct) if a else False,
+                "answered": a is not None and bool((a.selected_option_ids or []) or (a.text_response or "").strip()),
+            }
+            if q.type == Question.Type.SHORT_ANSWER:
+                item["student_answer_text"] = (a.text_response if a else "") or ""
+                item["expected_answer"] = "; ".join(str(x) for x in (q.accepted_answers or []))
+            else:
+                sel = (a.selected_option_ids if a else []) or []
+                item["options"] = [
+                    {
+                        "id": o.get("id"),
+                        "text": o.get("text"),
+                        "is_correct": o.get("id") in (q.correct_option_ids or []),
+                        "selected": o.get("id") in sel,
+                    }
+                    for o in (q.options or [])
+                ]
+            review.append(item)
+        return review
 
 
 # ── QuizAssignment ──────────────────────────────────────────────────────────

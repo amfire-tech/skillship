@@ -17,7 +17,10 @@ from apps.quizzes.tests.conftest import _make_course, _make_bank, _make_mcq, _su
 
 
 def _ranking_url(quiz: Quiz, **params) -> str:
-    base = f"/api/v1/quizzes/quizzes/{quiz.id}/rankings/"
+    # QuizViewSet is registered at the router root, so the per-quiz leaderboard
+    # lives at /api/v1/quizzes/{id}/rankings/ (NOT the old doubly-nested
+    # /quizzes/quizzes/{id}/rankings/).
+    base = f"/api/v1/quizzes/{quiz.id}/rankings/"
     if params:
         query = "&".join(f"{k}={v}" for k, v in params.items())
         return f"{base}?{query}"

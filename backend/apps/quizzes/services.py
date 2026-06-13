@@ -155,6 +155,10 @@ def _convert_question(raw: dict, default_difficulty: str) -> dict:
         "difficulty": diff,
         "options": [],
         "correct_option_ids": [],
+        # Normalise to lower/stripped so the auto string-match in _grade lines up.
+        "accepted_answers": [
+            str(a).strip().lower() for a in (raw.get("accepted_answers") or []) if str(a).strip()
+        ],
         "explanation": raw.get("explanation", "") or "",
         "points": raw.get("points") or 1,
     }
@@ -259,17 +263,35 @@ def submit_full_attempt(*, quiz: Quiz, student, answers: dict) -> QuizAttempt:
     points_earned = points_total = correct_count = 0
     rows = []
     for q in questions:
-        sel = (answers or {}).get(str(q.id))
-        selected_ids = [sel] if sel else []
-        is_correct = bool(selected_ids) and sorted(selected_ids) == sorted(q.correct_option_ids)
-        awarded = q.points if is_correct else 0
+        raw = (answers or {}).get(str(q.id))
         points_total += q.points
+        if q.type == Question.Type.SHORT_ANSWER:
+            # Free-text answer: the value is the student's text (we also accept
+            # {"text": ...}). Auto string-match for a provisional score, then
+            # queue it PENDING so a teacher can review/override via Feedback.
+            text = ""
+            if isinstance(raw, dict):
+                text = str(raw.get("text") or "").strip()
+            elif raw is not None:
+                text = str(raw).strip()
+            is_correct, awarded = _grade(q, {"text_response": text})
+            rows.append(Answer(
+                school_id=quiz.school_id, attempt=attempt, question=q,
+                selected_option_ids=[], text_response=text,
+                is_correct=is_correct, points_awarded=awarded,
+                feedback_status=Answer.FeedbackStatus.PENDING,
+            ))
+        else:
+            sel = raw if isinstance(raw, str) else None
+            selected_ids = [sel] if sel else []
+            is_correct, awarded = _grade(q, {"selected_option_ids": selected_ids})
+            rows.append(Answer(
+                school_id=quiz.school_id, attempt=attempt, question=q,
+                selected_option_ids=selected_ids, is_correct=is_correct, points_awarded=awarded,
+                feedback_status=Answer.FeedbackStatus.NOT_REQUIRED,
+            ))
         points_earned += awarded
         correct_count += 1 if is_correct else 0
-        rows.append(Answer(
-            school_id=quiz.school_id, attempt=attempt, question=q,
-            selected_option_ids=selected_ids, is_correct=is_correct, points_awarded=awarded,
-        ))
     Answer.objects.bulk_create(rows)
 
     pct = (
@@ -496,6 +518,9 @@ def record_answer(
 
         is_correct, points = _grade(question, payload)
 
+        # Short answers are auto-graded by string-match, then queued for a
+        # teacher to review (PENDING). Objective types need no human review.
+        is_short = question.type == Question.Type.SHORT_ANSWER
         answer, _created = Answer.objects.update_or_create(
             attempt=locked,
             question=question,
@@ -506,6 +531,10 @@ def record_answer(
                 "is_correct": is_correct,
                 "points_awarded": points,
                 "time_spent_seconds": int(payload.get("time_spent_seconds") or 0),
+                "feedback_status": (
+                    Answer.FeedbackStatus.PENDING if is_short
+                    else Answer.FeedbackStatus.NOT_REQUIRED
+                ),
             },
         )
 
@@ -570,6 +599,77 @@ def submit_attempt(attempt: QuizAttempt) -> QuizAttempt:
             "status", "submitted_at", "points_total", "points_earned",
             "correct_count", "score_percent", "updated_at",
         ])
+        return locked
+
+
+# ── Short-answer teacher feedback ───────────────────────────────────────────
+
+
+def recompute_attempt_score(attempt: QuizAttempt) -> QuizAttempt:
+    """Re-aggregate a submitted attempt's score from its answers.
+
+    Called after a teacher finalises a short-answer grade (which can change an
+    answer's points_awarded / is_correct). Mirrors submit_attempt's maths but
+    leaves status / submitted_at untouched.
+    """
+    with transaction.atomic():
+        locked = QuizAttempt.objects.select_for_update().get(pk=attempt.pk)
+        answers = list(Answer.objects.filter(attempt=locked))
+        served_ids = {str(a.question_id) for a in answers}
+        served_questions = Question.objects.filter(
+            school_id=locked.school_id, id__in=served_ids
+        )
+        points_total = sum(int(q.points) for q in served_questions) or 1
+        points_earned = sum(int(a.points_awarded) for a in answers)
+        correct_count = sum(1 for a in answers if a.is_correct)
+
+        score = (Decimal(points_earned) / Decimal(points_total)) * Decimal(100)
+        score = score.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        locked.points_total = points_total
+        locked.points_earned = points_earned
+        locked.correct_count = correct_count
+        locked.score_percent = score
+        locked.save(update_fields=[
+            "points_total", "points_earned", "correct_count", "score_percent", "updated_at",
+        ])
+        return locked
+
+
+def finalise_short_answer_feedback(*, answer: Answer, actor, marks, feedback: str) -> Answer:
+    """Record a teacher's grade for one short-answer response and recompute the
+    parent attempt's aggregate score.
+
+    `marks` is the whole-number marks the teacher awards, out of the question's
+    own `points` (e.g. 3 out of 5). No percentages, no rounding — the teacher's
+    marks go straight into points_awarded. is_correct (a display stat) is set
+    when the answer earned at least half marks. SHORT_ANSWER only.
+    """
+    if answer.question.type != Question.Type.SHORT_ANSWER:
+        raise ValidationError("Only short-answer responses can be graded here.")
+    max_marks = int(answer.question.points)
+    try:
+        marks_int = int(marks)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError("marks must be a whole number.") from exc
+    if marks_int < 0 or marks_int > max_marks:
+        raise ValidationError(f"marks must be between 0 and {max_marks}.")
+
+    with transaction.atomic():
+        locked = Answer.objects.select_for_update().get(pk=answer.pk)
+        locked.teacher_score = marks_int          # marks awarded (out of max_marks)
+        locked.teacher_feedback = (feedback or "").strip()
+        locked.points_awarded = marks_int
+        locked.is_correct = marks_int * 2 >= max_marks  # ≥ half marks counts as correct
+        locked.feedback_status = Answer.FeedbackStatus.FINALISED
+        locked.feedback_by = actor
+        locked.feedback_at = timezone.now()
+        # NB: answered_at is auto_now — omit it so the student's answer time is kept.
+        locked.save(update_fields=[
+            "teacher_score", "teacher_feedback", "points_awarded", "is_correct",
+            "feedback_status", "feedback_by", "feedback_at",
+        ])
+        recompute_attempt_score(locked.attempt)
         return locked
 
 
@@ -727,3 +827,179 @@ def _build_question_from_row(*, bank: QuestionBank, created_by, row: dict) -> Qu
         points=points,
         explanation=(row.get("explanation") or "").strip(),
     )
+
+
+# ── Student stats / leaderboard (dashboard, rankings, rank-in-class) ──────────
+
+
+def attempt_summary(student) -> dict:
+    """Aggregate a student's own quiz activity for the dashboard hero stats.
+
+    `avg_score` is the mean over the student's SUBMITTED attempts. The `prev_*`
+    figures cover the 30-day window *before* the most-recent 30 days so the
+    dashboard can render a "vs last month" delta. All values are real — derived
+    straight from QuizAttempt, never the (nightly, possibly-empty) rollup table.
+    """
+    from django.db.models import Avg, Count
+
+    now = timezone.now()
+    cur_start = now - timedelta(days=30)
+    prev_start = now - timedelta(days=60)
+
+    submitted = QuizAttempt.objects.filter(
+        student=student, status=QuizAttempt.Status.SUBMITTED
+    )
+    agg = submitted.aggregate(n=Count("id"), avg=Avg("score_percent"))
+
+    # Count of PUBLISHED quizzes available to the student (their school), so the
+    # dashboard can show "completed / total".
+    total_quizzes = Quiz.objects.filter(
+        school_id=student.school_id, status=Quiz.Status.PUBLISHED
+    ).count()
+
+    cur = submitted.filter(submitted_at__gte=cur_start).aggregate(
+        n=Count("id"), avg=Avg("score_percent")
+    )
+    prev = submitted.filter(
+        submitted_at__gte=prev_start, submitted_at__lt=cur_start
+    ).aggregate(n=Count("id"), avg=Avg("score_percent"))
+
+    def _round(v):
+        return round(float(v), 1) if v is not None else None
+
+    return {
+        "completed": agg["n"] or 0,
+        "total": total_quizzes,
+        "avg_score": _round(agg["avg"]),
+        "prev_avg_score": _round(prev["avg"]),
+        "prev_completed": prev["n"] or 0,
+    }
+
+
+def certificates_count(student) -> int:
+    """How many certificates a student has earned = passed SUBMITTED attempts.
+
+    A pass is `score_percent >= quiz.pass_percentage`, matching the
+    `passed` flag the attempt serializer exposes and the client-side derivation
+    on the Certificates page.
+    """
+    from django.db.models import F
+
+    return (
+        QuizAttempt.objects.filter(
+            student=student,
+            status=QuizAttempt.Status.SUBMITTED,
+            score_percent__gte=F("quiz__pass_percentage"),
+        )
+        .values("quiz_id")
+        .distinct()
+        .count()
+    )
+
+
+def student_leaderboard(*, school_id, klass_id=None) -> list[dict]:
+    """Ranked leaderboard rows for a school, optionally narrowed to one class.
+
+    One row per STUDENT who has at least one SUBMITTED attempt, ordered by
+    average score (desc), then quizzes attempted (desc), then name. Each row
+    carries the student's class label from their latest enrolment. `avg_score`
+    is the mean over all the student's submitted attempts (same basis as the
+    teacher/principal roster, so a student's rank matches what staff see).
+    """
+    from django.db.models import Avg, Count, Max
+
+    from apps.academics.models import Enrollment
+    from apps.accounts.models import User
+
+    student_qs = User.objects.filter(role=Role.STUDENT, school_id=school_id)
+    if klass_id is not None:
+        in_class = list(
+            Enrollment.objects.filter(
+                school_id=school_id, klass_id=klass_id, withdrawn_on__isnull=True
+            ).values_list("student_id", flat=True)
+        )
+        student_qs = student_qs.filter(id__in=in_class)
+
+    students = {s.id: s for s in student_qs}
+    if not students:
+        return []
+
+    # Latest class label per student (one query; first row per student wins).
+    klass_by_student: dict = {}
+    for e in (
+        Enrollment.objects.filter(student_id__in=list(students.keys()))
+        .select_related("klass")
+        .order_by("student_id", "-enrolled_on")
+    ):
+        if e.student_id not in klass_by_student and e.klass_id:
+            klass_by_student[e.student_id] = e.klass
+
+    stats = (
+        QuizAttempt.objects.filter(
+            student_id__in=list(students.keys()),
+            status=QuizAttempt.Status.SUBMITTED,
+        )
+        .values("student_id")
+        .annotate(avg=Avg("score_percent"), quizzes=Count("id"), last=Max("submitted_at"))
+    )
+
+    rows = []
+    for r in stats:
+        s = students.get(r["student_id"])
+        if s is None:
+            continue
+        klass = klass_by_student.get(s.id)
+        rows.append({
+            "id": str(s.id),
+            "first_name": s.first_name,
+            "last_name": s.last_name,
+            "full_name": s.get_full_name() or s.username,
+            "grade": klass.grade if klass else None,
+            "section": klass.section if klass else None,
+            "class_name": f"Grade {klass.grade}-{klass.section}" if klass else None,
+            "quizzes_attempted": r["quizzes"],
+            "avg_score": round(float(r["avg"]), 2) if r["avg"] is not None else None,
+        })
+
+    rows.sort(key=lambda x: (
+        -(x["avg_score"] or 0.0),
+        -(x["quizzes_attempted"] or 0),
+        (x["full_name"] or "").lower(),
+    ))
+    for i, row in enumerate(rows):
+        row["rank"] = i + 1
+    return rows
+
+
+def rank_in_class(student) -> tuple[int | None, int]:
+    """The student's (rank, class_size) within their current class.
+
+    Rank is over classmates with ≥1 submitted attempt (the leaderboard set);
+    a student with no attempts gets rank=None. class_size is the headcount of
+    the class regardless of activity. Returns (None, 0) if the student is not
+    enrolled in any class.
+    """
+    from apps.academics.models import Enrollment
+
+    enr = (
+        Enrollment.objects.filter(student=student, withdrawn_on__isnull=True)
+        .select_related("klass")
+        .order_by("-enrolled_on")
+        .first()
+    )
+    if enr is None or enr.klass_id is None:
+        return None, 0
+
+    class_size = (
+        Enrollment.objects.filter(
+            school_id=student.school_id, klass_id=enr.klass_id, withdrawn_on__isnull=True
+        )
+        .values("student_id")
+        .distinct()
+        .count()
+    )
+    board = student_leaderboard(school_id=student.school_id, klass_id=enr.klass_id)
+    for row in board:
+        if row["id"] == str(student.id):
+            return row["rank"], class_size
+    return None, class_size

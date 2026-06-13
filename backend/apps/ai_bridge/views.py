@@ -20,12 +20,21 @@ import logging
 
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.permissions import IsPrincipal, IsStudent, IsSubAdmin, IsTeacher
+from apps.common.permissions import (
+    IsMainAdmin,
+    IsPrincipal,
+    IsStudent,
+    IsSubAdmin,
+    IsTeacher,
+    Role,
+)
+from apps.schools.models import School
 
 from . import services
 from .client import AiServiceError, AiServiceUnavailable
@@ -43,6 +52,118 @@ logger = logging.getLogger(__name__)
 
 _503 = OpenApiResponse(description="AI service temporarily unavailable.")
 _403 = OpenApiResponse(description="Insufficient role or missing school context.")
+
+
+def _resolve_ai_school(request: Request) -> School:
+    """The School an AI job is billed/audited under.
+
+    School-scoped staff use their own school (from the JWT). MAIN_ADMIN has no
+    school of their own, so when they generate for a specific school (e.g. the
+    super-admin quiz wizard) they must name it via `school` in the request body.
+    """
+    user = request.user
+    if user.role == Role.MAIN_ADMIN:
+        school_id = request.data.get("school")
+        if not school_id:
+            raise ValidationError({"school": "Select a school for this AI request."})
+        school = School.objects.filter(id=school_id).first()
+        if school is None:
+            raise ValidationError({"school": "School not found."})
+        return school
+    return user.school
+
+
+def _student_career_context(user) -> dict:
+    """Build the real profile the roadmap / recommendations agents reason over —
+    grade (from current enrolment) + per-subject quiz performance + strengths.
+    All from live data so the AI output is personalised, never generic."""
+    from django.db.models import Avg, Count
+
+    from apps.academics.models import Enrollment
+    from apps.quizzes.models import QuizAttempt
+
+    enr = (
+        Enrollment.objects.filter(student=user, withdrawn_on__isnull=True)
+        .select_related("klass").order_by("-enrolled_on").first()
+    )
+    grade = enr.klass.grade if enr and enr.klass_id else None
+
+    submitted = QuizAttempt.objects.filter(student=user, status=QuizAttempt.Status.SUBMITTED)
+    rows = (
+        submitted.values("quiz__course__name")
+        .annotate(avg=Avg("score_percent"), n=Count("id"))
+    )
+    subjects = [
+        {
+            "subject": r["quiz__course__name"] or "General",
+            "avg_score": round(float(r["avg"]), 1),
+            "attempts": r["n"],
+        }
+        for r in rows if r["avg"] is not None
+    ]
+    subjects.sort(key=lambda s: -s["avg_score"])
+    overall = submitted.aggregate(a=Avg("score_percent"))["a"]
+
+    return {
+        "student_id": str(user.id),
+        "school_name": user.school.name if user.school_id else "",
+        "grade": grade,
+        "overall_avg_score": round(float(overall), 1) if overall is not None else None,
+        "quizzes_taken": submitted.count(),
+        "subject_performance": subjects,
+        "strengths": [s["subject"] for s in subjects[:2]],
+        "needs_work": [s["subject"] for s in subjects[-2:]] if len(subjects) > 2 else [],
+    }
+
+
+class CareerRoadmapView(APIView):
+    """
+    POST /api/v1/ai/career/roadmap/
+
+    Generates a personalised, chronological career roadmap for the requesting
+    student, grounded in their real grade + quiz performance.
+    """
+
+    permission_classes = [IsStudent]
+
+    @extend_schema(request=None, responses={200: dict, 503: _503})
+    def post(self, request: Request) -> Response:
+        user = request.user
+        payload = {"student_context": _student_career_context(user)}
+        try:
+            result = services.career_roadmap(school=user.school, user=user, payload=payload)
+        except (AiServiceUnavailable, AiServiceError) as exc:
+            logger.warning("career_roadmap failed — user=%s err=%s", user.id, exc)
+            return Response(
+                {"detail": "AI service is temporarily unavailable. Please try again shortly."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(result)
+
+
+class CareerRecommendationsView(APIView):
+    """
+    POST /api/v1/ai/career/recommendations/
+
+    Recommends best-fit careers + skill-building workshops for the requesting
+    student, grounded in their real quiz strengths.
+    """
+
+    permission_classes = [IsStudent]
+
+    @extend_schema(request=None, responses={200: dict, 503: _503})
+    def post(self, request: Request) -> Response:
+        user = request.user
+        payload = {"student_context": _student_career_context(user)}
+        try:
+            result = services.career_recommendations(school=user.school, user=user, payload=payload)
+        except (AiServiceUnavailable, AiServiceError) as exc:
+            logger.warning("career_recommendations failed — user=%s err=%s", user.id, exc)
+            return Response(
+                {"detail": "AI service is temporarily unavailable. Please try again shortly."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(result)
 
 
 class CareerAskView(APIView):
@@ -126,16 +247,17 @@ class GenerateQuestionsView(APIView):
     via the quiz API (Vishal's, week 5–6).
     """
 
-    permission_classes = [IsTeacher | IsPrincipal | IsSubAdmin]
+    permission_classes = [IsTeacher | IsPrincipal | IsSubAdmin | IsMainAdmin]
 
     @extend_schema(request=GenerateQuestionsSerializer, responses={200: dict, 503: _503})
     def post(self, request: Request) -> Response:
         ser = GenerateQuestionsSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        school = _resolve_ai_school(request)
 
         try:
             result = services.generate_questions(
-                school=request.user.school,
+                school=school,
                 user=request.user,
                 payload=ser.validated_data,
             )
@@ -157,7 +279,7 @@ class GenerateQuestionsFromPdfView(APIView):
     Same role gate as the JSON variant: TEACHER | PRINCIPAL | SUB_ADMIN.
     """
 
-    permission_classes = [IsTeacher | IsPrincipal | IsSubAdmin]
+    permission_classes = [IsTeacher | IsPrincipal | IsSubAdmin | IsMainAdmin]
     parser_classes = [MultiPartParser, FormParser]
 
     @extend_schema(request=GenerateFromPdfSerializer, responses={200: dict, 503: _503})
@@ -165,6 +287,7 @@ class GenerateQuestionsFromPdfView(APIView):
         ser = GenerateFromPdfSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
+        school = _resolve_ai_school(request)
 
         uploaded = data["file"]
         pdf_bytes = uploaded.read()
@@ -178,7 +301,7 @@ class GenerateQuestionsFromPdfView(APIView):
 
         try:
             result = services.generate_from_pdf(
-                school=request.user.school,
+                school=school,
                 user=request.user,
                 pdf_bytes=pdf_bytes,
                 filename=uploaded.name,

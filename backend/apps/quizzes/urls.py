@@ -6,16 +6,22 @@ Owner:   Navanish
   /api/v1/quizzes/banks/                    → QuestionBank CRUD
   /api/v1/quizzes/banks/{id}/import-csv/    → POST CSV bulk question import (Phase 4)
   /api/v1/quizzes/questions/                → Question CRUD
-  /api/v1/quizzes/quizzes/                  → Quiz CRUD + state actions + /start/ + /rankings/
+  /api/v1/quizzes/                          → Quiz CRUD + state actions + /{id}/start/ + /{id}/rankings/
+  /api/v1/quizzes/rankings/                 → student class/school leaderboard (?scope=CLASS|SCHOOL)
   /api/v1/quizzes/attempts/                 → QuizAttempt read + /next/, /answer/, /submit/
+  /api/v1/quizzes/attempts/summary/         → student dashboard hero stats
+  /api/v1/quizzes/attempts/pending-feedback/→ short-answer feedback queue (staff)
+  /api/v1/quizzes/answers/{id}/feedback/    → PATCH teacher grade for one short answer
   /api/v1/quizzes/assignments/              → QuizAssignment CRUD (Phase 4)
 """
 
 from __future__ import annotations
 
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AnswerFeedbackView,
     QuestionBankViewSet,
     QuestionViewSet,
     QuizAssignmentViewSet,
@@ -37,4 +43,8 @@ router.register(r"attempts", QuizAttemptViewSet, basename="quiz-attempt")
 router.register(r"assignments", QuizAssignmentViewSet, basename="quiz-assignment")
 router.register(r"", QuizViewSet, basename="quiz")
 
-urlpatterns = router.urls
+# Explicit path BEFORE the router so the root QuizViewSet's bare detail route
+# (^(?P<id>)/$) can never shadow it.
+urlpatterns = [
+    path("answers/<uuid:id>/feedback/", AnswerFeedbackView.as_view(), name="answer-feedback"),
+] + router.urls

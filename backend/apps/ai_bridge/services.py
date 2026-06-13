@@ -99,6 +99,21 @@ def college_finder(*, school: School, user: User, payload: dict[str, Any]) -> di
     )
 
 
+def career_roadmap(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
+    # Reuses the CAREER job kind — roadmap is a Career Pilot call, no new AiJob.Kind.
+    return _execute(
+        kind=_Kind.CAREER, school=school, created_by=user,
+        payload=payload, call=ai_client.career_roadmap,
+    )
+
+
+def career_recommendations(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
+    return _execute(
+        kind=_Kind.CAREER, school=school, created_by=user,
+        payload=payload, call=ai_client.career_recommendations,
+    )
+
+
 def generate_questions(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
     return _execute(
         kind=_Kind.QUESTION_GEN, school=school, created_by=user,

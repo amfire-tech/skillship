@@ -26,13 +26,19 @@ interface Student {
   quizzes_attempted?: number;
   avg_score?: number;
   last_attempt_at?: string;
-  trend?: number; // % change vs prior period
 }
 
 interface AcademicClass { id: string; name?: string; class_name?: string }
 
 function initials(name: string) {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+}
+
+// Parse a timestamp for sorting; missing / invalid dates sink to the bottom.
+function ts(iso?: string) {
+  if (!iso) return -Infinity;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? -Infinity : t;
 }
 
 function fmtDate(iso?: string) {
@@ -90,6 +96,7 @@ export default function StudentPerformancePage() {
         roll_number: r.roll_number ?? undefined,
         quizzes_attempted: r.quizzes_attempted ?? undefined,
         avg_score: r.avg_score ?? undefined,
+        last_attempt_at: r.last_attempt_at ?? undefined,
       })));
       setClasses([]);
     } catch {
@@ -119,7 +126,9 @@ export default function StudentPerformancePage() {
         || (scoreFilter === "MID"  && sc >= 65 && sc < 80)
         || (scoreFilter === "LOW"  && sc >= 0  && sc < 65);
       return matchSearch && matchClass && matchScore;
-    });
+    })
+      // Most recent submission first; never-attempted students fall to the bottom.
+      .sort((a, b) => ts(b.last_attempt_at) - ts(a.last_attempt_at));
   }, [students, search, classFilter, scoreFilter]);
 
   // Aggregate stats for the strip
@@ -183,7 +192,6 @@ export default function StudentPerformancePage() {
                 <th className="px-6 py-3">Class · Section</th>
                 <th className="px-6 py-3">Quizzes Attempted</th>
                 <th className="px-6 py-3">Avg Score</th>
-                <th className="px-6 py-3">Trend</th>
                 <th className="px-6 py-3">Last Attempt</th>
               </tr>
             </thead>
@@ -191,13 +199,13 @@ export default function StudentPerformancePage() {
               {filtered === null ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-[var(--border)]/60 last:border-0">
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 5 }).map((__, j) => (
                       <td key={j} className="px-6 py-3.5"><div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8">
+                <tr><td colSpan={5} className="px-6 py-8">
                   <EmptyState
                     title={students?.length === 0 ? "No students yet" : "No students match"}
                     description={students?.length === 0 ? "Once the Super Admin assigns students to you, they'll appear here with their class and performance." : "Try clearing the filters or search."}
@@ -223,13 +231,6 @@ export default function StudentPerformancePage() {
                       </td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.quizzes_attempted ?? "—"}</td>
                       <td className="px-6 py-3.5"><ScoreBar value={s.avg_score} /></td>
-                      <td className="px-6 py-3.5">
-                        {typeof s.trend === "number" ? (
-                          <span className={`inline-flex items-center gap-1 text-xs font-semibold ${s.trend >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                            {s.trend >= 0 ? "↑" : "↓"} {Math.abs(s.trend)}%
-                          </span>
-                        ) : <span className="text-xs text-[var(--muted-foreground)]">—</span>}
-                      </td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{fmtDate(s.last_attempt_at)}</td>
                     </tr>
                   );

@@ -23,7 +23,9 @@ def draft_quiz_a(school_a, course_a, bank_a, teacher_a):
 
 
 def _url(quiz: Quiz, action: str = "") -> str:
-    base = f"/api/v1/quizzes/quizzes/{quiz.id}/"
+    # QuizViewSet is registered at the router root → /api/v1/quizzes/{id}/...
+    # (not the old doubly-nested /quizzes/quizzes/{id}/).
+    base = f"/api/v1/quizzes/{quiz.id}/"
     return base + action + ("/" if action else "")
 
 
@@ -87,7 +89,7 @@ class TestQuizListIsolation:
         )
 
         login(api_client, student_a)
-        ids = {q["id"] for q in api_client.get("/api/v1/quizzes/quizzes/").json()["results"]}
+        ids = {q["id"] for q in api_client.get("/api/v1/quizzes/").json()["results"]}
         assert str(pub.id) in ids
         assert str(draft.id) not in ids
         assert str(review.id) not in ids
@@ -95,7 +97,7 @@ class TestQuizListIsolation:
         # Student B in another school sees zero of A's quizzes.
         api_client.credentials()
         login(api_client, student_b)
-        ids_b = {q["id"] for q in api_client.get("/api/v1/quizzes/quizzes/").json()["results"]}
+        ids_b = {q["id"] for q in api_client.get("/api/v1/quizzes/").json()["results"]}
         assert ids_b.isdisjoint({str(draft.id), str(review.id), str(pub.id)})
 
 

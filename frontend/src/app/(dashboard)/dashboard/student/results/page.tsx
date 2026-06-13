@@ -20,8 +20,11 @@ interface Attempt {
   quiz_subject?: string;
   quiz_total_questions?: number;
   status?: string;
+  awaiting_review?: boolean;
   score_percent?: number | null;
   score?: number;
+  points_earned?: number | null;
+  points_total?: number | null;
   correct_count?: number;
   correct?: number;
   wrong_count?: number;
@@ -71,7 +74,9 @@ export default function MyResultsPage() {
     return attempts.filter((a) => {
       const score = a.score_percent ?? a.score;
       const passed = a.passed ?? (typeof score === "number" && score >= 50);
-      const okF = filter === "ALL" || (filter === "PASS" ? passed : !passed);
+      // Attempts still awaiting a teacher's grade have no pass/fail yet — they
+      // only show under "All".
+      const okF = filter === "ALL" || (!a.awaiting_review && (filter === "PASS" ? passed : !passed));
       const okS = !q || (a.quiz_title ?? "").toLowerCase().includes(q) || (a.quiz_subject ?? "").toLowerCase().includes(q);
       return okF && okS;
     });
@@ -144,12 +149,21 @@ export default function MyResultsPage() {
                         {a.quiz_subject && <p className="text-xs text-[var(--muted-foreground)]">{a.quiz_subject}</p>}
                       </td>
                       <td className="px-6 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-base font-bold ${passed ? "text-emerald-600" : "text-red-500"}`}>
-                            {typeof score === "number" ? `${Math.round(Number(score))}%` : "—"}
+                        {a.awaiting_review ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                            Pending review
                           </span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${passed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"}`}>{passed ? "PASS" : "FAIL"}</span>
-                        </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className={`text-base font-bold ${passed ? "text-emerald-600" : "text-red-500"}`}>
+                              {typeof a.points_earned === "number" && typeof a.points_total === "number"
+                                ? `${a.points_earned} / ${a.points_total}`
+                                : (typeof score === "number" ? `${Math.round(Number(score))}%` : "—")}
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${passed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"}`}>{passed ? "PASS" : "FAIL"}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3.5 text-xs text-[var(--muted-foreground)]">
                         <span className="font-semibold text-emerald-600">{correct ?? "—"}</span>

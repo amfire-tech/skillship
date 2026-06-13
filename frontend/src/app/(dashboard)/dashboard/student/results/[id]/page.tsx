@@ -18,7 +18,10 @@ interface Attempt {
   id: string;
   quiz_id?: string;
   quiz_title?: string;
+  awaiting_review?: boolean;
   score?: number;
+  points_earned?: number | null;
+  points_total?: number | null;
   correct?: number;
   wrong?: number;
   skipped?: number;
@@ -38,19 +41,18 @@ interface Attempt {
   questions?: ResultQuestion[];
 }
 
+interface ResultOption { id: string; text: string; is_correct?: boolean; selected?: boolean }
 interface ResultQuestion {
   id: string;
-  question_text?: string;
   text?: string;
-  options?: string[];
-  choices?: string[];
-  student_answer?: string | number;
-  student_answer_text?: string;
-  correct_answer_index?: number;
-  correct_answer?: string;
-  explanation?: string;
+  type?: string;                 // "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER"
+  points?: number;               // max marks
+  points_awarded?: number;       // marks earned
   is_correct?: boolean;
-  status?: "CORRECT" | "WRONG" | "SKIPPED";
+  answered?: boolean;
+  options?: ResultOption[];      // MCQ / TF — with is_correct + selected flags
+  student_answer_text?: string;  // descriptive
+  expected_answer?: string;      // descriptive — model answer
 }
 
 function ordinal(n: number) { const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]); }
@@ -85,10 +87,13 @@ export default function ResultDetailPage() {
 
   const score = typeof attempt?.score === "number" ? Math.round(attempt.score) : null;
   const passed = attempt?.passed ?? (score != null && score >= 50);
-  const correct = attempt?.correct ?? 0;
-  const wrong = attempt?.wrong ?? 0;
-  const skipped = attempt?.skipped ?? 0;
-  const total = attempt?.total ?? (correct + wrong + skipped);
+  // Breakdown counts come from the per-question review (real data), not from
+  // fields the API never sent. Empty while awaiting review.
+  const reviewQs = attempt?.questions ?? [];
+  const total = reviewQs.length;
+  const correct = reviewQs.filter((q) => q.is_correct).length;
+  const skipped = reviewQs.filter((q) => !q.answered).length;
+  const wrong = Math.max(total - correct - skipped, 0);
 
   async function shareCertificate() {
     if (!attempt?.certificate_url && !attempt?.certificate_id) {
@@ -132,6 +137,18 @@ export default function ResultDetailPage() {
       {/* Hero banner */}
       {loading ? (
         <div className="h-32 animate-pulse rounded-2xl bg-[var(--muted)]/60" />
+      ) : attempt?.awaiting_review ? (
+        // Quiz has written answers the teacher hasn't graded yet — withhold marks.
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 p-6 text-white shadow-[0_30px_60px_-20px_rgba(245,158,11,0.4)] md:p-7">
+          <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+            Awaiting teacher review
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">&ldquo;{attempt?.quiz_title ?? "Quiz"}&rdquo; submitted</h1>
+          <p className="mt-1.5 text-sm text-white/90">
+            Your written answers are being graded by your teacher. Your marks will appear here once every answer has been reviewed.
+          </p>
+        </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className={`overflow-hidden rounded-2xl bg-gradient-to-br ${passed ? "from-emerald-500 to-emerald-600" : "from-amber-500 to-orange-500"} p-6 text-white shadow-[0_30px_60px_-20px_rgba(16,185,129,0.4)] md:p-7`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -148,14 +165,22 @@ export default function ResultDetailPage() {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-4xl font-bold md:text-5xl">{score ?? "—"}/100</p>
+              {typeof attempt?.points_earned === "number" && typeof attempt?.points_total === "number" ? (
+                <>
+                  <p className="text-4xl font-bold md:text-5xl">{attempt.points_earned}<span className="text-2xl">/{attempt.points_total}</span></p>
+                  <p className="mt-0.5 text-sm text-white/85">marks{score != null ? ` · ${score}%` : ""}</p>
+                </>
+              ) : (
+                <p className="text-4xl font-bold md:text-5xl">{score ?? "—"}/100</p>
+              )}
               {attempt?.rank && <p className="mt-1 text-sm text-white/85">Rank: {ordinal(attempt.rank)}{attempt.total_in_class ? ` of ${attempt.total_in_class}` : ""}</p>}
             </div>
           </div>
         </motion.div>
       )}
 
-      {/* Score breakdown + AI analysis */}
+      {/* Score breakdown + AI analysis — hidden until the teacher has graded. */}
+      {!attempt?.awaiting_review && (
       <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_minmax(0,2fr)]">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
           <h2 className="text-center text-base font-bold tracking-tight text-[var(--foreground)]">Score Breakdown</h2>
@@ -240,8 +265,10 @@ export default function ResultDetailPage() {
           </div>
         </motion.div>
       </div>
+      )}
 
-      {/* Question review */}
+      {/* Question review — also hidden until graded. */}
+      {!attempt?.awaiting_review && (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
         <div className="border-b border-[var(--border)] px-6 py-5">
           <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Question Review</h2>
@@ -254,9 +281,8 @@ export default function ResultDetailPage() {
             <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">Question-level review not available for this attempt.</p>
           ) : (
             (attempt?.questions ?? []).map((q, i) => {
-              const correctText = q.correct_answer ?? (typeof q.correct_answer_index === "number" ? (q.options ?? q.choices ?? [])[q.correct_answer_index] : "");
-              const isCorrect = q.is_correct ?? q.status === "CORRECT";
-              const studentText = q.student_answer_text ?? (typeof q.student_answer === "number" ? (q.options ?? q.choices ?? [])[q.student_answer] : (typeof q.student_answer === "string" ? q.student_answer : "—"));
+              const isShort = q.type === "SHORT_ANSWER";
+              const isCorrect = !!q.is_correct;
               return (
                 <div key={q.id} className="rounded-xl border border-[var(--border)] p-4">
                   <div className="flex items-start gap-3">
@@ -265,24 +291,46 @@ export default function ResultDetailPage() {
                         ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                         : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="M6 6l12 12" /></svg>}
                     </span>
-                    <p className="text-sm font-semibold text-[var(--foreground)]">Q{i + 1}. {q.question_text ?? q.text ?? "—"}</p>
+                    <p className="flex-1 text-sm font-semibold text-[var(--foreground)]">Q{i + 1}. {q.text ?? "—"}</p>
+                    <span className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                      {q.points_awarded ?? 0}/{q.points ?? 1} marks
+                    </span>
                   </div>
                   <div className="mt-3 space-y-2 pl-10">
-                    <div className={`rounded-lg px-3 py-2 text-sm ${isCorrect ? "bg-emerald-50 dark:bg-emerald-500/10" : "bg-red-50 dark:bg-red-500/10"}`}>
-                      <span className="font-semibold text-[var(--foreground)]">Your answer:</span>{" "}
-                      <span className={isCorrect ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}>{studentText || "Skipped"}</span>
-                    </div>
-                    {!isCorrect && correctText && (
-                      <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm dark:bg-emerald-500/10">
-                        <span className="font-semibold text-[var(--foreground)]">Correct answer:</span>{" "}
-                        <span className="text-emerald-700 dark:text-emerald-300">{correctText}</span>
-                      </div>
-                    )}
-                    {q.explanation && (
-                      <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm dark:bg-blue-500/10">
-                        <span className="font-semibold text-[var(--foreground)]"><span aria-hidden="true">📘</span> Explanation:</span>{" "}
-                        <span className="text-[var(--muted-foreground)]">{q.explanation}</span>
-                      </div>
+                    {isShort ? (
+                      <>
+                        <div className="rounded-lg bg-[var(--muted)]/50 px-3 py-2 text-sm">
+                          <span className="font-semibold text-[var(--foreground)]">Your answer:</span>{" "}
+                          <span className="text-[var(--foreground)]">{q.student_answer_text || "Not answered"}</span>
+                        </div>
+                        {q.expected_answer && (
+                          <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm dark:bg-emerald-500/10">
+                            <span className="font-semibold text-[var(--foreground)]">Model answer:</span>{" "}
+                            <span className="text-emerald-700 dark:text-emerald-300">{q.expected_answer}</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {(q.options ?? []).map((o) => (
+                          <li
+                            key={o.id}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+                              o.is_correct
+                                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                : o.selected
+                                ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                                : "bg-[var(--muted)]/40 text-[var(--muted-foreground)]"
+                            }`}
+                          >
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-[10px] font-bold">{String(o.id).toUpperCase()}</span>
+                            <span className="flex-1">{o.text}</span>
+                            {o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">✓ Correct</span>}
+                            {o.selected && !o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">Your answer</span>}
+                            {o.selected && o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">Your answer</span>}
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
                 </div>
@@ -291,6 +339,7 @@ export default function ResultDetailPage() {
           )}
         </div>
       </motion.div>
+      )}
     </div>
   );
 }
