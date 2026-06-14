@@ -10,7 +10,9 @@ interface BarChartCardProps {
 }
 
 export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
-  const max = Math.max(...data.map((d) => d.value));
+  // Floor the max at 1 so an all-zero dataset can't produce NaN bar heights or
+  // a column of duplicate "0" tick keys.
+  const max = Math.max(1, ...data.map((d) => d.value));
   const ticks = [0, Math.round(max / 4), Math.round(max / 2), Math.round((3 * max) / 4), max];
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -35,8 +37,8 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
       <div aria-hidden="true" className="mt-5 flex h-[220px] items-end gap-2">
         {/* Y ticks */}
         <div className="flex h-full flex-col justify-between py-1 text-xs text-[var(--muted-foreground)]">
-          {ticks.slice().reverse().map((t) => (
-            <span key={t}>{t}</span>
+          {ticks.slice().reverse().map((t, i) => (
+            <span key={i}>{t}</span>
           ))}
         </div>
 

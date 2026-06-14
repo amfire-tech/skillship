@@ -30,6 +30,17 @@ interface Assignment {
   klass?: string | null;
 }
 
+interface Attempt {
+  id: string;
+  quiz?: string;             // quiz UUID this attempt belongs to
+  status?: string;
+  score_percent?: number | null;
+  score?: number | null;
+  passed?: boolean | null;
+  submitted_at?: string;
+  created_at?: string;
+}
+
 const difficultyStyle: Record<string, string> = {
   EASY:   "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300",
   MEDIUM: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
@@ -60,6 +71,9 @@ function QuizSkeleton() {
 export default function StudentQuizzesPage() {
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
+  // quizId → the student's latest attempt for that quiz (so cards can show an
+  // "Attempted" badge + link to the result instead of looking identical to new ones).
+  const [attemptByQuiz, setAttemptByQuiz] = useState<Map<string, Attempt>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -68,9 +82,10 @@ export default function StudentQuizzesPage() {
     if (!token) { setError("Authentication failed."); return; }
 
     try {
-      const [qRes, aRes] = await Promise.all([
+      const [qRes, aRes, atRes] = await Promise.all([
         fetch(`${API_BASE}/quizzes/?status=PUBLISHED`, { headers: { Authorization: `Bearer ${token}` } }),
         apiFetch(`/quizzes/assignments/`),
+        apiFetch(`/quizzes/attempts/`),
       ]);
 
       if (!qRes.ok) {
@@ -80,6 +95,17 @@ export default function StudentQuizzesPage() {
         setQuizzes(asArray<Quiz>(await qRes.json()));
       }
       setAssignments(aRes.ok ? asArray<Assignment>(await aRes.json()) : []);
+
+      // Keep the most-recent attempt per quiz.
+      const map = new Map<string, Attempt>();
+      if (atRes.ok) {
+        const att = asArray<Attempt>(await atRes.json());
+        att.sort((x, y) => new Date(y.submitted_at ?? y.created_at ?? "").getTime() - new Date(x.submitted_at ?? x.created_at ?? "").getTime());
+        for (const a of att) {
+          if (a.quiz && !map.has(a.quiz)) map.set(a.quiz, a);
+        }
+      }
+      setAttemptByQuiz(map);
     } catch {
       setError("Network error. Please check your connection and try again.");
       setQuizzes([]); setAssignments([]);
@@ -120,6 +146,7 @@ export default function StudentQuizzesPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {assignments.map((a) => {
               const overdue = a.due_at ? new Date(a.due_at).getTime() < Date.now() : false;
+              const attempt = attemptByQuiz.get(a.quiz);
               return (
                 <div
                   key={a.id}
@@ -131,6 +158,7 @@ export default function StudentQuizzesPage() {
                       {a.student ? "Personal" : "Class"}
                     </span>
                   </div>
+                  <StatusPill attempt={attempt} />
                   {a.due_at ? (
                     <p className={`text-[12px] ${overdue ? "text-red-600 font-semibold" : "text-[var(--muted-foreground)]"}`}>
                       {overdue ? "Overdue · " : "Due "}
@@ -140,12 +168,21 @@ export default function StudentQuizzesPage() {
                     <p className="text-[12px] text-[var(--muted-foreground)]">No due date</p>
                   )}
                   <div className="mt-auto flex justify-end">
-                    <Link
-                      href={`/dashboard/student/quizzes/${a.quiz}`}
-                      className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
-                    >
-                      Start
-                    </Link>
+                    {attempt ? (
+                      <Link
+                        href={`/dashboard/student/results/${attempt.id}`}
+                        className="rounded-xl border border-primary/40 bg-white px-4 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5 dark:bg-[var(--background)]"
+                      >
+                        View Result
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/dashboard/student/quizzes/${a.quiz}`}
+                        className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+                      >
+                        Start
+                      </Link>
+                    )}
                   </div>
                 </div>
               );
@@ -173,7 +210,9 @@ export default function StudentQuizzesPage() {
       {/* Quiz cards */}
       {quizzes !== null && quizzes.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz) => (
+          {quizzes.map((quiz) => {
+            const attempt = attemptByQuiz.get(quiz.id);
+            return (
             <div
               key={quiz.id}
               className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm flex flex-col gap-3"
@@ -193,6 +232,8 @@ export default function StudentQuizzesPage() {
                 )}
               </div>
 
+              <StatusPill attempt={attempt} />
+
               {quiz.subject && (
                 <p className="text-[13px] text-[var(--muted-foreground)]">{quiz.subject}</p>
               )}
@@ -207,17 +248,46 @@ export default function StudentQuizzesPage() {
               )}
 
               <div className="mt-auto flex justify-end">
-                <Link
-                  href={`/dashboard/student/quizzes/${quiz.id}`}
-                  className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
-                >
-                  Start
-                </Link>
+                {attempt ? (
+                  <Link
+                    href={`/dashboard/student/results/${attempt.id}`}
+                    className="rounded-xl border border-[var(--border)] px-4 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5"
+                  >
+                    View Result
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/dashboard/student/quizzes/${quiz.id}`}
+                    className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+                  >
+                    Start
+                  </Link>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Attempted / not-attempted status pill ──────────────────────────────────
+function StatusPill({ attempt }: { attempt?: Attempt }) {
+  if (attempt) {
+    const score = attempt.score_percent ?? attempt.score;
+    const pending = attempt.status && attempt.status !== "SUBMITTED";
+    return (
+      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        {pending ? "In progress" : "Attempted"}{!pending && typeof score === "number" ? ` · ${Math.round(Number(score))}%` : ""}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex w-fit items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+      Not attempted
+    </span>
   );
 }

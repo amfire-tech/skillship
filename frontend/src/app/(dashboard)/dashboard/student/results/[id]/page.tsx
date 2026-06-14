@@ -13,6 +13,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { API_BASE, getToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
+import { SkillshipLockup } from "@/components/brand/SkillshipMark";
 
 interface Attempt {
   id: string;
@@ -32,9 +33,9 @@ interface Attempt {
   class_name?: string;
   school_name?: string;
   attempted_at?: string;
+  submitted_at?: string;
   created_at?: string;
-  certificate_url?: string;
-  certificate_id?: string;
+  certificate_available?: boolean;
   ai_analysis?: string;
   weak_areas?: string[];
   practice_topics?: { title: string; href?: string }[];
@@ -64,7 +65,8 @@ export default function ResultDetailPage() {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,34 +97,85 @@ export default function ResultDetailPage() {
   const skipped = reviewQs.filter((q) => !q.answered).length;
   const wrong = Math.max(total - correct - skipped, 0);
 
-  async function shareCertificate() {
-    if (!attempt?.certificate_url && !attempt?.certificate_id) {
-      toast("No certificate available for this attempt.", "info");
-      return;
-    }
-    const url = attempt.certificate_url ?? `${window.location.origin}/certificates/${attempt.certificate_id}`;
+  function certFileName() {
+    return `${(attempt?.quiz_title ?? "skillship").replace(/[^a-z0-9]+/gi, "_")}-certificate.pdf`;
+  }
+
+  // The certificate PDF is generated + auth-protected by the backend, so we fetch
+  // the bytes (Bearer token) and hand the browser a blob — there is no public URL.
+  async function fetchCertBlob(): Promise<Blob | null> {
+    const token = await getToken();
+    if (!token) { toast("Session expired.", "error"); return null; }
     try {
-      await navigator.clipboard.writeText(url);
-      setShareCopied(true);
-      toast("Certificate link copied", "success");
-      setTimeout(() => setShareCopied(false), 2000);
+      const res = await fetch(`${API_BASE}/quizzes/attempts/${id}/certificate/`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { toast(`Couldn't load certificate (${res.status})`, "error"); return null; }
+      return await res.blob();
     } catch {
-      toast("Couldn't copy — open the certificate manually.", "error");
+      toast("Network error — couldn't load the certificate.", "error");
+      return null;
+    }
+  }
+
+  function saveBlob(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = certFileName();
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadCertificate() {
+    setDownloading(true);
+    try {
+      const blob = await fetchCertBlob();
+      if (blob) saveBlob(blob);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function shareCertificate() {
+    setSharing(true);
+    try {
+      const blob = await fetchCertBlob();
+      if (!blob) return;
+      const file = new File([blob], certFileName(), { type: "application/pdf" });
+      const nav = navigator as Navigator & { canShare?: (d: unknown) => boolean };
+      // Native share sheet (mobile / supported browsers) — share the actual file.
+      if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
+        try {
+          await nav.share({ files: [file], title: `${attempt?.quiz_title ?? "Quiz"} — Certificate`, text: "I earned a certificate on Skillship!" });
+        } catch { /* user dismissed the share sheet */ }
+        return;
+      }
+      // No Web Share support (most desktops) — download so they can attach/share it.
+      saveBlob(blob);
+      toast("Certificate downloaded — you can now share the file", "success");
+    } finally {
+      setSharing(false);
     }
   }
 
   return (
     <div className="space-y-6">
+      {/* Brand letterhead — official Skillship logo + wordmark (from the brand
+          PDF). Marks this as a shareable, certificate-grade result page. */}
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
+        <SkillshipLockup badgeSize={40} wordmarkSize="lg" subLabel="Quiz Result" />
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/dashboard/student/results" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           Back to Dashboard
         </Link>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={shareCertificate} className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
-            {shareCopied ? "Copied!" : "Share Certificate"}
-          </button>
+          {attempt?.certificate_available && (
+            <button type="button" onClick={shareCertificate} disabled={sharing} className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-sm disabled:opacity-60">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
+              {sharing ? "Preparing…" : "Share Certificate"}
+            </button>
+          )}
           {attempt?.quiz_id && (
             <Link href={`/dashboard/student/quizzes/${attempt.quiz_id}`} className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--foreground)] hover:border-primary/30 hover:text-primary dark:bg-[var(--background)]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -159,7 +212,7 @@ export default function ResultDetailPage() {
               </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">Result for &ldquo;{attempt?.quiz_title ?? "Quiz"}&rdquo;</h1>
               <p className="mt-1.5 text-sm text-white/85">
-                Attempted on {fmtDate(attempt?.attempted_at ?? attempt?.created_at)}
+                Attempted on {fmtDate(attempt?.submitted_at ?? attempt?.attempted_at ?? attempt?.created_at)}
                 {attempt?.class_name ? ` · ${attempt.class_name}` : ""}
                 {attempt?.school_name ? ` · ${attempt.school_name}` : ""}
               </p>
@@ -238,7 +291,7 @@ export default function ResultDetailPage() {
                     ))}
                   </ol>
                 )}
-                {(attempt?.certificate_id || attempt?.certificate_url) && (
+                {attempt?.certificate_available && (
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">
                     <div className="flex items-start gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/30 dark:text-amber-300">
@@ -249,15 +302,10 @@ export default function ResultDetailPage() {
                         <p className="text-xs text-amber-800/80 dark:text-amber-200/80">You&apos;ve qualified for the {attempt?.quiz_title ?? "quiz"} completion certificate.</p>
                       </div>
                     </div>
-                    {attempt?.certificate_url ? (
-                      <a href={attempt.certificate_url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-amber-500 px-4 text-xs font-semibold text-white hover:bg-amber-600">
-                        Download
-                      </a>
-                    ) : attempt?.certificate_id ? (
-                      <Link href={`/dashboard/student/certificates`} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-amber-500 px-4 text-xs font-semibold text-white hover:bg-amber-600">
-                        View
-                      </Link>
-                    ) : null}
+                    <button type="button" onClick={downloadCertificate} disabled={downloading} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-amber-500 px-4 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-60">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                      {downloading ? "Preparing…" : "Download"}
+                    </button>
                   </div>
                 )}
               </>

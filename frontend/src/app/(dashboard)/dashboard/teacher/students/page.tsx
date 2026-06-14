@@ -26,6 +26,8 @@ interface Student {
   quizzes_attempted?: number;
   avg_score?: number;
   last_attempt_at?: string;
+  last_score?: number;        // score of the most recent submitted attempt
+  last_quiz_title?: string;   // title of that most recent exam
 }
 
 interface AcademicClass { id: string; name?: string; class_name?: string }
@@ -97,6 +99,8 @@ export default function StudentPerformancePage() {
         quizzes_attempted: r.quizzes_attempted ?? undefined,
         avg_score: r.avg_score ?? undefined,
         last_attempt_at: r.last_attempt_at ?? undefined,
+        last_score: r.last_score ?? undefined,
+        last_quiz_title: r.last_quiz_title ?? undefined,
       })));
       setClasses([]);
     } catch {
@@ -185,12 +189,13 @@ export default function StudentPerformancePage() {
       {/* Table */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                 <th className="px-6 py-3">Student</th>
                 <th className="px-6 py-3">Class · Section</th>
                 <th className="px-6 py-3">Quizzes Attempted</th>
+                <th className="px-6 py-3">Latest Exam · Marks</th>
                 <th className="px-6 py-3">Avg Score</th>
                 <th className="px-6 py-3">Last Attempt</th>
               </tr>
@@ -199,13 +204,13 @@ export default function StudentPerformancePage() {
               {filtered === null ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-[var(--border)]/60 last:border-0">
-                    {Array.from({ length: 5 }).map((__, j) => (
+                    {Array.from({ length: 6 }).map((__, j) => (
                       <td key={j} className="px-6 py-3.5"><div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} /></td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8">
+                <tr><td colSpan={6} className="px-6 py-8">
                   <EmptyState
                     title={students?.length === 0 ? "No students yet" : "No students match"}
                     description={students?.length === 0 ? "Once the Super Admin assigns students to you, they'll appear here with their class and performance." : "Try clearing the filters or search."}
@@ -230,6 +235,18 @@ export default function StudentPerformancePage() {
                         {s.class_name ?? s.grade ?? "—"}{s.section ? ` · ${s.section}` : ""}
                       </td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.quizzes_attempted ?? "—"}</td>
+                      <td className="px-6 py-3.5">
+                        {s.last_quiz_title || typeof s.last_score === "number" ? (
+                          <div className="min-w-0">
+                            {s.last_quiz_title && (
+                              <p className="max-w-[200px] truncate text-xs font-medium text-[var(--foreground)]" title={s.last_quiz_title}>{s.last_quiz_title}</p>
+                            )}
+                            <ScoreBar value={s.last_score} />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[var(--muted-foreground)]">—</span>
+                        )}
+                      </td>
                       <td className="px-6 py-3.5"><ScoreBar value={s.avg_score} /></td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{fmtDate(s.last_attempt_at)}</td>
                     </tr>

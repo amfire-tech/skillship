@@ -46,6 +46,7 @@ interface Settings {
   show_correct: boolean;
   passing_score: number;
   attempts_allowed: number;
+  certificate_enabled: boolean;
 }
 
 const STEPS = [
@@ -71,6 +72,7 @@ export default function QuizCreationWizard() {
   const [questions, setQuestions] = useState<DraftQuestion[]>([]);
   const [settings, setSettings] = useState<Settings>({
     shuffle_questions: true, show_correct: false, passing_score: 50, attempts_allowed: 1,
+    certificate_enabled: false,
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -139,6 +141,7 @@ export default function QuizCreationWizard() {
           passing_score: settings.passing_score,
           attempts_allowed: settings.attempts_allowed,
           shuffle_questions: settings.shuffle_questions,
+          certificate_enabled: settings.certificate_enabled,
           status: status === "PUBLISHED" ? "REVIEW" : status,
           questions: questions.map((q) => ({
             text: q.text,
@@ -558,6 +561,12 @@ function Step3Settings({ settings, onChange }: { settings: Settings; onChange: (
         checked={settings.show_correct}
         onChange={(v) => set("show_correct", v)}
       />
+      <ToggleRow
+        label="Issue Certificate on Pass"
+        description="Students who pass this quiz earn a downloadable certificate"
+        checked={settings.certificate_enabled}
+        onChange={(v) => set("certificate_enabled", v)}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Passing Score (%)">
@@ -633,6 +642,7 @@ function Step4Review({
         <ReviewItem k="Show Correct Answers" v={settings.show_correct ? "Yes" : "No"} />
         <ReviewItem k="Passing Score" v={`${settings.passing_score}%`} />
         <ReviewItem k="Attempts Allowed" v={String(settings.attempts_allowed)} />
+        <ReviewItem k="Certificate on Pass" v={settings.certificate_enabled ? "Yes" : "No"} />
       </ReviewCard>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">

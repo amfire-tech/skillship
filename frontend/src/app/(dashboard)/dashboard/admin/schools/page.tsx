@@ -19,6 +19,7 @@ interface ApiSchool {
   address: string;
   plan: string;
   is_active: boolean;
+  ai_enabled: boolean;
   created_at: string;
 }
 
@@ -80,6 +81,27 @@ export default function SchoolsManagementPage() {
     const matchStatus = statusFilter === "All Status" || (statusFilter === "Active" ? s.is_active : !s.is_active);
     return matchSearch && matchCity && matchStatus;
   });
+
+  async function toggleAi(school: ApiSchool) {
+    const next = !school.ai_enabled;
+    // Optimistic flip; revert on failure.
+    setSchools((prev) => prev.map((s) => s.id === school.id ? { ...s, ai_enabled: next } : s));
+    const token = await getToken();
+    if (!token) { toast("Session expired", "error"); return; }
+    try {
+      // School-wide AI switch lives on SchoolSettings; MAIN_ADMIN passes ?school=.
+      const res = await fetch(`${API_BASE}/schools/settings/?school=${school.id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ai_enabled: next }),
+      });
+      if (!res.ok) throw new Error();
+      toast(`AI ${next ? "enabled" : "disabled"} for ${school.name}`, next ? "success" : "info");
+    } catch {
+      setSchools((prev) => prev.map((s) => s.id === school.id ? { ...s, ai_enabled: !next } : s));
+      toast("Failed to update AI access", "error");
+    }
+  }
 
   async function handleRemove(school: ApiSchool) {
     const token = await getToken();
@@ -172,7 +194,7 @@ export default function SchoolsManagementPage() {
       >
         {loading ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[940px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   <th className="px-5 py-3">School Name</th>
@@ -180,11 +202,12 @@ export default function SchoolsManagementPage() {
                   <th className="px-5 py-3">Board</th>
                   <th className="px-5 py-3">Plan</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">AI Access</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <TableRowSkeleton rows={6} columns={6} withAvatar />
+                <TableRowSkeleton rows={6} columns={7} withAvatar />
               </tbody>
             </table>
           </div>
@@ -195,7 +218,7 @@ export default function SchoolsManagementPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[940px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   <th className="px-5 py-3">School Name</th>
@@ -203,12 +226,13 @@ export default function SchoolsManagementPage() {
                   <th className="px-5 py-3">Board</th>
                   <th className="px-5 py-3">Plan</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">AI Access</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="px-5 py-8">
+                  <tr><td colSpan={7} className="px-5 py-8">
                     <EmptyState
                       title={schools.length === 0 ? "No schools yet" : "No schools match"}
                       description={schools.length === 0 ? "Onboard your first school to start managing classes, teachers, and students." : "Adjust the search or filters to see more results."}
@@ -246,6 +270,19 @@ export default function SchoolsManagementPage() {
                         <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${s.is_active ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
                           {s.is_active ? "Active" : "Inactive"}
                         </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={s.ai_enabled}
+                          aria-label={`AI access for ${s.name}`}
+                          title={s.ai_enabled ? "AI enabled — click to disable for this school" : "AI disabled — click to enable for this school"}
+                          onClick={() => toggleAi(s)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${s.ai_enabled ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-300"}`}
+                        >
+                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${s.ai_enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                        </button>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1 text-xs">

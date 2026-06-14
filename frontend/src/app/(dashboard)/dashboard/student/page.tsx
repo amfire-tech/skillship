@@ -26,6 +26,7 @@ interface Quiz {
 
 interface Attempt {
   id: string;
+  quiz?: string;       // the quiz UUID this attempt belongs to
   quiz_id?: string;
   quiz_title?: string;
   score?: number;
@@ -82,12 +83,18 @@ export default function StudentMyLearning() {
         fetch(`${API_BASE}/quizzes/attempts/summary/`, { headers }),
         fetch(`${API_BASE}/auth/me/`, { headers }),
       ]);
-      if (quizzesRes.ok)  setUpcoming(asArray<Quiz>(await quizzesRes.json()).slice(0, 4));  else setUpcoming([]);
-      if (attemptsRes.ok) {
-        const att = asArray<Attempt>(await attemptsRes.json());
-        att.sort((a, b) => new Date(b.attempted_at ?? b.created_at ?? "").getTime() - new Date(a.attempted_at ?? a.created_at ?? "").getTime());
-        setRecent(att.slice(0, 5));
-      } else setRecent([]);
+
+      // Resolve attempts first so we can show only quizzes the student has NOT
+      // attempted yet under "Upcoming Quizzes".
+      const att = attemptsRes.ok ? asArray<Attempt>(await attemptsRes.json()) : [];
+      att.sort((a, b) => new Date(b.attempted_at ?? b.created_at ?? "").getTime() - new Date(a.attempted_at ?? a.created_at ?? "").getTime());
+      setRecent(att.slice(0, 5));
+      const attemptedIds = new Set(att.map((a) => a.quiz ?? a.quiz_id).filter(Boolean) as string[]);
+
+      if (quizzesRes.ok) {
+        const published = asArray<Quiz>(await quizzesRes.json());
+        setUpcoming(published.filter((q) => !attemptedIds.has(q.id)).slice(0, 4));
+      } else setUpcoming([]);
       if (summaryRes.ok)  setSummary(await summaryRes.json());                    else setSummary({ completed: 0, total: 0, avg_score: null });
       if (meRes.ok)       setProfile(await meRes.json());                         else setProfile({});
     } catch {

@@ -19,8 +19,15 @@ interface Attempt {
   quiz_title?: string;
   quiz_subject?: string;
   score?: number;
+  submitted_at?: string;
   attempted_at?: string;
   created_at?: string;
+}
+
+// The attempts list endpoint dates an attempt by `submitted_at`; older callers
+// looked only at `attempted_at` (never sent), which is why dates showed as "—".
+function attemptDate(a: Attempt): string | undefined {
+  return a.submitted_at ?? a.attempted_at ?? a.created_at;
 }
 
 export default function ProgressAnalyticsPage() {
@@ -51,7 +58,7 @@ export default function ProgressAnalyticsPage() {
     if (!attempts) return null;
     const cutoff = new Date();
     cutoff.setMonth(cutoff.getMonth() - months);
-    return attempts.filter((a) => new Date(a.attempted_at ?? a.created_at ?? "") >= cutoff);
+    return attempts.filter((a) => new Date(attemptDate(a) ?? "") >= cutoff);
   }, [attempts, months]);
 
   const kpi = useMemo(() => {
@@ -60,7 +67,7 @@ export default function ProgressAnalyticsPage() {
     const avg = scored.length === 0 ? null : Math.round(scored.reduce((s, a) => s + (a.score ?? 0), 0) / scored.length * 10) / 10;
     const best = scored.length === 0 ? null : Math.round(Math.max(...scored.map((a) => a.score ?? 0)));
     // Streak = consecutive days with at least one attempt
-    const dates = new Set(scored.map((a) => new Date(a.attempted_at ?? a.created_at ?? "").toDateString()));
+    const dates = new Set(scored.map((a) => new Date(attemptDate(a) ?? "").toDateString()));
     let streak = 0;
     const cur = new Date();
     while (dates.has(cur.toDateString())) { streak++; cur.setDate(cur.getDate() - 1); }
@@ -72,7 +79,7 @@ export default function ProgressAnalyticsPage() {
     const byMonth = new Map<string, number[]>();
     filtered.forEach((a) => {
       if (typeof a.score !== "number") return;
-      const d = new Date(a.attempted_at ?? a.created_at ?? "");
+      const d = new Date(attemptDate(a) ?? "");
       if (Number.isNaN(d.getTime())) return;
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const arr = byMonth.get(key) ?? [];
@@ -187,7 +194,7 @@ export default function ProgressAnalyticsPage() {
                   <td className="px-6 py-3.5"><Link href={`/dashboard/student/results/${a.id}`} className="font-medium text-[var(--foreground)] hover:text-primary">{a.quiz_title ?? "—"}</Link></td>
                   <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{a.quiz_subject ?? "—"}</td>
                   <td className="px-6 py-3.5 font-semibold text-emerald-600">{typeof a.score === "number" ? `${Math.round(a.score)}%` : "—"}</td>
-                  <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{a.attempted_at ? new Date(a.attempted_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}</td>
+                  <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{attemptDate(a) ? new Date(attemptDate(a)!).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                 </tr>
               ))}
             </tbody>

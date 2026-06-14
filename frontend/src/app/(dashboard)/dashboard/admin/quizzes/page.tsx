@@ -44,6 +44,17 @@ const statusColor: Record<string, string> = {
   Published: "bg-primary/10 text-primary border-primary/20",
   Draft: "bg-slate-100 text-slate-600 border-slate-200",
   Review: "bg-amber-50 text-amber-700 border-amber-200",
+  Archived: "bg-slate-100 text-slate-500 border-slate-200",
+};
+
+// The backend serializes status in UPPER_CASE (DRAFT / REVIEW / PUBLISHED /
+// ARCHIVED) — normalise to the Title-case the filter dropdown and statusColor
+// map use, so both the badge colour and the status filter actually match.
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  REVIEW: "Review",
+  PUBLISHED: "Published",
+  ARCHIVED: "Archived",
 };
 
 const subjectTint: Record<string, string> = {
@@ -78,7 +89,8 @@ function formatUpdated(q: Quiz): string {
 }
 
 function getQuizStatus(q: Quiz): string {
-  return q.status ?? "Draft";
+  const raw = (q.status ?? "DRAFT").toString();
+  return STATUS_LABEL[raw.toUpperCase()] ?? raw;
 }
 
 function getGrade(q: Quiz): string {
@@ -106,7 +118,7 @@ function SkeletonCard() {
 // ── Filter option constants — extended dynamically from quizzes payload ──
 const STATIC_SUBJECTS = [...QUIZ_SUBJECTS];
 const STATIC_GRADES = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
-const statuses = ["All Status", "Published", "Review", "Draft"];
+const statuses = ["All Status", "Published", "Review", "Draft", "Archived"];
 
 // ── Page ───────────────────────────────────────────────────────
 export default function GlobalQuizPage() {

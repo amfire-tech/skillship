@@ -17,26 +17,42 @@ interface Quiz {
   subject?: string;
   grade?: string;
   grade_level?: string;
-  duration?: string;
+  section?: string;
+  duration_minutes?: number;
   description?: string;
   school?: string | null;
+  school_name?: string | null;
   questions_count?: number;
   question_count?: number;
   total_attempts?: number;
   avg_score?: number | string | null;
-  status?: "Published" | "Draft" | "Review" | string;
+  status?: string;
   updated_at?: string;
   created_at?: string;
 }
 
-type EditableQuiz = Pick<Quiz, "title" | "subject" | "grade" | "duration" | "description" | "status">;
+// Only title / grade / description are writable on the quiz serializer — subject
+// is derived from the course, duration_minutes/status are managed elsewhere
+// (status is driven by the publish/return-to-draft state machine, not PATCH).
+type EditableQuiz = Pick<Quiz, "title" | "grade" | "description">;
 
-const statusOptions = ["Published", "Draft", "Review"] as const;
+// Backend serializes status in UPPER_CASE; map it to a friendly Title-case label.
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draft",
+  REVIEW: "Review",
+  PUBLISHED: "Published",
+  ARCHIVED: "Archived",
+};
+function prettyStatus(raw?: string): string {
+  if (!raw) return "—";
+  return STATUS_LABEL[raw.toUpperCase()] ?? raw;
+}
 
 const statusColor: Record<string, string> = {
   Published: "bg-primary/10 text-primary border-primary/20",
   Draft: "bg-slate-100 text-slate-600 border-slate-200",
   Review: "bg-amber-50 text-amber-700 border-amber-200",
+  Archived: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
 const Field = ({ label, value }: { label: string; value: string }) => (
@@ -57,7 +73,7 @@ export default function QuizDetailPage() {
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [form, setForm] = useState<EditableQuiz>({
-    title: "", subject: "", grade: "", duration: "", description: "", status: "Draft",
+    title: "", grade: "", description: "",
   });
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -69,7 +85,7 @@ export default function QuizDetailPage() {
     setError(null);
     const token = await getToken();
     if (!token) { setError("Session expired. Please log in again."); setLoading(false); return; }
-    const res = await fetch(`${API_BASE}/quizzes/quizzes/${id}/`, {
+    const res = await fetch(`${API_BASE}/quizzes/${id}/`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) { setError("Failed to load quiz. Please try again."); setLoading(false); return; }
@@ -77,11 +93,8 @@ export default function QuizDetailPage() {
     setQuiz(data);
     setForm({
       title: data.title ?? "",
-      subject: data.subject ?? "",
       grade: data.grade ?? data.grade_level ?? "",
-      duration: data.duration ?? "",
       description: data.description ?? "",
-      status: data.status ?? "Draft",
     });
     setLoading(false);
   }, [id]);
@@ -96,16 +109,13 @@ export default function QuizDetailPage() {
     setSaving(true);
     const token = await getToken();
     if (!token) { toast("Session expired.", "error"); setSaving(false); return; }
-    const res = await fetch(`${API_BASE}/quizzes/quizzes/${id}/`, {
+    const res = await fetch(`${API_BASE}/quizzes/${id}/`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         title: form.title,
-        subject: form.subject,
         grade: form.grade,
-        duration: form.duration,
         description: form.description,
-        status: form.status,
       }),
     });
     if (!res.ok) {
@@ -117,11 +127,8 @@ export default function QuizDetailPage() {
     setQuiz(updated);
     setForm({
       title: updated.title ?? "",
-      subject: updated.subject ?? "",
       grade: updated.grade ?? updated.grade_level ?? "",
-      duration: updated.duration ?? "",
       description: updated.description ?? "",
-      status: updated.status ?? "Draft",
     });
     toast("Quiz updated", "success");
     setEditing(false);
@@ -210,45 +217,41 @@ export default function QuizDetailPage() {
                 <div className="mt-1 flex gap-2 flex-wrap">
                   {quiz?.subject && <span className="rounded-full bg-teal-100 text-teal-700 px-2.5 py-0.5 text-xs font-semibold">{quiz.subject}</span>}
                   {(quiz?.grade ?? quiz?.grade_level) && <span className="rounded-full bg-blue-100 text-blue-700 px-2.5 py-0.5 text-xs font-semibold">{quiz?.grade ?? quiz?.grade_level}</span>}
-                  {quiz?.status && <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor[quiz.status] ?? ""}`}>{quiz.status}</span>}
+                  {quiz?.status && <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor[prettyStatus(quiz.status)] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>{prettyStatus(quiz.status)}</span>}
                 </div>
               </div>
             </div>
 
             {editing ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                {(["title", "subject", "grade", "duration", "description"] as const).map((k) => (
+                {(["title", "grade", "description"] as const).map((k) => (
                   <div key={k} className={`flex flex-col gap-1 ${k === "description" ? "sm:col-span-2" : ""}`}>
                     <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{k}</label>
                     {k === "description" ? (
                       <textarea
-                        value={form[k]}
+                        value={form[k] ?? ""}
                         onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                         rows={3}
                         className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-none"
                       />
                     ) : (
-                      <input value={form[k] as string} onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+                      <input value={form[k] ?? ""} onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                         className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10" />
                     )}
                   </div>
                 ))}
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Status</label>
-                  <select value={form.status ?? "Draft"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as typeof form.status }))}
-                    className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">
-                    {statusOptions.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
+                <p className="sm:col-span-2 text-xs text-[var(--muted-foreground)]">
+                  Subject, status and duration are managed through the quiz workflow (approval / publish) and the question bank — they aren&apos;t edited here.
+                </p>
               </div>
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Subject" value={quiz?.subject ?? ""} />
                 <Field label="Grade" value={quiz?.grade ?? quiz?.grade_level ?? ""} />
-                <Field label="Duration" value={quiz?.duration ?? ""} />
-                <Field label="School" value={quiz?.school ? String(quiz.school) : "All Schools"} />
+                <Field label="Duration" value={quiz?.duration_minutes ? `${quiz.duration_minutes} min` : ""} />
+                <Field label="School" value={quiz?.school_name ?? (quiz?.school ? "Single school" : "All Schools")} />
                 <Field label="Last Updated" value={quiz?.updated_at ? new Date(quiz.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
-                <Field label="Status" value={quiz?.status ?? ""} />
+                <Field label="Status" value={prettyStatus(quiz?.status)} />
                 {quiz?.description && (
                   <div className="sm:col-span-2 lg:col-span-3">
                     <Field label="Description" value={quiz.description} />
@@ -263,7 +266,9 @@ export default function QuizDetailPage() {
       {/* Questions placeholder */}
       <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Questions ({questionCount})</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">Question editor available — GET /api/v1/quizzes/quizzes/{id}/questions/</p>
+        <p className="text-sm text-[var(--muted-foreground)]">
+          This quiz has {questionCount} question{questionCount === 1 ? "" : "s"} in its bank. Review them from the Quiz Approval panel, or rebuild the set from the quiz wizard.
+        </p>
       </div>
     </div>
   );

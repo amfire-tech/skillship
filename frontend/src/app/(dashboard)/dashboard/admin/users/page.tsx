@@ -27,6 +27,7 @@ interface ApiUser {
   assigned_teacher_name?: string | null;
   profile_completed?: boolean;
   is_active: boolean;
+  ai_enabled?: boolean;
   date_joined: string;
 }
 
@@ -209,6 +210,25 @@ export default function UserManagementPage() {
     }
   }
 
+  async function toggleAi(user: ApiUser) {
+    const next = !(user.ai_enabled ?? true);
+    setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, ai_enabled: next } : u));
+    const token = await getToken();
+    if (!token) { toast("Session expired", "error"); return; }
+    try {
+      const res = await fetch(`${API_BASE}/users/${user.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ai_enabled: next }),
+      });
+      if (!res.ok) throw new Error();
+      toast(`AI ${next ? "enabled" : "disabled"} for ${displayName(user)}`, next ? "success" : "info");
+    } catch {
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, ai_enabled: !next } : u));
+      toast("Failed to update AI access", "error");
+    }
+  }
+
   async function handleSuspend(user: ApiUser) {
     const token = await getToken();
     if (!token) return;
@@ -233,7 +253,7 @@ export default function UserManagementPage() {
   const firstRow = count === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const lastRow = Math.min(page * PAGE_SIZE, count);
   const roleNoun = activeRole === "all" ? "user" : roleLabel[activeRole].toLowerCase();
-  const colCount = 7 + (bulkMode ? 1 : 0);
+  const colCount = 8 + (bulkMode ? 1 : 0);
 
   return (
     <div className="space-y-6">
@@ -357,6 +377,7 @@ export default function UserManagementPage() {
                   <th className="px-5 py-3">Roll No.</th>
                   <th className="px-5 py-3">Assigned Teacher</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">AI Access</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -420,6 +441,23 @@ export default function UserManagementPage() {
                           <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}>
                             {status}
                           </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {u.role === "MAIN_ADMIN" ? (
+                            <span className="text-xs text-[var(--muted-foreground)]">—</span>
+                          ) : (
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={u.ai_enabled ?? true}
+                              aria-label={`AI access for ${fullName}`}
+                              title={(u.ai_enabled ?? true) ? "AI enabled — click to disable for this user" : "AI disabled — click to enable for this user"}
+                              onClick={() => toggleAi(u)}
+                              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${(u.ai_enabled ?? true) ? "bg-gradient-to-r from-primary to-accent" : "bg-slate-300"}`}
+                            >
+                              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${(u.ai_enabled ?? true) ? "translate-x-4" : "translate-x-0.5"}`} />
+                            </button>
+                          )}
                         </td>
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1 text-xs">
