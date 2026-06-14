@@ -25,6 +25,43 @@ const nextConfig = {
       },
     ];
   },
+  // Permanent (308) redirects from legacy URLs the OLD skillship.in site exposed
+  // and that Google + social platforms still have indexed/cached. Without these,
+  // those old links land on the new Next.js 404 page (e.g. /about-us). Every
+  // `source` here is a slug with NO real route in this app, so a redirect can
+  // never shadow a live page.
+  async redirects() {
+    const map = [
+      // About
+      { from: ["/about-us", "/aboutus"], to: "/about" },
+      // Contact
+      { from: ["/contact-us", "/contactus"], to: "/contact" },
+      // School-facing / demo
+      { from: ["/school-contact", "/schools", "/school", "/for-schools"], to: "/request-demo" },
+      { from: ["/demo", "/book-demo", "/request-a-demo"], to: "/request-demo" },
+      // Auth (old site had a combined login / sign-up entry point)
+      {
+        from: [
+          "/login-signup", "/login-sign-up", "/sign-up", "/signup",
+          "/register", "/sign-in", "/signin", "/log-in", "/dashboard",
+        ],
+        to: "/login",
+      },
+      // Marketplace / store
+      { from: ["/store", "/shop"], to: "/marketplace" },
+      // Workshops
+      { from: ["/workshop"], to: "/workshops" },
+      // Legal
+      { from: ["/privacy-policy"], to: "/privacy" },
+      { from: ["/terms-of-service", "/terms-and-conditions", "/terms-conditions"], to: "/terms" },
+      // Home aliases
+      { from: ["/home", "/index", "/index.html"], to: "/" },
+    ];
+
+    return map.flatMap(({ from, to }) =>
+      from.map((source) => ({ source, destination: to, permanent: true }))
+    );
+  },
   images: {
     remotePatterns: [
       {

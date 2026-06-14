@@ -32,9 +32,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # NEXT_PUBLIC_* env vars are inlined into the build, so they must be available
-# at build time. `docker-compose.prod.yml` passes them through `build.args`.
+# at build time. `.github/workflows/deploy.yml` passes them through `build-args`.
 ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
+# Canonical public origin — feeds metadataBase (og:image / twitter:image URLs),
+# sitemap.xml, and robots.txt. If the CI build-arg is empty or unset, fall back
+# to the prod domain so we never bake "http://localhost:3000" into a shipped
+# image (which would break social-share previews and SEO).
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://skillship.in}
 
 RUN npm run build
 

@@ -84,11 +84,14 @@ jobs:
             ${{ steps.meta.outputs.image_base }}:latest
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to:   type=gha,scope=${{ matrix.service }},mode=max
-          # Frontend bakes NEXT_PUBLIC_API_BASE_URL at build time. Override per
-          # environment if staging and prod use different API URLs — for now
-          # they share one, and it's read from a repo-level variable.
+          # Frontend bakes NEXT_PUBLIC_* at build time. Override per environment
+          # if staging and prod differ — for now they share one set, read from
+          # repo-level variables. NEXT_PUBLIC_SITE_URL feeds og:image / sitemap /
+          # robots; if the var is unset the Dockerfile defaults it to the prod
+          # domain, so an empty value here can never bake in localhost.
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
 
   # ── 2. Auto-deploy main → staging ───────────────────────────────────────
   deploy-staging:
