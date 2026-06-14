@@ -275,6 +275,28 @@ class CompleteProfileView(APIView):
         return year
 
 
+class ChangePasswordView(APIView):
+    """POST /api/v1/auth/change-password/ — the logged-in user changes their own
+    password by proving the current one. Body: {current_password, new_password}.
+
+    Self-service (any authenticated role); we verify the current password and run
+    the new one through Django's validators. No email is involved — that matches
+    the rest of the platform, which never does email-based resets.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .serializers import ChangePasswordSerializer
+
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class StudentRosterView(ListAPIView):
     """GET /api/v1/users/roster/ — the student roster, role-scoped.
 
@@ -348,11 +370,15 @@ class StudentRosterView(ListAPIView):
 
     @staticmethod
     def _stats_for(student_ids):
-        """One aggregate query → {student_id: {avg, quizzes}} for the page.
+        """Two queries → {student_id: {avg, quizzes, last, last_score, last_quiz_title}}.
 
         Computed straight from submitted quiz attempts so a student's marks show
         up the moment they finish a quiz (the analytics daily-rollup table is a
         separate, nightly concern and may lag / be empty).
+
+        Besides the running average we also surface the *latest* submitted
+        attempt's score + quiz title, so the teacher's roster shows "latest exam
+        and marks" next to the average — the full leaderboard at a glance.
         """
         from django.db.models import Avg, Count, Max
 
@@ -366,7 +392,26 @@ class StudentRosterView(ListAPIView):
             .values("student_id")
             .annotate(avg=Avg("score_percent"), quizzes=Count("id"), last=Max("submitted_at"))
         )
-        return {r["student_id"]: r for r in rows}
+        stats = {r["student_id"]: r for r in rows}
+
+        # Most-recent submitted attempt per student → its score + quiz title.
+        # DISTINCT ON (PostgreSQL) keeps this to one query; select_related avoids
+        # an N+1 on quiz.title. The leftmost ORDER BY must match the distinct col.
+        latest = (
+            QuizAttempt.objects.filter(
+                student_id__in=student_ids,
+                status=QuizAttempt.Status.SUBMITTED,
+            )
+            .select_related("quiz")
+            .order_by("student_id", "-submitted_at")
+            .distinct("student_id")
+        )
+        for a in latest:
+            row = stats.get(a.student_id)
+            if row is not None:
+                row["last_score"] = a.score_percent
+                row["last_quiz_title"] = a.quiz.title if a.quiz_id else None
+        return stats
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

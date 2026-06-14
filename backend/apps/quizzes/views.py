@@ -29,8 +29,11 @@ from __future__ import annotations
 
 import logging
 
+import re
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Avg, Count, F, Q, QuerySet
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
@@ -628,6 +631,39 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
         "vs last month" deltas. Drives the student My Learning hero cards.
         """
         return Response(services.attempt_summary(request.user))
+
+    # ── Certificate (PDF) ───────────────────────────────────────────────────
+
+    @extend_schema(responses={200: OpenApiResponse(description="Certificate PDF."), 404: _NOT_FOUND})
+    @action(detail=True, methods=["get"], url_path="certificate")
+    def certificate(self, request, id=None):
+        """GET /api/v1/quizzes/attempts/{id}/certificate/ → certificate PDF.
+
+        Issued only when the quiz opted into certificates AND this attempt passed
+        (and any short answers are graded). Streams a generated PDF — nothing is
+        stored. A student can only fetch their own; staff may fetch any in-school.
+        """
+        attempt = self._owned_attempt()
+        services.expire_attempt_if_due(attempt)
+        attempt.refresh_from_db()
+        quiz = attempt.quiz
+
+        if not getattr(quiz, "certificate_enabled", False):
+            raise NotFound("This quiz does not issue a certificate.")
+        if attempt.status != QuizAttempt.Status.SUBMITTED or attempt.score_percent is None:
+            raise NotFound("Certificate not earned yet.")
+        if float(attempt.score_percent) < float(quiz.pass_percentage):
+            raise NotFound("Certificate not earned — the quiz was not passed.")
+        if attempt.answers.filter(feedback_status=Answer.FeedbackStatus.PENDING).exists():
+            raise NotFound("Certificate pending — your short answers are still being graded.")
+
+        from .certificates import render_certificate_pdf
+
+        pdf = render_certificate_pdf(attempt)
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "_", f"certificate-{quiz.title}")[:80].strip("_") or "certificate"
+        resp = HttpResponse(pdf, content_type="application/pdf")
+        resp["Content-Disposition"] = f'inline; filename="{safe}.pdf"'
+        return resp
 
     # ── Staff: short-answer feedback queue ──────────────────────────────────
 

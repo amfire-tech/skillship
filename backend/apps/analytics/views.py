@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 from apps.academics.models import Class
 from apps.accounts.models import User
 from apps.common.permissions import (
-    IsPrincipal, IsSchoolStaff, IsStudent, IsTeacher, Role,
+    IsMainAdmin, IsPrincipal, IsSchoolStaff, IsStudent, IsTeacher, Role,
 )
 from apps.common.viewsets import TenantScopedViewSet
 from apps.schools.models import School
@@ -366,3 +366,206 @@ class RiskSignalViewSet(TenantScopedViewSet):
         signal.acknowledged_at = timezone.now()
         signal.save(update_fields=["acknowledged_by", "acknowledged_at"])
         return Response(RiskSignalSerializer(signal).data)
+
+
+class PlatformAnalyticsView(APIView):
+    """GET /api/v1/analytics/platform/ — owner-wide analytics for MAIN_ADMIN.
+
+    Every number here is computed from live rows (schools, users, quizzes, quiz
+    attempts) — nothing is fabricated:
+
+      * onboarding trends come from created_at / date_joined,
+      * performance/score metrics from submitted QuizAttempt rows,
+      * "avg time per quiz" is the real attempt duration (submitted_at − started_at),
+      * "active students" are students with a submitted attempt in the window.
+
+    We deliberately do NOT expose a "website visit" count or a "dashboard usage
+    time" figure: there is no pageview / session tracking in the data model, so
+    inventing those would be fake. The metrics below are the real equivalents.
+    """
+
+    permission_classes = [IsAuthenticated, IsMainAdmin]
+
+    # ── small helpers ────────────────────────────────────────────────────────
+    @staticmethod
+    def _month_buckets(n: int):
+        """Return the first-of-month `date` for each of the last `n` months,
+        oldest first."""
+        from django.utils import timezone
+
+        first = timezone.now().date().replace(day=1)
+        out, y, m = [], first.year, first.month
+        for _ in range(n):
+            out.append(date(y, m, 1))
+            m -= 1
+            if m == 0:
+                m, y = 12, y - 1
+        return list(reversed(out))
+
+    @staticmethod
+    def _series(qs, field: str, months):
+        """Count rows per calendar month for `field`, aligned to `months` (so
+        gaps are filled with 0). Keyed by 'YYYY-MM' to dodge timezone edge cases."""
+        from django.db.models import Count
+        from django.db.models.functions import TruncMonth
+
+        start = months[0]
+        raw = (
+            qs.filter(**{f"{field}__date__gte": start})
+            .annotate(_m=TruncMonth(field))
+            .values("_m")
+            .annotate(c=Count("id"))
+        )
+        cmap = {r["_m"].strftime("%Y-%m"): r["c"] for r in raw if r["_m"]}
+        return [
+            {"month": mo.strftime("%Y-%m"), "label": mo.strftime("%b"), "count": cmap.get(mo.strftime("%Y-%m"), 0)}
+            for mo in months
+        ]
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.db.models import (
+            Avg, Count, DurationField, ExpressionWrapper, F, Q,
+        )
+        from django.db.models.functions import TruncMonth
+        from django.utils import timezone
+
+        from apps.quizzes.models import Quiz, QuizAttempt
+
+        now = timezone.now()
+        months = self._month_buckets(12)
+
+        students_qs = User.objects.filter(role=User.Role.STUDENT)
+        teachers_qs = User.objects.filter(role=User.Role.TEACHER)
+        submitted = QuizAttempt.objects.filter(status=QuizAttempt.Status.SUBMITTED)
+
+        # ── onboarding / creation trends (last 12 months) ────────────────────
+        schools_pm = self._series(School.objects.all(), "created_at", months)
+        students_pm = self._series(students_qs, "date_joined", months)
+        teachers_pm = self._series(teachers_qs, "date_joined", months)
+        quizzes_pm = self._series(Quiz.objects.all(), "created_at", months)
+
+        # ── quiz attempts + average score per month ──────────────────────────
+        attempts_raw = (
+            submitted.annotate(_m=TruncMonth("submitted_at"))
+            .values("_m")
+            .annotate(c=Count("id"), avg=Avg("score_percent"))
+        )
+        amap = {r["_m"].strftime("%Y-%m"): r for r in attempts_raw if r["_m"]}
+        attempts_pm = [
+            {
+                "month": mo.strftime("%Y-%m"),
+                "label": mo.strftime("%b"),
+                "count": amap.get(mo.strftime("%Y-%m"), {}).get("c", 0),
+                "avg_score": round(float(amap[mo.strftime("%Y-%m")]["avg"]), 1)
+                if mo.strftime("%Y-%m") in amap and amap[mo.strftime("%Y-%m")]["avg"] is not None
+                else 0,
+            }
+            for mo in months
+        ]
+
+        # ── quiz status breakdown ────────────────────────────────────────────
+        status_raw = dict(Quiz.objects.values_list("status").annotate(c=Count("id")))
+        quiz_status = [
+            {"label": lbl, "count": status_raw.get(code, 0)}
+            for code, lbl in (
+                ("PUBLISHED", "Published"), ("REVIEW", "In Review"),
+                ("DRAFT", "Draft"), ("ARCHIVED", "Archived"),
+            )
+        ]
+
+        # ── score distribution (submitted attempts) ──────────────────────────
+        dist = submitted.aggregate(
+            b0=Count("id", filter=Q(score_percent__lt=40)),
+            b1=Count("id", filter=Q(score_percent__gte=40, score_percent__lt=60)),
+            b2=Count("id", filter=Q(score_percent__gte=60, score_percent__lt=75)),
+            b3=Count("id", filter=Q(score_percent__gte=75, score_percent__lt=90)),
+            b4=Count("id", filter=Q(score_percent__gte=90)),
+        )
+        score_distribution = [
+            {"bucket": "0–40%", "count": dist["b0"]},
+            {"bucket": "40–60%", "count": dist["b1"]},
+            {"bucket": "60–75%", "count": dist["b2"]},
+            {"bucket": "75–90%", "count": dist["b3"]},
+            {"bucket": "90–100%", "count": dist["b4"]},
+        ]
+
+        # ── average score by subject (quiz.course.name) ──────────────────────
+        subj_raw = (
+            submitted.values("quiz__course__name")
+            .annotate(avg=Avg("score_percent"), n=Count("id"))
+            .order_by("-n")[:8]
+        )
+        avg_score_by_subject = [
+            {
+                "subject": r["quiz__course__name"] or "—",
+                "avg": round(float(r["avg"]), 1) if r["avg"] is not None else 0,
+                "attempts": r["n"],
+            }
+            for r in subj_raw
+        ]
+
+        # ── regional distribution: schools + students per state ──────────────
+        sch_state = dict(School.objects.values_list("state").annotate(c=Count("id")))
+        stu_state = {
+            r["school__state"]: r["c"]
+            for r in students_qs.values("school__state").annotate(c=Count("id"))
+        }
+        regional = sorted(
+            (
+                {"state": (st or "Unknown"), "schools": sch_state.get(st, 0), "students": stu_state.get(st, 0)}
+                for st in (set(sch_state) | set(stu_state))
+            ),
+            key=lambda x: (-x["students"], -x["schools"]),
+        )
+
+        # ── engagement / real usage time ─────────────────────────────────────
+        # Average real attempt duration (submitted_at − started_at). Only count
+        # rows where submitted_at is genuinely after started_at — otherwise a
+        # mis-stamped row would drag the average negative.
+        dur = (
+            submitted.filter(submitted_at__isnull=False, submitted_at__gt=F("started_at"))
+            .annotate(d=ExpressionWrapper(F("submitted_at") - F("started_at"), output_field=DurationField()))
+            .aggregate(avg=Avg("d"))["avg"]
+        )
+        avg_quiz_minutes = round(max(dur.total_seconds(), 0) / 60, 1) if dur else 0
+        active_7d = submitted.filter(submitted_at__gte=now - timedelta(days=7)).values("student_id").distinct().count()
+        active_30d = submitted.filter(submitted_at__gte=now - timedelta(days=30)).values("student_id").distinct().count()
+
+        # ── headline KPIs ────────────────────────────────────────────────────
+        agg = submitted.aggregate(
+            total=Count("id"),
+            avg=Avg("score_percent"),
+            passed=Count("id", filter=Q(score_percent__gte=F("quiz__pass_percentage"))),
+        )
+        total = agg["total"] or 0
+        kpis = {
+            "schools": School.objects.count(),
+            "students": students_qs.count(),
+            "teachers": teachers_qs.count(),
+            "quizzes": Quiz.objects.count(),
+            "total_attempts": total,
+            "avg_score": round(float(agg["avg"]), 1) if agg["avg"] is not None else 0,
+            "pass_rate": round(100 * agg["passed"] / total, 1) if total else 0,
+            "active_students_30d": active_30d,
+            "avg_quiz_minutes": avg_quiz_minutes,
+        }
+
+        return Response({
+            "kpis": kpis,
+            "schools_per_month": schools_pm,
+            "students_per_month": students_pm,
+            "teachers_per_month": teachers_pm,
+            "quizzes_per_month": quizzes_pm,
+            "attempts_per_month": attempts_pm,
+            "quiz_status": quiz_status,
+            "score_distribution": score_distribution,
+            "avg_score_by_subject": avg_score_by_subject,
+            "regional": regional,
+            "engagement": {
+                "active_7d": active_7d,
+                "active_30d": active_30d,
+                "avg_quiz_minutes": avg_quiz_minutes,
+            },
+        })

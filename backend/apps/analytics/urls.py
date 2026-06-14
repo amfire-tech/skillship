@@ -11,6 +11,7 @@ from .views import (
     BenchmarkingView,
     ClassReportExportView,
     ClassSkillBreakdownView,
+    PlatformAnalyticsView,
     PrincipalDashboardView,
     RiskSignalViewSet,
     SchoolReportExportView,
@@ -36,4 +37,6 @@ urlpatterns = [
     path("dashboards/class/<uuid:class_id>/skills/",  ClassSkillBreakdownView.as_view(),   name="class-skills"),
     # Benchmarking (Phase 2.3)
     path("benchmarking/",                             BenchmarkingView.as_view(),          name="benchmarking"),
+    # Platform-wide owner analytics (MAIN_ADMIN)
+    path("platform/",                                 PlatformAnalyticsView.as_view(),     name="platform-analytics"),
 ] + router.urls

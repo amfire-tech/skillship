@@ -130,6 +130,7 @@ class UserSerializer(serializers.ModelSerializer):
             "assigned_teacher_name",
             "profile_completed",
             "is_active",
+            "ai_enabled",
             "date_joined",
         ]
         read_only_fields = [
@@ -138,7 +139,7 @@ class UserSerializer(serializers.ModelSerializer):
             "current_class", "class_name", "roll_number", "rank_in_class",
             "class_size", "certificates_count",
             "assigned_teacher", "assigned_teacher_name",
-            "profile_completed", "is_active", "date_joined",
+            "profile_completed", "is_active", "ai_enabled", "date_joined",
         ]
 
 
@@ -324,6 +325,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "admission_number",
             "assigned_teacher",
             "is_active",
+            "ai_enabled",
         ]
         read_only_fields = ["id", "role", "school"]
 
@@ -350,6 +352,31 @@ class PasswordSetSerializer(serializers.Serializer):
     def validate_password(self, value):
         try:
             validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Body for POST /api/v1/auth/change-password/ — self-service password change.
+
+    The caller proves the current password before we accept a new one; the new
+    password is run through Django's configured validators.
+    """
+
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate_new_password(self, value):
+        user = self.context["request"].user
+        try:
+            validate_password(value, user)
         except DjangoValidationError as exc:
             raise serializers.ValidationError(list(exc.messages)) from exc
         return value
@@ -503,6 +530,8 @@ class StudentRosterSerializer(serializers.ModelSerializer):
     avg_score = serializers.SerializerMethodField()
     quizzes_attempted = serializers.SerializerMethodField()
     last_attempt_at = serializers.SerializerMethodField()
+    last_score = serializers.SerializerMethodField()
+    last_quiz_title = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -510,7 +539,7 @@ class StudentRosterSerializer(serializers.ModelSerializer):
             "id", "first_name", "last_name", "email", "roll_number",
             "is_active", "profile_completed", "grade", "section", "class_label",
             "assigned_teacher", "assigned_teacher_name", "avg_score", "quizzes_attempted",
-            "last_attempt_at",
+            "last_attempt_at", "last_score", "last_quiz_title",
         ]
 
     @staticmethod
@@ -546,6 +575,15 @@ class StudentRosterSerializer(serializers.ModelSerializer):
         row = self.context.get("stats", {}).get(obj.id)
         last = row.get("last") if row else None
         return last.isoformat() if last else None
+
+    def get_last_score(self, obj):
+        row = self.context.get("stats", {}).get(obj.id)
+        val = row.get("last_score") if row else None
+        return float(val) if val is not None else None
+
+    def get_last_quiz_title(self, obj):
+        row = self.context.get("stats", {}).get(obj.id)
+        return row.get("last_quiz_title") if row else None
 
 
 class TeacherDirectorySerializer(serializers.ModelSerializer):

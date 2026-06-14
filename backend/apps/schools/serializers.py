@@ -23,6 +23,10 @@ from .models import School, SchoolSettings
 class SchoolSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
     slug = serializers.SlugField(max_length=200, required=False)
+    # Read-only mirror of SchoolSettings.ai_enabled so the admin schools list can
+    # show each school's AI status in one request. Toggling it is done through the
+    # settings endpoint (PATCH /schools/settings/?school=<id>), not here.
+    ai_enabled = serializers.SerializerMethodField()
 
     class Meta:
         model = School
@@ -37,10 +41,16 @@ class SchoolSerializer(serializers.ModelSerializer):
             "plan",
             "subscription_expires_at",
             "is_active",
+            "ai_enabled",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_ai_enabled(self, obj) -> bool:
+        # No settings row yet → AI is on by default (matches the model default).
+        settings = getattr(obj, "settings", None)
+        return settings.ai_enabled if settings is not None else True
 
     def validate(self, attrs):
         # Auto-derive slug from name on create when not provided.

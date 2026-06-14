@@ -214,6 +214,7 @@ def author_quiz(*, actor, school_id, data: dict) -> Quiz:
         total_questions=max(len(questions), 1),
         pass_percentage=data.get("passing_score", 50),
         attempts_allowed=data.get("attempts_allowed", 1),
+        certificate_enabled=data.get("certificate_enabled", False),
         created_by=actor,
         status=Quiz.Status.DRAFT,
     )
@@ -877,11 +878,12 @@ def attempt_summary(student) -> dict:
 
 
 def certificates_count(student) -> int:
-    """How many certificates a student has earned = passed SUBMITTED attempts.
+    """How many certificates a student has earned.
 
-    A pass is `score_percent >= quiz.pass_percentage`, matching the
-    `passed` flag the attempt serializer exposes and the client-side derivation
-    on the Certificates page.
+    A certificate exists only for a quiz whose teacher enabled certificates
+    (`quiz.certificate_enabled`) AND which the student passed
+    (`score_percent >= quiz.pass_percentage`). Counted once per quiz. Matches
+    `certificate_available` on the attempt serializer + the Certificates page.
     """
     from django.db.models import F
 
@@ -889,6 +891,7 @@ def certificates_count(student) -> int:
         QuizAttempt.objects.filter(
             student=student,
             status=QuizAttempt.Status.SUBMITTED,
+            quiz__certificate_enabled=True,
             score_percent__gte=F("quiz__pass_percentage"),
         )
         .values("quiz_id")

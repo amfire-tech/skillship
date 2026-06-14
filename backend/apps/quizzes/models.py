@@ -191,6 +191,9 @@ class Quiz(TenantModel):
     attempts_allowed = models.PositiveSmallIntegerField(
         default=1, help_text="0 = unlimited."
     )
+    # When True, a student who PASSES this quiz earns a downloadable certificate.
+    # Off by default — the teacher opts in per quiz when authoring it.
+    certificate_enabled = models.BooleanField(default=False)
 
     published_at = models.DateTimeField(null=True, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True)

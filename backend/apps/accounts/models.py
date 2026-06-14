@@ -53,6 +53,13 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     admission_number = models.CharField(max_length=50, blank=True)
 
+    # Per-user AI gate. MAIN_ADMIN can switch a specific teacher / student off so
+    # they can no longer reach any AI feature (career pilot, quiz generation,
+    # adaptive engine, content search). Default True so existing accounts keep
+    # access. The effective gate is this AND the school's SchoolSettings.ai_enabled
+    # — either being off blocks AI. Enforced by ai_bridge.permissions.CanUseAI.
+    ai_enabled = models.BooleanField(default=True)
+
     # First-login profile lock. Accounts created blank (via bulk credential
     # generation) start False: the student fills in their own name / roll /
     # class exactly once on first login, after which this flips to True and

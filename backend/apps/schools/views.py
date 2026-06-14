@@ -38,7 +38,7 @@ class SchoolViewSet(ModelViewSet):
     with the platform owner until we explicitly delegate them.
     """
 
-    queryset = School.objects.all().order_by("-created_at")
+    queryset = School.objects.select_related("settings").order_by("-created_at")
     serializer_class = SchoolSerializer
     permission_classes = [IsAuthenticated, IsMainAdmin]
     lookup_field = "id"

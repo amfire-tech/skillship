@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from apps.common.permissions import IsSchoolStaff, IsTeacher
+from apps.common.permissions import IsMainAdmin, IsSchoolStaff, IsTeacher
 from apps.common.viewsets import TenantScopedViewSet
 
 from .models import ContentItem, MarketplaceListing
@@ -24,8 +24,12 @@ class ContentItemViewSet(TenantScopedViewSet):
     queryset = ContentItem.objects.select_related("course", "klass", "uploaded_by")
 
     def get_permissions(self):
+        # MAIN_ADMIN (platform owner, no school) can read content across every
+        # school — the admin Reports console lists auto-generated PDFs this way.
+        # TenantScopedViewSet.get_queryset already bypasses the school filter for
+        # MAIN_ADMIN, so the only thing that needed widening was this read gate.
         if self.action in ("list", "retrieve"):
-            return [IsSchoolStaff()]
+            return [(IsSchoolStaff | IsMainAdmin)()]
         return [IsTeacher()]
 
     def perform_create(self, serializer):

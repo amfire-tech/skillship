@@ -224,6 +224,7 @@ class QuizSerializer(serializers.ModelSerializer):
             "title", "description", "grade", "section", "status",
             "is_adaptive", "randomize_questions", "randomize_options",
             "duration_minutes", "total_questions", "pass_percentage", "attempts_allowed",
+            "certificate_enabled",
             "published_at", "archived_at",
             "created_by", "created_by_name", "question_count",
             "total_attempts", "avg_score", "pass_rate",
@@ -310,6 +311,8 @@ class QuizAuthoringSerializer(serializers.Serializer):
     passing_score = serializers.IntegerField(required=False, default=50, min_value=0, max_value=100)
     attempts_allowed = serializers.IntegerField(required=False, default=1, min_value=1, max_value=20)
     shuffle_questions = serializers.BooleanField(required=False, default=True)
+    # Teacher opt-in: issue a certificate to students who PASS this quiz.
+    certificate_enabled = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=["DRAFT", "REVIEW"], required=False, default="DRAFT")
     questions = _AuthoringQuestionSerializer(many=True)
 
@@ -330,7 +333,7 @@ class QuizStudentSerializer(serializers.ModelSerializer):
         fields = [
             "id", "school", "course", "title", "description",
             "is_adaptive", "duration_minutes", "total_questions",
-            "pass_percentage", "attempts_allowed", "published_at",
+            "pass_percentage", "attempts_allowed", "certificate_enabled", "published_at",
         ]
         read_only_fields = fields
 
@@ -384,6 +387,9 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
     wrong_count = serializers.SerializerMethodField()
     passed = serializers.SerializerMethodField()
     awaiting_review = serializers.SerializerMethodField()
+    # True only when the quiz opted into certificates AND this attempt passed.
+    certificate_available = serializers.SerializerMethodField()
+    quiz_certificate_enabled = serializers.BooleanField(source="quiz.certificate_enabled", read_only=True)
 
     class Meta:
         model = QuizAttempt
@@ -394,6 +400,7 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
             "started_at", "expires_at", "submitted_at",
             "score_percent", "score", "points_earned", "points_total",
             "correct_count", "wrong_count", "passed", "awaiting_review",
+            "certificate_available", "quiz_certificate_enabled",
             "question_order", "last_difficulty",
             "created_at", "updated_at",
         ]
@@ -404,7 +411,7 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
     # "awaiting review" — and a STUDENT must not see provisional marks yet.
     _GATED_FIELDS = (
         "score_percent", "score", "points_earned", "points_total",
-        "correct_count", "wrong_count", "passed",
+        "correct_count", "wrong_count", "passed", "certificate_available",
     )
 
     def get_awaiting_review(self, obj: QuizAttempt) -> bool:
@@ -436,6 +443,17 @@ class QuizAttemptReadSerializer(serializers.ModelSerializer):
     def get_passed(self, obj: QuizAttempt) -> bool | None:
         if obj.score_percent is None:
             return None
+        pass_pct = getattr(obj.quiz, "pass_percentage", 50)
+        return float(obj.score_percent) >= float(pass_pct)
+
+    def get_certificate_available(self, obj: QuizAttempt) -> bool:
+        # A certificate exists only when the teacher enabled it for the quiz,
+        # the attempt is finalised, and the student passed. Marks gated behind a
+        # pending short-answer review don't count yet (handled in to_representation).
+        if not getattr(obj.quiz, "certificate_enabled", False):
+            return False
+        if obj.status != QuizAttempt.Status.SUBMITTED or obj.score_percent is None:
+            return False
         pass_pct = getattr(obj.quiz, "pass_percentage", 50)
         return float(obj.score_percent) >= float(pass_pct)
 
