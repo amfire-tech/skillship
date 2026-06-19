@@ -112,7 +112,7 @@ export function ImpactGallery() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section ref={ref} className="bg-white">
+    <section ref={ref} className="cv-auto bg-white">
       <div className="mx-auto max-w-[1280px] px-6 py-28 md:py-36 lg:px-12">
         {/* Header */}
         <div className="grid grid-cols-1 items-end gap-10 md:grid-cols-12">

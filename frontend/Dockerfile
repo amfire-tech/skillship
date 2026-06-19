@@ -56,7 +56,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 
-RUN apk update && apk upgrade --no-cache && apk add --no-cache curl \
+# `curl` for the healthcheck; `libc6-compat` so sharp's native binary loads.
+RUN apk update && apk upgrade --no-cache && apk add --no-cache curl libc6-compat \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 --ingroup nodejs nextjs
 
@@ -64,6 +65,12 @@ RUN apk update && apk upgrade --no-cache && apk add --no-cache curl \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Guarantee the Next.js image optimizer's native dep (sharp) is present in the
+# standalone runtime. Next usually traces it, but copy it explicitly so AVIF/
+# WebP optimization can never silently fall back to serving the originals.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@img ./node_modules/@img
 
 USER nextjs
 

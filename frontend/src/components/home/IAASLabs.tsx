@@ -472,10 +472,10 @@ export function IAASLabs() {
           >
             <div className="relative aspect-[4/3] w-full">
               <Image
-                src="/iaas-classroom.png"
+                src="/iaas-classroom.jpg"
                 alt="Skillship classroom in action — students working on robotics, drones, coding, and 3D printing"
                 fill
-                priority
+                loading="lazy"
                 sizes="(max-width: 768px) 100vw, 600px"
                 className="object-cover"
               />

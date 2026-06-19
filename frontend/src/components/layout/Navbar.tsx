@@ -61,11 +61,24 @@ export function Navbar() {
   const overDark = pathname === "/" && !scrolled;
 
   // Scroll-state for the transparent → blurred transition (brief §2.1).
+  // rAF-throttled: collapse every scroll event into at most one read+update per
+  // frame, and only setState when the boolean actually flips — so scrolling
+  // never triggers a React re-render storm or layout read per event.
   useEffect(() => {
-    function onScroll() { setScrolled(window.scrollY > 40); }
-    onScroll();
+    let raf = 0;
+    let last = false;
+    function update() {
+      raf = 0;
+      const next = window.scrollY > 40;
+      if (next !== last) { last = next; setScrolled(next); }
+    }
+    function onScroll() { if (!raf) raf = requestAnimationFrame(update); }
+    update();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);

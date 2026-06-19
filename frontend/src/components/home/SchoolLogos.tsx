@@ -43,6 +43,7 @@ export function SchoolLogos() {
                 src={`/schools/${file}`}
                 alt="Partner school logo"
                 loading="lazy"
+                decoding="async"
                 className="max-h-14 w-auto max-w-full object-contain"
               />
             </li>

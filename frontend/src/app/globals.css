@@ -201,6 +201,17 @@
     background-image: var(--gradient-headline) !important;
   }
 
+  /* Skip rendering (layout/paint) + pause animations for off-screen sections
+     until they scroll near the viewport — a big win on this long homepage.
+     `auto` intrinsic size lets the browser remember each section's real height
+     after first render, so the scrollbar never jumps. Only apply to sections
+     whose decoration does NOT bleed outside their box (paint containment clips
+     overflow). */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 800px;
+  }
+
   /* Card / surface backgrounds — translucency preserved via /opacity suffixes
      handled by Tailwind, plain bg-white is the common case. */
   .dark .bg-white { background-color: var(--card); }
@@ -427,8 +438,10 @@
   100% { background-position: 46px 46px, 46px 46px; }
 }
 @keyframes site-orange-drift {
-  0%, 100% { transform: translate3d(-3%, -2%, 0) scale(1); opacity: 0.9; }
-  50%      { transform: translate3d(4%, 3%, 0)  scale(1.12); opacity: 1; }
+  /* translate + opacity only — both GPU-composited. (Was `scale(1.12)`, which
+     forces the blur(60px) wash to re-rasterize every frame.) */
+  0%, 100% { transform: translate3d(-3%, -2%, 0); opacity: 0.9; }
+  50%      { transform: translate3d(4%, 3%, 0); opacity: 1; }
 }
 @keyframes hero-drift {
   /* Subtle parallax for the floating decorative shapes behind the hero */
@@ -820,4 +833,17 @@
   .site-bg::before,
   .site-bg::after { animation: none; }
   .card-pop:hover { transform: none; }
+}
+
+/* ── Mobile fluidity: kill the paint-heavy *continuous* ambient animations ──
+   On phones the GPU chokes on (a) the full-screen masked grid panning its
+   background-position, (b) the large blur(60px) wash being rescaled every
+   frame, and (c) box-shadow "breathing" CTAs — all of which repaint forever
+   and stall scrolling. They're purely decorative, so on small screens we
+   freeze them to a static state. No layout/DOM change; biggest single
+   scroll-smoothness win on mobile. Entrance animations are unaffected. */
+@media (max-width: 768px) {
+  .site-bg::before,
+  .site-bg::after,
+  .cta-sun { animation: none !important; }
 }

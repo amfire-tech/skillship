@@ -63,6 +63,11 @@ const nextConfig = {
     );
   },
   images: {
+    // Serve modern formats — AVIF/WebP are 30-50% smaller than JPEG/PNG for the
+    // same quality, and next/image negotiates per-browser. Big LCP + scroll win.
+    formats: ["image/avif", "image/webp"],
+    // Optimized variants are immutable per source → cache them hard at the edge.
+    minimumCacheTTL: 2678400, // 31 days
     remotePatterns: [
       {
         protocol: "http",
