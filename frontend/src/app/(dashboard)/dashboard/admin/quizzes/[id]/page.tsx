@@ -183,17 +183,17 @@ export default function QuizDetailPage() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: "Questions", value: loading ? null : String(questionCount) },
           { label: "Attempts", value: loading ? null : (attempts != null ? Number(attempts).toLocaleString("en-IN") : "—") },
           { label: "Avg Score", value: loading ? null : avgScore },
         ].map((s) => (
-          <div key={s.label} className="rounded-2xl border border-[var(--border)] bg-white p-5 text-center shadow-sm">
+          <div key={s.label} className="rounded-2xl border border-[var(--border)] bg-white p-3 text-center shadow-sm sm:p-5">
             {s.value === null ? (
               <Skeleton className="h-8 w-16 mx-auto" />
             ) : (
-              <p className="text-2xl font-bold text-primary">{s.value}</p>
+              <p className="text-lg font-bold text-primary sm:text-2xl">{s.value}</p>
             )}
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">{s.label}</p>
           </div>

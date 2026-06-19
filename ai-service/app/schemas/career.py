@@ -104,3 +104,92 @@ class CareerRecommendation(BaseModel):
 
 class CareerRecommendationsResponse(BaseModel):
     recommendations: list[CareerRecommendation]
+
+
+# ── Detailed roadmap (cached per career × grade × board) ───────────────────────
+
+
+class DetailedRoadmapRequest(BaseModel):
+    """Inputs that define a cacheable roadmap. `strengths` is advisory context
+    only — it does NOT change the cache identity (career/grade/board do)."""
+
+    career_title: str = Field(min_length=2, max_length=120)
+    grade: int = Field(ge=1, le=12)
+    board: str = Field(min_length=2, max_length=10)
+    strengths: list[str] = Field(default_factory=list)
+
+
+class RoadmapItem(BaseModel):
+    text: str
+    type: str = Field(default="action", description="action | skill | exam | milestone")
+
+
+class RoadmapSection(BaseModel):
+    id: str
+    title: str
+    timeframe: str = ""
+    focus: str = ""
+    items: list[RoadmapItem] = Field(default_factory=list)
+
+
+class RecommendedStream(BaseModel):
+    name: str = ""
+    why: str = ""
+
+
+class CollegePick(BaseModel):
+    name: str
+    location: str = ""
+    note: str = ""
+
+
+class CompanyPick(BaseModel):
+    name: str
+    note: str = ""
+
+
+class ProjectIdea(BaseModel):
+    title: str
+    detail: str = ""
+
+
+class InternshipIdea(BaseModel):
+    title: str
+    detail: str = ""
+
+
+class DetailedRoadmapResponse(BaseModel):
+    headline: str = ""
+    summary: str = ""
+    recommended_stream: RecommendedStream = Field(default_factory=RecommendedStream)
+    sections: list[RoadmapSection] = Field(default_factory=list)
+    key_exams: list[str] = Field(default_factory=list)
+    key_skills: list[str] = Field(default_factory=list)
+    top_colleges: list[CollegePick] = Field(default_factory=list)
+    top_companies: list[CompanyPick] = Field(default_factory=list)
+    projects: list[ProjectIdea] = Field(default_factory=list)
+    internships: list[InternshipIdea] = Field(default_factory=list)
+
+
+# ── 30-day checklist (fresh per student, capped 1/month upstream) ──────────────
+
+
+class ChecklistRequest(BaseModel):
+    career_title: str = Field(min_length=2, max_length=120)
+    grade: int = Field(ge=1, le=12)
+    board: str = Field(min_length=2, max_length=10)
+    strengths: list[str] = Field(default_factory=list)
+    needs_work: list[str] = Field(default_factory=list)
+    days: int = Field(default=30, ge=1, le=31)
+
+
+class ChecklistTaskOut(BaseModel):
+    day_index: int = Field(ge=1, le=31)
+    title: str
+    detail: str = ""
+    category: str = Field(default="study", description="study | practice | revise | explore | rest")
+
+
+class ChecklistResponse(BaseModel):
+    headline: str = ""
+    tasks: list[ChecklistTaskOut] = Field(default_factory=list)

@@ -49,6 +49,7 @@ LOCAL_APPS = [
     "apps.analytics",
     "apps.notifications",
     "apps.ai_bridge",
+    "apps.career",
     "apps.leads",
     "apps.exam_alerts",
 ]

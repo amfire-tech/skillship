@@ -114,6 +114,22 @@ def career_recommendations(*, school: School, user: User, payload: dict[str, Any
     )
 
 
+def career_roadmap_detail(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
+    # Detailed roadmap — a Career Pilot call. Reuses the CAREER job kind.
+    return _execute(
+        kind=_Kind.CAREER, school=school, created_by=user,
+        payload=payload, call=ai_client.career_roadmap_detail,
+    )
+
+
+def career_checklist(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
+    # 30-day checklist — a Career Pilot call. Reuses the CAREER job kind.
+    return _execute(
+        kind=_Kind.CAREER, school=school, created_by=user,
+        payload=payload, call=ai_client.career_checklist,
+    )
+
+
 def generate_questions(*, school: School, user: User, payload: dict[str, Any]) -> dict[str, Any]:
     return _execute(
         kind=_Kind.QUESTION_GEN, school=school, created_by=user,

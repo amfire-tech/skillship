@@ -72,6 +72,8 @@ function icon(d: string) {
     marketplace: "M3 3h2l.4 2M7 13h10l4-8H5.4M9 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
     analytics: "M18 20V10M12 20V4M6 20v-6",
     content: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v5h5",
+    bookmark: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
+    planner: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 16l2 2 4-4",
   };
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -124,6 +126,8 @@ const STUDENT_NAV: SidebarNavItem[] = [
   { label: "Certificates",       href: "/dashboard/student/certificates",     icon: icon("content")     },
   { label: "Progress Analytics", href: "/dashboard/student/progress",         icon: icon("analytics")   },
   { label: "AI Career Pilot",    href: "/dashboard/student/career",           icon: icon("career")      },
+  { label: "Saved Roadmaps",     href: "/dashboard/student/roadmaps",         icon: icon("bookmark")    },
+  { label: "My Daily Planner",   href: "/dashboard/student/planner",          icon: icon("planner")     },
   { label: "Exam Alerts",        href: "/dashboard/student/exam-alerts",      icon: icon("reports")     },
 ];
 
@@ -209,7 +213,7 @@ export default function DashboardLayout({
   if (pathname === COMPLETE_PROFILE_PATH) {
     return (
       <div className="min-h-screen bg-[var(--muted)]/30">
-        <main id="main-content" className="p-4 md:p-6 lg:p-8">
+        <main id="main-content" className="overflow-x-clip p-4 md:p-6 lg:p-8">
           <PageTransition pathname={pathname}>{children}</PageTransition>
         </main>
       </div>
@@ -229,7 +233,7 @@ export default function DashboardLayout({
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <AdminTopbar onMenuClick={toggleSidebar} />
-          <main id="main-content" className="flex-1 p-4 md:p-6 lg:p-8">
+          <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
             <PageTransition pathname={pathname}>{children}</PageTransition>
           </main>
         </div>
@@ -252,7 +256,7 @@ export default function DashboardLayout({
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onMenuClick={toggleSidebar} />
-          <main id="main-content" className="flex-1 p-4 md:p-6 lg:p-8">
+          <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
             <PageTransition pathname={pathname}>{children}</PageTransition>
           </main>
         </div>
@@ -263,7 +267,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <main id="main-content" className="p-6 lg:p-8">
+      <main id="main-content" className="overflow-x-clip p-4 md:p-6 lg:p-8">
         <PageTransition pathname={pathname}>{children}</PageTransition>
       </main>
       <CommandPalette />

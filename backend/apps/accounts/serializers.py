@@ -10,6 +10,7 @@ frontend/src/types/index.ts. If you change a field name or shape, run
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -33,6 +34,9 @@ class UserSerializer(serializers.ModelSerializer):
     )
     school_name = serializers.SerializerMethodField()
     current_class = serializers.SerializerMethodField()
+    # The class UUID (not just the label) so the admin edit form can preselect
+    # the student's current class in the Class dropdown.
+    current_class_id = serializers.SerializerMethodField()
     assigned_teacher = serializers.PrimaryKeyRelatedField(
         read_only=True, pk_field=serializers.UUIDField()
     )
@@ -69,8 +73,8 @@ class UserSerializer(serializers.ModelSerializer):
         if not self._is_me_student(obj):
             return None
         enr = (
-            Enrollment.objects.filter(student=obj)
-            .select_related("klass").order_by("-enrolled_on").first()
+            Enrollment.objects.filter(student=obj, withdrawn_on__isnull=True)
+            .select_related("klass").order_by("-enrolled_on", "-created_at").first()
         )
         return f"Grade {enr.klass.grade}-{enr.klass.section}" if enr and enr.klass_id else None
 
@@ -102,10 +106,22 @@ class UserSerializer(serializers.ModelSerializer):
         if obj.role != User.Role.STUDENT or getattr(view, "action", None) != "retrieve":
             return None
         enr = (
-            Enrollment.objects.filter(student=obj)
-            .select_related("klass").order_by("-enrolled_on").first()
+            Enrollment.objects.filter(student=obj, withdrawn_on__isnull=True)
+            .select_related("klass").order_by("-enrolled_on", "-created_at").first()
         )
-        return f"Grade {enr.klass.grade}-{enr.klass.section}" if enr else None
+        return f"Grade {enr.klass.grade}-{enr.klass.section}" if enr and enr.klass_id else None
+
+    def get_current_class_id(self, obj):
+        """The student's active class UUID (latest non-withdrawn enrolment), for
+        the admin edit form. Only on the single-user detail view to avoid N+1s."""
+        view = self.context.get("view")
+        if obj.role != User.Role.STUDENT or getattr(view, "action", None) != "retrieve":
+            return None
+        enr = (
+            Enrollment.objects.filter(student=obj, withdrawn_on__isnull=True)
+            .order_by("-enrolled_on", "-created_at").first()
+        )
+        return str(enr.klass_id) if enr and enr.klass_id else None
 
     class Meta:
         model = User
@@ -121,6 +137,7 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "admission_number",
             "current_class",
+            "current_class_id",
             "class_name",
             "roll_number",
             "rank_in_class",
@@ -136,7 +153,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "email", "username", "first_name", "last_name",
             "role", "school", "phone", "admission_number",
-            "current_class", "class_name", "roll_number", "rank_in_class",
+            "current_class", "current_class_id", "class_name", "roll_number", "rank_in_class",
             "class_size", "certificates_count",
             "assigned_teacher", "assigned_teacher_name",
             "profile_completed", "is_active", "ai_enabled", "date_joined",
@@ -291,6 +308,34 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return user
 
 
+def _set_student_class(student, klass):
+    """Move a student to `klass` (or withdraw them when klass is None) by managing
+    their Enrollment rows. Bare class membership uses course=None; a withdrawn
+    enrolment to the same class is reactivated rather than duplicated (the
+    (student, klass) partial unique constraint forbids a second row)."""
+    today = timezone.localdate()
+    active = (
+        Enrollment.objects.filter(student=student, withdrawn_on__isnull=True)
+        .order_by("-enrolled_on").first()
+    )
+    if klass is None:
+        if active:
+            active.withdrawn_on = today
+            active.save(update_fields=["withdrawn_on"])
+        return
+    if active and active.klass_id == klass.id:
+        return  # already in this class — no-op
+    # Withdraw any other active enrolments, then activate the target class.
+    Enrollment.objects.filter(student=student, withdrawn_on__isnull=True).update(withdrawn_on=today)
+    enr, created = Enrollment.objects.get_or_create(
+        student=student, klass=klass, course=None,
+        defaults={"school_id": student.school_id},
+    )
+    if not created and enr.withdrawn_on is not None:
+        enr.withdrawn_on = None
+        enr.save(update_fields=["withdrawn_on"])
+
+
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Update surface for /api/v1/users/{id}/.
 
@@ -310,6 +355,16 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         allow_null=True,
         pk_field=serializers.UUIDField(),
     )
+    # Write-only: move a STUDENT to a different class (manages the Enrollment).
+    # null = withdraw from their current class. Read the current value via
+    # UserSerializer.current_class_id on the detail GET.
+    klass = serializers.PrimaryKeyRelatedField(
+        queryset=Class.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+        pk_field=serializers.UUIDField(),
+    )
 
     class Meta:
         model = User
@@ -324,10 +379,26 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "phone",
             "admission_number",
             "assigned_teacher",
+            "klass",
             "is_active",
             "ai_enabled",
         ]
         read_only_fields = ["id", "role", "school"]
+
+    def validate_klass(self, value):
+        # The class must belong to the same school as the student being edited.
+        if value is not None and self.instance is not None and value.school_id != self.instance.school_id:
+            raise serializers.ValidationError("Class must belong to the same school as the student.")
+        return value
+
+    def update(self, instance, validated_data):
+        # `klass` is not a User field — pop it and apply as an Enrollment move.
+        klass_provided = "klass" in validated_data
+        new_klass = validated_data.pop("klass", None)
+        user = super().update(instance, validated_data)
+        if klass_provided and user.role == User.Role.STUDENT:
+            _set_student_class(user, new_klass)
+        return user
 
     def validate_email(self, value):
         qs = User.objects.filter(email__iexact=value)

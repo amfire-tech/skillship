@@ -185,6 +185,47 @@ class QuizViewSet(TenantScopedViewSet):
         qs = super().get_queryset()
         if self.request.user.role == Role.STUDENT:
             qs = qs.filter(status=Quiz.Status.PUBLISHED)
+            # Scope to what THIS student should see. Previously every student saw
+            # every published quiz in the school (e.g. a Class 7 student seeing
+            # Class 9 quizzes). A quiz is visible if any of:
+            #   1. it is explicitly ASSIGNED to the student or a class they're in;
+            #   2. its grade label matches the student's grade ("Class 7" → 7);
+            #   3. its grade label is blank (a school-wide quiz — documented "all").
+            from apps.academics.models import Enrollment
+
+            enrollments = list(
+                Enrollment.objects
+                .filter(student=self.request.user, withdrawn_on__isnull=True)
+                .select_related("klass")
+            )
+            enrolled_class_ids = [e.klass_id for e in enrollments]
+            student_grade = next(
+                (e.klass.grade for e in enrollments if e.klass_id and e.klass.grade is not None),
+                None,
+            )
+
+            assigned_to_me = (
+                QuizAssignment.objects
+                .filter(Q(student_id=self.request.user.id) | Q(klass_id__in=enrolled_class_ids))
+                .values_list("quiz_id", flat=True)
+            )
+            # Any quiz that has at least one assignment is "targeted" — it must
+            # only reach its assignees, even if its grade label is blank.
+            targeted_ids = (
+                QuizAssignment.objects
+                .filter(school_id=self.request.user.school_id)
+                .values_list("quiz_id", flat=True)
+            )
+
+            # Open (un-assigned) quizzes are matched by grade label.
+            grade_match = Q(grade="")  # blank label = school-wide
+            if student_grade is not None:
+                # Match the grade number as a standalone token so "Class 7"
+                # matches grade 7 but "Class 17" / "Class 70" do not.
+                grade_match |= Q(grade__iregex=r"(^|[^0-9])%d([^0-9]|$)" % student_grade)
+
+            visible = Q(id__in=assigned_to_me) | (~Q(id__in=targeted_ids) & grade_match)
+            qs = qs.filter(visible)
         # Optional ?course=<uuid> filter (used by both staff and student lists).
         course_id = self.request.query_params.get("course")
         if course_id:

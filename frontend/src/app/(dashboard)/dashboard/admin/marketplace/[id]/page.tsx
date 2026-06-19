@@ -212,17 +212,17 @@ export default function WorkshopDetailPage() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: "Enrolled", value: loading ? null : (workshop?.enrolled != null ? workshop.enrolled.toLocaleString("en-IN") : "—") },
           { label: "Rating", value: loading ? null : (workshop?.rating != null ? `${workshop.rating.toFixed(1)} / 5` : "—") },
           { label: "Price", value: loading ? null : (workshop?.price != null ? `₹${workshop.price.toLocaleString("en-IN")}` : "—") },
         ].map((s) => (
-          <div key={s.label} className="rounded-2xl border border-[var(--border)] bg-white p-5 text-center shadow-sm">
+          <div key={s.label} className="rounded-2xl border border-[var(--border)] bg-white p-3 text-center shadow-sm sm:p-5">
             {s.value === null ? (
               <Skeleton className="h-8 w-16 mx-auto" />
             ) : (
-              <p className="text-2xl font-bold text-primary">{s.value}</p>
+              <p className="text-lg font-bold text-primary sm:text-2xl">{s.value}</p>
             )}
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">{s.label}</p>
           </div>

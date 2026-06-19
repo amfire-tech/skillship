@@ -219,7 +219,7 @@ function FormPanel({ onLogin, error, submitting }: FormPanelProps) {
                   <button
                     key={r.value}
                     type="button"
-                    onClick={() => setRole(r.value)}
+                    onClick={() => setRole((cur) => (cur === r.value ? "" : r.value))}
                     aria-pressed={active}
                     title={`${r.label} — ${r.hint}`}
                     className={`group relative flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border text-[10px] font-semibold transition-all duration-300 ease-out-expo ${

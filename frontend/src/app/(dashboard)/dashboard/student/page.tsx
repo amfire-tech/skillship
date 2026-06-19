@@ -198,7 +198,7 @@ export default function StudentMyLearning() {
 
       {/* Two-col: Upcoming + Recent Results */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="min-w-0 rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
             <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Upcoming Quizzes</h2>
             <Link href="/dashboard/student/quizzes" className="text-xs font-semibold text-primary hover:underline">View all →</Link>
@@ -220,7 +220,7 @@ export default function StudentMyLearning() {
                         {q.duration_minutes ? ` · ${q.duration_minutes} min` : ""}
                       </p>
                     </div>
-                    <Link href={`/dashboard/student/quizzes/${q.id}`} className="inline-flex h-9 items-center gap-1 rounded-full bg-gradient-to-r from-primary to-accent px-4 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5">
+                    <Link href={`/dashboard/student/quizzes/${q.id}`} className="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-gradient-to-r from-primary to-accent px-4 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5">
                       Attempt Now
                     </Link>
                   </div>
@@ -228,7 +228,7 @@ export default function StudentMyLearning() {
           </div>
         </motion.section>
 
-        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.25 }} className="rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.25 }} className="min-w-0 rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
             <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Recent Results</h2>
             <Link href="/dashboard/student/results" className="text-xs font-semibold text-primary hover:underline">View all →</Link>

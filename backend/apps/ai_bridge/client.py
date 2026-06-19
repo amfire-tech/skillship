@@ -64,6 +64,12 @@ class AiClient:
     def career_recommendations(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/api/career/recommendations", payload)
 
+    def career_roadmap_detail(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/api/career/roadmap-detail", payload)
+
+    def career_checklist(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/api/career/checklist", payload)
+
     def generate_questions(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post("/api/quiz/generate", payload)
 
