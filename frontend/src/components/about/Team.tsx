@@ -6,6 +6,12 @@ import { MotionSection } from "@/components/ui/MotionWrapper";
 
 const team = [
   {
+    name: "Harsh Bhardwaj",
+    role: "Founder & CEO",
+    initials: "HB",
+    focus: "Vision · Product · Schools",
+  },
+  {
     name: "Education Leadership",
     role: "Curriculum & school transformation",
     initials: "EL",
@@ -39,8 +45,9 @@ export function Team() {
             </h2>
           </div>
           <p className="max-w-sm text-sm text-[var(--muted-foreground)] md:text-base">
-            A team that has built inside classrooms and at scale in product —
-            grounded in both realities.
+            Founded by <span className="font-semibold text-[var(--foreground)]">Harsh Bhardwaj</span>,
+            Skillship is built by a team that has worked inside classrooms and at
+            scale in product — grounded in both realities.
           </p>
         </MotionSection>
 

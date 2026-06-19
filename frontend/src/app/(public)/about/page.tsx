@@ -8,11 +8,11 @@ import { CTABanner } from "@/components/shared/CTABanner";
 export const metadata = {
   title: "About Us | Skillship",
   description:
-    "Skillship is building the intelligence layer for modern Indian schools — connecting quizzes, analytics, and AI career guidance into one live system.",
+    "Skillship Edutech, founded by Harsh Bhardwaj, is building the intelligence layer for modern Indian schools — connecting quizzes, analytics, and AI career guidance into one live system.",
   openGraph: {
     title: "About Us | Skillship",
     description:
-      "The intelligence layer for modern schools — built by educators, operators, and AI engineers.",
+      "Skillship Edutech, founded by Harsh Bhardwaj — the intelligence layer for modern schools, built by educators, operators, and AI engineers.",
     type: "website",
   },
   twitter: {
