@@ -87,6 +87,67 @@ def send_in_app(recipient, title: str, body: str, data: dict | None = None) -> N
     return notif
 
 
+def send_alert(recipient, title: str, body: str, category: str = "") -> Notification:
+    """Create an in-app alert AND fire a best-effort browser push.
+
+    Used by the super-admin alert composer. The in-app row is the source of
+    truth (always created); the web push is a bonus that reaches the user even
+    when the dashboard tab is closed.
+    """
+    notif = send_in_app(recipient, title, body, {"category": category})
+    send_web_push(recipient, title=title, body=body, data={"category": category, "url": "/dashboard"})
+    return notif
+
+
+def send_web_push(user, *, title: str, body: str, data: dict | None = None) -> int:
+    """Push to every browser `user` has subscribed. Returns how many succeeded.
+
+    Best-effort: prunes subscriptions the push service reports as gone (404/410)
+    and no-ops when VAPID keys aren't configured, so an in-app alert is never
+    blocked by a push failure.
+    """
+    import json
+    import logging
+
+    from django.conf import settings
+
+    from .models import PushSubscription
+
+    logger = logging.getLogger(__name__)
+
+    if not (settings.VAPID_PRIVATE_KEY and settings.VAPID_PUBLIC_KEY):
+        return 0
+
+    subs = list(PushSubscription.objects.filter(user=user))
+    if not subs:
+        return 0
+
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:  # pragma: no cover - dependency missing
+        logger.warning("pywebpush not installed; skipping web push")
+        return 0
+
+    message = json.dumps({"title": title, "body": body, "data": data or {}})
+    delivered = 0
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info=sub.as_subscription_info(),
+                data=message,
+                vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": settings.VAPID_SUBJECT},
+            )
+            delivered += 1
+        except WebPushException as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status in (404, 410):
+                sub.delete()  # permanently gone — stop retrying
+            else:
+                logger.warning("Web push failed for sub %s: %s", sub.id, exc)
+    return delivered
+
+
 # ── Async delivery tasks ──────────────────────────────────────────────────────
 
 

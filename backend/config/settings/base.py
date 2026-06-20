@@ -43,6 +43,7 @@ LOCAL_APPS = [
     "apps.common",
     "apps.accounts",
     "apps.schools",
+    "apps.billing",
     "apps.academics",
     "apps.quizzes",
     "apps.content",
@@ -205,3 +206,11 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # ── AI Service ────────────────────────────────────────────────────────────────
 AI_SERVICE_URL = os.environ.get("AI_SERVICE_URL", "http://localhost:8001")
 AI_SERVICE_INTERNAL_KEY = os.environ.get("AI_SERVICE_INTERNAL_KEY", "change-me-shared-with-ai-service")
+
+# ── Web Push (VAPID) ──────────────────────────────────────────────────────────
+# Free browser push via the Web Push protocol. The public key is handed to the
+# browser to create a subscription; the private key signs each push. When unset
+# (e.g. CI), push is simply skipped — in-app notifications still work.
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:admin@skillship.in")

@@ -1,0 +1,124 @@
+"""
+File:    backend/apps/notifications/tests/test_admin_alerts.py
+Purpose: Super-admin alert composer + Web Push subscription endpoints.
+Owner:   Vishal
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from apps.notifications.models import Notification, PushSubscription
+
+pytestmark = pytest.mark.django_db
+
+SEND = "/api/v1/notifications/admin/send/"
+SUBSCRIBE = "/api/v1/notifications/push/subscribe/"
+UNSUBSCRIBE = "/api/v1/notifications/push/unsubscribe/"
+PUBLIC_KEY = "/api/v1/notifications/push/public-key/"
+
+
+def _alerts_for(user):
+    return Notification.objects.filter(recipient=user, channel=Notification.Channel.IN_APP)
+
+
+def test_admin_alerts_principal_only(api_client, main_admin, school_a, principal_a, teacher_a, login):
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["PRINCIPAL"], "title": "Payment due", "body": "Please clear the invoice.", "category": "PAYMENT"},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert res.data["sent"] == 1
+    assert _alerts_for(principal_a).count() == 1
+    assert _alerts_for(teacher_a).count() == 0
+    notif = _alerts_for(principal_a).first()
+    assert notif.title == "Payment due"
+    assert notif.data_json["category"] == "PAYMENT"
+    assert notif.status == Notification.Status.SENT
+
+
+def test_admin_alerts_teachers(api_client, main_admin, school_a, principal_a, teacher_a, login):
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["TEACHER"], "title": "Guidance", "body": "Upload weekly plans."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert _alerts_for(teacher_a).count() == 1
+    assert _alerts_for(principal_a).count() == 0
+
+
+def test_admin_alert_is_school_scoped(api_client, main_admin, school_a, principal_a, principal_b, login):
+    login(api_client, main_admin)
+    api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["PRINCIPAL"], "title": "Hi", "body": "Only school A."},
+        format="json",
+    )
+    assert _alerts_for(principal_a).count() == 1
+    assert _alerts_for(principal_b).count() == 0
+
+
+def test_admin_alert_validation(api_client, main_admin, school_a, login):
+    login(api_client, main_admin)
+    res = api_client.post(SEND, {"school": str(school_a.id), "roles": [], "title": "x", "body": "y"}, format="json")
+    assert res.status_code == 400
+    assert "roles" in res.data
+
+
+def test_non_admin_cannot_send(api_client, principal_a, school_a, login):
+    login(api_client, principal_a)
+    res = api_client.post(
+        SEND, {"school": str(school_a.id), "roles": ["TEACHER"], "title": "x", "body": "y"}, format="json"
+    )
+    assert res.status_code == 403
+
+
+def test_recipient_sees_alert_on_own_feed(api_client, main_admin, school_a, principal_a, login):
+    login(api_client, main_admin)
+    api_client.post(
+        SEND, {"school": str(school_a.id), "roles": ["PRINCIPAL"], "title": "Ping", "body": "Check this."}, format="json"
+    )
+    # Principal lists their own notifications.
+    pc = api_client.__class__()
+    login(pc, principal_a)
+    res = pc.get("/api/v1/notifications/")
+    assert res.status_code == 200, res.content
+    titles = [n["title"] for n in (res.data.get("results") or res.data)]
+    assert "Ping" in titles
+
+
+# ── Web Push subscription ─────────────────────────────────────────────────────
+
+
+def test_push_public_key(api_client, principal_a, login, settings):
+    settings.VAPID_PUBLIC_KEY = "TEST_PUB_KEY"
+    login(api_client, principal_a)
+    res = api_client.get(PUBLIC_KEY)
+    assert res.status_code == 200
+    assert res.data["public_key"] == "TEST_PUB_KEY"
+
+
+def test_push_subscribe_and_unsubscribe(api_client, principal_a, login):
+    login(api_client, principal_a)
+    sub = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "k1", "auth": "k2"}}
+    res = api_client.post(SUBSCRIBE, sub, format="json")
+    assert res.status_code == 201, res.content
+    assert PushSubscription.objects.filter(user=principal_a, endpoint=sub["endpoint"]).exists()
+
+    # Idempotent: posting the same endpoint again updates, doesn't duplicate.
+    api_client.post(SUBSCRIBE, sub, format="json")
+    assert PushSubscription.objects.filter(endpoint=sub["endpoint"]).count() == 1
+
+    res = api_client.post(UNSUBSCRIBE, {"endpoint": sub["endpoint"]}, format="json")
+    assert res.status_code == 200
+    assert not PushSubscription.objects.filter(endpoint=sub["endpoint"]).exists()
+
+
+def test_push_subscribe_rejects_incomplete(api_client, principal_a, login):
+    login(api_client, principal_a)
+    res = api_client.post(SUBSCRIBE, {"endpoint": "https://push.example/x"}, format="json")
+    assert res.status_code == 400

@@ -19,6 +19,10 @@ from rest_framework import serializers
 
 from .models import School, SchoolSettings
 
+# Logos are tiny; cap the stored data-URL so a stray multi-MB image can't bloat
+# the row (and every /auth/me/ payload). ~700k chars of base64 ≈ a ~512 KB image.
+MAX_LOGO_CHARS = 700_000
+
 
 class SchoolSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
@@ -41,6 +45,7 @@ class SchoolSerializer(serializers.ModelSerializer):
             "plan",
             "subscription_expires_at",
             "is_active",
+            "logo",
             "ai_enabled",
             "created_at",
             "updated_at",
@@ -51,6 +56,20 @@ class SchoolSerializer(serializers.ModelSerializer):
         # No settings row yet → AI is on by default (matches the model default).
         settings = getattr(obj, "settings", None)
         return settings.ai_enabled if settings is not None else True
+
+    def validate_logo(self, value):
+        # Empty string clears the logo — always allowed.
+        if not value:
+            return ""
+        if not value.startswith("data:image/"):
+            raise serializers.ValidationError(
+                "Logo must be an image data-URL (data:image/...)."
+            )
+        if len(value) > MAX_LOGO_CHARS:
+            raise serializers.ValidationError(
+                "Logo is too large. Please upload an image under ~500 KB."
+            )
+        return value
 
     def validate(self, attrs):
         # Auto-derive slug from name on create when not provided.

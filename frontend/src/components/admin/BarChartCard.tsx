@@ -56,7 +56,7 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
             return (
               <div
                 key={d.label}
-                className="relative flex flex-1 flex-col items-center justify-end"
+                className="relative flex h-full flex-1 flex-col items-center justify-end"
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >

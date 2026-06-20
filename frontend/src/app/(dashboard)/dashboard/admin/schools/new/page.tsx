@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { PageHeader } from "@/components/admin/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { API_BASE, getToken } from "@/lib/auth";
+import { fileToLogoDataUrl, ACCEPTED_LOGO_TYPES } from "@/lib/logo";
 
 const boardOptions = [
   { value: "CBSE", label: "CBSE" },
@@ -52,10 +53,22 @@ export default function AddSchoolPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [logo, setLogo] = useState<string>("");
+  const [logoErr, setLogoErr] = useState<string | null>(null);
 
   function handleChange(key: keyof FormValues, val: string) {
     setValues((p) => ({ ...p, [key]: val }));
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }));
+  }
+
+  async function handleLogoPick(file?: File) {
+    if (!file) return;
+    setLogoErr(null);
+    try {
+      setLogo(await fileToLogoDataUrl(file));
+    } catch (err) {
+      setLogoErr(err instanceof Error ? err.message : "Could not read that image.");
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -78,6 +91,7 @@ export default function AddSchoolPage() {
           state: values.state,
           address: values.address,
           plan: values.plan,
+          ...(logo ? { logo } : {}),
         }),
       });
 
@@ -204,6 +218,36 @@ export default function AddSchoolPage() {
                 <input type="text" placeholder="Full postal address" value={values.address}
                   onChange={(e) => handleChange("address", e.target.value)}
                   className="h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-4 focus:ring-primary/10" />
+              </motion.div>
+
+              {/* School Logo — full width */}
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }} className="grid gap-1.5 md:col-span-2">
+                <label className="text-xs font-semibold text-[var(--muted-foreground)]">School Logo <span className="font-normal">(optional — shown to the school&apos;s students, teachers &amp; principal)</span></label>
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--muted)]/30">
+                    {logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={logo} alt="School logo preview" className="h-full w-full object-contain" />
+                    ) : (
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="text-[var(--muted-foreground)]"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <label className="inline-flex h-9 cursor-pointer items-center rounded-full border border-[var(--border)] bg-white px-4 text-xs font-semibold text-[var(--foreground)] transition-colors hover:border-primary/40 hover:text-primary">
+                        {logo ? "Change Logo" : "Upload Logo"}
+                        <input type="file" accept={ACCEPTED_LOGO_TYPES} className="hidden"
+                          onChange={(e) => handleLogoPick(e.target.files?.[0])} />
+                      </label>
+                      {logo && (
+                        <button type="button" onClick={() => { setLogo(""); setLogoErr(null); }}
+                          className="inline-flex h-9 items-center rounded-full px-3 text-xs font-semibold text-red-500 hover:underline">Remove</button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">PNG, JPG, WEBP or SVG · under ~500 KB</p>
+                  </div>
+                </div>
+                {logoErr && <p role="alert" className="text-xs font-medium text-red-500">{logoErr}</p>}
               </motion.div>
             </div>
 

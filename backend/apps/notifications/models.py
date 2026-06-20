@@ -6,9 +6,11 @@ Owner:   Vishal
 
 from __future__ import annotations
 
+import uuid
+
 from django.db import models
 
-from apps.common.models import TenantModel
+from apps.common.models import TenantModel, TimeStampedModel
 
 
 class NotificationTemplate(TenantModel):
@@ -75,3 +77,34 @@ class Notification(TenantModel):
 
     def __str__(self):
         return f"{self.channel} → {self.recipient}: {self.title}"
+
+
+class PushSubscription(TimeStampedModel):
+    """A browser's Web Push subscription for one user.
+
+    NOT a TenantModel: it belongs to a *user* (who may be MAIN_ADMIN with no
+    school), and a user can have several — one per browser/device. The endpoint
+    is the unique handle the push service gives us; we store the two keys needed
+    to encrypt the payload. Dead subscriptions are pruned on a 404/410 push.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+    )
+    endpoint = models.TextField(unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user"])]
+
+    def __str__(self):
+        return f"PushSubscription({self.user_id})"
+
+    def as_subscription_info(self) -> dict:
+        """Shape pywebpush expects."""
+        return {"endpoint": self.endpoint, "keys": {"p256dh": self.p256dh, "auth": self.auth}}

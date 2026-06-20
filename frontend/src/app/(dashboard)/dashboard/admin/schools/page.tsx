@@ -20,6 +20,7 @@ interface ApiSchool {
   plan: string;
   is_active: boolean;
   ai_enabled: boolean;
+  logo?: string;
   created_at: string;
 }
 
@@ -251,9 +252,16 @@ export default function SchoolsManagementPage() {
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-xs font-bold text-white ${initialsColor(s.name)}`}>
-                            {s.name.charAt(0).toUpperCase()}
-                          </div>
+                          {s.logo ? (
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-white">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={s.logo} alt={`${s.name} logo`} className="h-full w-full object-contain" />
+                            </span>
+                          ) : (
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-xs font-bold text-white ${initialsColor(s.name)}`}>
+                              {s.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <span className="max-w-[220px] truncate font-semibold text-[var(--foreground)]">{s.name}</span>
                         </div>
                       </td>

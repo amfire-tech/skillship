@@ -74,6 +74,7 @@ function icon(d: string) {
     content: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7zM14 2v5h5",
     bookmark: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
     planner: "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM9 16l2 2 4-4",
+    billing: "M3 7h18v12H3zM3 11h18M7 15h4",
   };
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -103,6 +104,7 @@ const PRINCIPAL_NAV: SidebarNavItem[] = [
   { label: "Student Management",    href: "/dashboard/principal/students",            icon: icon("users")     },
   { label: "Class Management",      href: "/dashboard/principal/classes",             icon: icon("academics") },
   { label: "Performance Analytics", href: "/dashboard/principal/analytics",           icon: icon("analytics") },
+  { label: "Fees & Payments",       href: "/dashboard/principal/billing",             icon: icon("billing")   },
   { label: "Download Reports",      href: "/dashboard/principal/reports",             icon: icon("reports")   },
   { label: "AI Summary",            href: "/dashboard/principal/ai-summary",          icon: icon("content")   },
 ];

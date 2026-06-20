@@ -33,6 +33,7 @@ class UserSerializer(serializers.ModelSerializer):
         pk_field=serializers.UUIDField(),
     )
     school_name = serializers.SerializerMethodField()
+    school_logo = serializers.SerializerMethodField()
     current_class = serializers.SerializerMethodField()
     # The class UUID (not just the label) so the admin edit form can preselect
     # the student's current class in the Class dropdown.
@@ -52,6 +53,14 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_school_name(self, obj):
         return obj.school.name if obj.school_id else None
+
+    def get_school_logo(self, obj):
+        # The logo can be a sizeable base64 data-URL, so only return it on the
+        # self-profile call (/auth/me/) — never on the paginated user list where
+        # it would be repeated per row. Every role's dashboard hydrates from /me.
+        if not self.context.get("me") or not obj.school_id:
+            return None
+        return obj.school.logo or None
 
     def get_assigned_teacher_name(self, obj):
         t = obj.assigned_teacher
@@ -134,6 +143,7 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "school",
             "school_name",
+            "school_logo",
             "phone",
             "admission_number",
             "current_class",

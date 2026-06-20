@@ -6,15 +6,21 @@ Owner:   Vishal
 
 from __future__ import annotations
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from apps.common.permissions import IsSchoolStaff
+from apps.accounts.models import User
+from apps.common.permissions import IsMainAdmin, IsSchoolStaff, Role
 from apps.common.viewsets import TenantScopedViewSet
 
-from .models import Notification, NotificationTemplate
+from .models import Notification, NotificationTemplate, PushSubscription
 from .serializers import NotificationSerializer, NotificationTemplateSerializer
+from .services import send_alert
 
 
 class NotificationViewSet(TenantScopedViewSet):
@@ -67,3 +73,96 @@ class NotificationTemplateViewSet(TenantScopedViewSet):
 
     def perform_create(self, serializer):
         serializer.save(school_id=self.request.user.school_id)
+
+
+# ── Super-admin alert composer ────────────────────────────────────────────────
+
+
+ALERTABLE_ROLES = {Role.PRINCIPAL, Role.TEACHER}
+
+
+class AdminAlertView(APIView):
+    """POST /api/v1/notifications/admin/send/ — MAIN_ADMIN sends an alert.
+
+    Body: { school: <uuid>, roles: ["PRINCIPAL","TEACHER"], title, body,
+            category? }
+    Creates one in-app Notification per matching recipient in that school and
+    fires a best-effort browser push to each. Like the billing endpoints, this
+    is a plain APIView (not tenant-scoped) because MAIN_ADMIN has school=NULL.
+    """
+
+    permission_classes = [IsAuthenticated, IsMainAdmin]
+
+    def post(self, request):
+        data = request.data
+        school = data.get("school")
+        roles = data.get("roles") or []
+        title = (data.get("title") or "").strip()
+        body = (data.get("body") or "").strip()
+        category = (data.get("category") or "").strip()
+
+        if not school:
+            raise ValidationError({"school": "Pick a school to alert."})
+        if not title:
+            raise ValidationError({"title": "A title is required."})
+        if not body:
+            raise ValidationError({"body": "A message is required."})
+        roles = [r for r in roles if r in ALERTABLE_ROLES]
+        if not roles:
+            raise ValidationError({"roles": "Choose at least one of PRINCIPAL or TEACHER."})
+
+        recipients = User.objects.filter(
+            school_id=school, role__in=roles, is_active=True
+        )
+        sent = 0
+        for user in recipients:
+            send_alert(user, title=title, body=body, category=category)
+            sent += 1
+
+        return Response({"sent": sent}, status=status.HTTP_201_CREATED)
+
+
+# ── Web Push subscriptions ────────────────────────────────────────────────────
+
+
+class PushPublicKeyView(APIView):
+    """GET /api/v1/notifications/push/public-key/ — the VAPID public key the
+    browser needs to create a subscription. Safe to expose."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"public_key": settings.VAPID_PUBLIC_KEY})
+
+
+class PushSubscribeView(APIView):
+    """POST /api/v1/notifications/push/subscribe/ — store this browser's
+    subscription for the current user (idempotent on endpoint)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        sub = request.data or {}
+        endpoint = sub.get("endpoint")
+        keys = sub.get("keys") or {}
+        p256dh, auth = keys.get("p256dh"), keys.get("auth")
+        if not (endpoint and p256dh and auth):
+            raise ValidationError("A valid push subscription (endpoint + keys) is required.")
+
+        PushSubscription.objects.update_or_create(
+            endpoint=endpoint,
+            defaults={"user": request.user, "p256dh": p256dh, "auth": auth},
+        )
+        return Response({"subscribed": True}, status=status.HTTP_201_CREATED)
+
+
+class PushUnsubscribeView(APIView):
+    """POST /api/v1/notifications/push/unsubscribe/ — drop a subscription."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        endpoint = (request.data or {}).get("endpoint")
+        if endpoint:
+            PushSubscription.objects.filter(endpoint=endpoint, user=request.user).delete()
+        return Response({"unsubscribed": True})

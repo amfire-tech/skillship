@@ -14,6 +14,7 @@ import { StatCard } from "@/components/admin/StatCard";
 import { LineChartCard } from "@/components/admin/LineChartCard";
 import { BarChartCard } from "@/components/admin/BarChartCard";
 import { API_BASE, getToken } from "@/lib/auth";
+import { inr } from "@/components/billing/BillingPanel";
 
 // ── Types (match the /analytics/platform/ payload) ─────────────────────────
 interface MonthPoint { month: string; label: string; count: number }
@@ -41,6 +42,35 @@ interface PlatformAnalytics {
   avg_score_by_subject: { subject: string; avg: number; attempts: number }[];
   regional: { state: string; schools: number; students: number }[];
   engagement: { active_7d: number; active_30d: number; avg_quiz_minutes: number };
+}
+
+// ── Revenue types (match the /billing/revenue/ payload) ────────────────────
+interface RevenuePerSchool {
+  school: string;
+  name: string;
+  city: string;
+  plan: string;
+  total_charged: string;
+  total_paid: string;
+  remaining: string;
+}
+interface RevenueData {
+  totals: {
+    total_charged: string;
+    total_paid: string;
+    total_outstanding: string;
+    collected_this_year: string;
+    collected_this_month: string;
+    school_count: number;
+  };
+  per_school: RevenuePerSchool[];
+  monthly: { month: string; collected: string }[];
+  yearly: { year: string; collected: string }[];
+}
+
+function monthLabel(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
@@ -89,6 +119,7 @@ function MiniStat({ label, value, hint, tone = "default" }: { label: string; val
 export default function GlobalAnalyticsPage() {
   const [data, setData] = useState<PlatformAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rev, setRev] = useState<RevenueData | null>(null);
 
   useEffect(() => { document.title = "Analytics — Skillship"; }, []);
 
@@ -96,6 +127,9 @@ export default function GlobalAnalyticsPage() {
     apiFetch<PlatformAnalytics>("/analytics/platform/")
       .then(setData)
       .catch(() => setError("Couldn't load analytics. Check that the backend is running on port 8000."));
+    // Revenue is a separate concern (billing app) — fetch it independently so a
+    // billing hiccup never blanks the rest of the analytics page.
+    apiFetch<RevenueData>("/billing/revenue/").then(setRev).catch(() => setRev(null));
   }, []);
 
   const k = data?.kpis;
@@ -174,6 +208,83 @@ export default function GlobalAnalyticsPage() {
         <BarChartCard title="Average Score by Subject" subtitle="Mean score % per subject (top subjects by attempts)" data={data.avg_score_by_subject.map((d) => ({ label: d.subject, value: d.avg }))} />
         <BarChartCard title="Quizzes by Status" subtitle="Lifecycle state of every quiz on the platform" data={data.quiz_status.map((d) => ({ label: d.label, value: d.count }))} />
       </div>
+        </>
+      )}
+
+      {/* ── Revenue analytics (money collected, the business backbone) ── */}
+      <div className="pt-2">
+        <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">Revenue</h2>
+        <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+          Money actually collected from schools — total, annual, month-wise and per school. Outstanding is what is still owed to us.
+        </p>
+      </div>
+
+      {!rev ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-[92px] animate-pulse rounded-2xl border border-[var(--border)] bg-[var(--muted)]/30" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <MiniStat label="Total Revenue" value={inr(rev.totals.total_paid)} tone="emerald" hint="collected all-time" />
+            <MiniStat label="This Year" value={inr(rev.totals.collected_this_year)} tone="emerald" hint="collected in current year" />
+            <MiniStat label="This Month" value={inr(rev.totals.collected_this_month)} hint="collected this month" />
+            <MiniStat label="Outstanding" value={inr(rev.totals.total_outstanding)} tone="amber" hint="remaining payment owed to us" />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <BarChartCard
+              title="Revenue by Month"
+              subtitle="Payments collected per month (₹)"
+              data={rev.monthly.map((m) => ({ label: monthLabel(m.month), value: Number(m.collected) }))}
+            />
+            <BarChartCard
+              title="Revenue by Year"
+              subtitle="Payments collected per calendar year (₹)"
+              data={rev.yearly.map((y) => ({ label: y.year, value: Number(y.collected) }))}
+            />
+          </div>
+
+          {/* Per-school revenue — collected vs remaining */}
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+            <div className="border-b border-[var(--border)] p-5">
+              <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Revenue by School</h3>
+              <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">What each school has paid us and what is still due</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                    <th className="px-5 py-3">School</th>
+                    <th className="px-5 py-3 text-right">Charged</th>
+                    <th className="px-5 py-3 text-right">Collected</th>
+                    <th className="px-5 py-3 text-right">Remaining</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rev.per_school.length === 0 ? (
+                    <tr><td colSpan={4} className="px-5 py-8 text-center text-sm text-[var(--muted-foreground)]">No billing recorded yet.</td></tr>
+                  ) : (
+                    [...rev.per_school]
+                      .sort((a, b) => Number(b.total_paid) - Number(a.total_paid))
+                      .map((s) => {
+                        const due = Number(s.remaining);
+                        return (
+                          <tr key={s.school} className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/30">
+                            <td className="px-5 py-3.5 font-semibold text-[var(--foreground)]">{s.name}<span className="ml-2 text-xs font-normal text-[var(--muted-foreground)]">{s.city || ""}</span></td>
+                            <td className="px-5 py-3.5 text-right text-[var(--muted-foreground)]">{inr(s.total_charged)}</td>
+                            <td className="px-5 py-3.5 text-right font-medium text-emerald-600">{inr(s.total_paid)}</td>
+                            <td className={`px-5 py-3.5 text-right font-semibold ${due > 0 ? "text-amber-600" : "text-emerald-600"}`}>{inr(s.remaining)}</td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
       )}
 

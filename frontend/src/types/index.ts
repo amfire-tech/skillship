@@ -23,6 +23,9 @@ export interface User {
   role: UserRole;
   school: string | null;
   school_name?: string | null;
+  // School logo as a base64 data-URL. Only returned on /auth/me/ (not on the
+  // user list) so a school's students/teachers/principal can show their branding.
+  school_logo?: string | null;
   phone?: string;
   admission_number?: string;
   // First-login profile lock. Blank-generated student accounts start `false`:
@@ -44,6 +47,7 @@ export interface School {
   address?: string;
   is_active: boolean;
   subscription_expires_at?: string;
+  logo?: string;
 }
 
 // === API Contract Types ===

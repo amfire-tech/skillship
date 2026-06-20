@@ -30,6 +30,11 @@ class School(TimeStampedModel):
     plan = models.CharField(max_length=10, choices=Plan.choices, default=Plan.CORE)
     subscription_expires_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    # School logo as a base64 data-URL (e.g. "data:image/png;base64,...").
+    # Stored inline rather than as an uploaded file so it needs no media-serving
+    # infra (nginx /media/, persistent volume) and returns in one API call — fine
+    # for a small logo. Set/cleared by MAIN_ADMIN; read by every role's /auth/me/.
+    logo = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-created_at"]
