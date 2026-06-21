@@ -206,6 +206,19 @@ class Quiz(TenantModel):
         related_name="quizzes_authored",
     )
 
+    # Who moved this quiz REVIEW → PUBLISHED (the approver), plus a snapshot of
+    # their role at that moment. Lets the super-admin see at a glance that a quiz
+    # was approved by a SUB_ADMIN / PRINCIPAL (vs the platform owner) without a
+    # later role change rewriting history.
+    published_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quizzes_published",
+    )
+    published_by_role = models.CharField(max_length=20, blank=True, default="")
+
     class Meta(TenantModel.Meta):
         constraints = [
             models.CheckConstraint(

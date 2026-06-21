@@ -121,6 +121,10 @@ class TestQuizApproval:
         assert r.status_code == 200, r.content
         quiz.refresh_from_db()
         assert quiz.status == Quiz.Status.PUBLISHED
+        # The approver + role snapshot are recorded so the super-admin can see
+        # the quiz was approved by a sub-admin.
+        assert quiz.published_by_id == sub_admin.id
+        assert quiz.published_by_role == User.Role.SUB_ADMIN
 
     def test_without_quiz_cap_403(self, api_client, login, sub_admin, school_a, teacher_a):
         quiz = _review_quiz(school_a, teacher_a)

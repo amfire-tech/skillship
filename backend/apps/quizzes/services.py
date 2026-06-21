@@ -99,11 +99,16 @@ def transition_quiz_status(quiz: Quiz, *, target: str, actor) -> Quiz:
             )
 
         locked.status = target
+        fields = ["status", "published_at", "archived_at", "updated_at"]
         if target == Quiz.Status.PUBLISHED:
             locked.published_at = timezone.now()
+            # Record the approver + their role snapshot for the "approved by" tag.
+            locked.published_by = actor
+            locked.published_by_role = actor.role
+            fields += ["published_by", "published_by_role"]
         elif target == Quiz.Status.ARCHIVED:
             locked.archived_at = timezone.now()
-        locked.save(update_fields=["status", "published_at", "archived_at", "updated_at"])
+        locked.save(update_fields=fields)
         return locked
 
 

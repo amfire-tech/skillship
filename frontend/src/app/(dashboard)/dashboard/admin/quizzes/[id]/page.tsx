@@ -27,8 +27,22 @@ interface Quiz {
   total_attempts?: number;
   avg_score?: number | string | null;
   status?: string;
+  approved_by_name?: string | null;
+  approved_by_role?: string | null;
   updated_at?: string;
   created_at?: string;
+}
+
+// Friendly label for the role that approved (published) the quiz.
+const ROLE_LABEL: Record<string, string> = {
+  MAIN_ADMIN: "Super Admin",
+  SUB_ADMIN: "Sub Admin",
+  PRINCIPAL: "Principal",
+  TEACHER: "Teacher",
+};
+function approverLabel(role?: string | null): string | null {
+  if (!role) return null;
+  return ROLE_LABEL[role] ?? role;
 }
 
 // Only title / grade / description are writable on the quiz serializer — subject
@@ -218,6 +232,12 @@ export default function QuizDetailPage() {
                   {quiz?.subject && <span className="rounded-full bg-teal-100 text-teal-700 px-2.5 py-0.5 text-xs font-semibold">{quiz.subject}</span>}
                   {(quiz?.grade ?? quiz?.grade_level) && <span className="rounded-full bg-blue-100 text-blue-700 px-2.5 py-0.5 text-xs font-semibold">{quiz?.grade ?? quiz?.grade_level}</span>}
                   {quiz?.status && <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusColor[prettyStatus(quiz.status)] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>{prettyStatus(quiz.status)}</span>}
+                  {quiz?.status?.toUpperCase() === "PUBLISHED" && approverLabel(quiz?.approved_by_role) && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/15 dark:text-violet-300">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                      Approved by {approverLabel(quiz?.approved_by_role)}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -252,6 +272,12 @@ export default function QuizDetailPage() {
                 <Field label="School" value={quiz?.school_name ?? (quiz?.school ? "Single school" : "All Schools")} />
                 <Field label="Last Updated" value={quiz?.updated_at ? new Date(quiz.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
                 <Field label="Status" value={prettyStatus(quiz?.status)} />
+                {quiz?.status?.toUpperCase() === "PUBLISHED" && approverLabel(quiz?.approved_by_role) && (
+                  <Field
+                    label="Approved by"
+                    value={`${quiz?.approved_by_name ? `${quiz.approved_by_name} · ` : ""}${approverLabel(quiz?.approved_by_role)}`}
+                  />
+                )}
                 {quiz?.description && (
                   <div className="sm:col-span-2 lg:col-span-3">
                     <Field label="Description" value={quiz.description} />

@@ -212,6 +212,8 @@ class QuizSerializer(serializers.ModelSerializer):
     subject = serializers.CharField(source="course.name", read_only=True)
     school_name = serializers.CharField(source="school.name", read_only=True, default=None)
     created_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    approved_by_role = serializers.CharField(source="published_by_role", read_only=True)
     question_count = serializers.SerializerMethodField()
     total_attempts = serializers.SerializerMethodField()
     avg_score = serializers.SerializerMethodField()
@@ -226,18 +228,27 @@ class QuizSerializer(serializers.ModelSerializer):
             "duration_minutes", "total_questions", "pass_percentage", "attempts_allowed",
             "certificate_enabled",
             "published_at", "archived_at",
-            "created_by", "created_by_name", "question_count",
+            "created_by", "created_by_name",
+            "approved_by_name", "approved_by_role",
+            "question_count",
             "total_attempts", "avg_score", "pass_rate",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "school", "school_name", "subject", "status", "published_at", "archived_at",
-            "created_by", "created_by_name", "question_count", "total_attempts", "avg_score",
+            "created_by", "created_by_name", "approved_by_name", "approved_by_role",
+            "question_count", "total_attempts", "avg_score",
             "pass_rate", "created_at", "updated_at",
         ]
 
     def get_created_by_name(self, obj) -> str | None:
         u = obj.created_by
+        if not u:
+            return None
+        return u.get_full_name() or u.username
+
+    def get_approved_by_name(self, obj) -> str | None:
+        u = obj.published_by
         if not u:
             return None
         return u.get_full_name() or u.username

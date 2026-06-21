@@ -19,6 +19,7 @@ interface Student {
   last_name: string;
   email: string;
   is_active: boolean;
+  profile_completed?: boolean;
   class_name?: string;
   grade?: string;
   section?: string;
@@ -92,6 +93,7 @@ export default function StudentPerformancePage() {
         last_name: r.last_name,
         email: r.email,
         is_active: r.is_active,
+        profile_completed: r.profile_completed ?? undefined,
         class_name: r.class_label ?? undefined,
         grade: r.grade != null ? String(r.grade) : undefined,
         section: r.section ?? undefined,
@@ -160,7 +162,7 @@ export default function StudentPerformancePage() {
       {/* Aggregate strip */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card label="Total Students"      value={aggregate.total === null ? null : aggregate.total} />
-        <Card label="Class Average"       value={aggregate.avg === null ? null : `${aggregate.avg}%`} />
+        <Card label="Class Average"       value={students === null ? null : aggregate.avg === null ? "—" : `${aggregate.avg}%`} />
         <Card label="Top Performers (≥80%)" value={aggregate.top === null ? null : aggregate.top}    tone="emerald" />
         <Card label="Needs Attention (<65%)" value={aggregate.bottom === null ? null : aggregate.bottom} tone="red" />
       </div>
@@ -227,7 +229,11 @@ export default function StudentPerformancePage() {
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">{initials(fullName)}</div>
                           <div className="min-w-0">
                             <p className="truncate font-medium text-[var(--foreground)]">{fullName}</p>
-                            {s.roll_number && <p className="text-xs text-[var(--muted-foreground)]">Roll {s.roll_number}</p>}
+                            {s.profile_completed === false ? (
+                              <span className="mt-0.5 inline-block rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Awaiting first login</span>
+                            ) : s.roll_number ? (
+                              <p className="text-xs text-[var(--muted-foreground)]">Roll {s.roll_number}</p>
+                            ) : null}
                           </div>
                         </div>
                       </td>
