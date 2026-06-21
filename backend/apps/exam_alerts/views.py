@@ -74,7 +74,11 @@ class ExamAlertViewSet(TenantScopedViewSet):
     def _target_school_id(self):
         if self._user_is_main_admin():
             return self.request.data.get("school")
-        return self.request.user.school_id
+        # Acting school — own school, or a Skillship teacher's selected,
+        # actively-assigned X-School-Context school. Refuse if none is set.
+        from apps.common.tenancy import require_school_id
+
+        return require_school_id(self.request)
 
     def perform_create(self, serializer):
         self._assert_staff()

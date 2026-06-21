@@ -77,6 +77,33 @@ class TestCareerAskView:
         # Failed job still recorded for audit.
         assert AiJob.objects.filter(status=AiJob.Status.FAILED).count() == 1
 
+    def test_language_passes_through_to_ai_client(
+        self, api_client, login, student_a, monkeypatch
+    ):
+        """The reply-language hint reaches the AI service; absent → 'auto'."""
+        from apps.ai_bridge import client as client_mod
+
+        seen: list[dict] = []
+
+        def capture(payload, *args, **kwargs):
+            seen.append(payload)
+            return {"answer": "ok", "model_used": "gemini-test"}
+
+        monkeypatch.setattr(client_mod.ai_client, "career_ask", capture)
+        login(api_client, student_a)
+
+        assert api_client.post(
+            CAREER_URL, {"question": "hu doctor banva maangu chhu", "language": "gu"},
+            format="json",
+        ).status_code == 200
+        assert seen[-1]["language"] == "gu"
+
+        # Omitting language defaults to auto-detect.
+        assert api_client.post(
+            CAREER_URL, {"question": "what next?"}, format="json"
+        ).status_code == 200
+        assert seen[-1]["language"] == "auto"
+
 
 # ── quiz/grade-short — staff only, new in Phase 1 ────────────────────────────
 

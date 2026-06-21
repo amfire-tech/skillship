@@ -46,6 +46,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from apps.common.permissions import Role
+from apps.common.tenancy import require_school_id, resolve_school_id
 from apps.common.viewsets import TenantScopedViewSet
 
 from . import services
@@ -89,7 +90,7 @@ class QuestionBankViewSet(TenantScopedViewSet):
             school_id = self.request.data.get("school")
             serializer.save(school_id=school_id, created_by=self.request.user)
         else:
-            serializer.save(school_id=self.request.user.school_id, created_by=self.request.user)
+            serializer.save(school_id=require_school_id(self.request), created_by=self.request.user)
 
     # ── CSV bulk import (Phase 4.4) ─────────────────────────────────────────
 
@@ -158,7 +159,7 @@ class QuestionViewSet(TenantScopedViewSet):
             school_id = self.request.data.get("school")
             serializer.save(school_id=school_id, created_by=self.request.user)
         else:
-            serializer.save(school_id=self.request.user.school_id, created_by=self.request.user)
+            serializer.save(school_id=require_school_id(self.request), created_by=self.request.user)
 
 
 # ── Quiz ────────────────────────────────────────────────────────────────────
@@ -262,7 +263,7 @@ class QuizViewSet(TenantScopedViewSet):
             school_id = self.request.data.get("school")
             serializer.save(school_id=school_id, created_by=self.request.user)
         else:
-            serializer.save(school_id=self.request.user.school_id, created_by=self.request.user)
+            serializer.save(school_id=require_school_id(self.request), created_by=self.request.user)
 
     @extend_schema(request=QuizAuthoringSerializer, responses={201: QuizSerializer, 400: _BAD_REQUEST})
     @action(detail=False, methods=["post"], url_path="authoring",
@@ -280,7 +281,7 @@ class QuizViewSet(TenantScopedViewSet):
             if not school_id:
                 raise ValidationError({"school": "MAIN_ADMIN must specify a target school."})
         else:
-            school_id = request.user.school_id
+            school_id = require_school_id(request)
 
         try:
             quiz = services.author_quiz(
@@ -576,7 +577,10 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
         if u.role == Role.MAIN_ADMIN:
             pass  # cross-school
         else:
-            qs = qs.filter(school_id=u.school_id)
+            # Acting school: own school for student/teacher/principal, or the
+            # validated X-School-Context school for a roaming sub-admin / Skillship
+            # teacher (None → no rows, never a cross-tenant leak).
+            qs = qs.filter(school_id=resolve_school_id(self.request))
             if u.role == Role.STUDENT:
                 qs = qs.filter(student_id=u.id)
         # Optional filters
@@ -741,7 +745,9 @@ class QuizAttemptViewSet(ReadOnlyModelViewSet):
             ))
         )
         if u.role != Role.MAIN_ADMIN:
-            answers = answers.filter(school_id=u.school_id)
+            # Scope to the acting school (own school, or a Skillship teacher's
+            # selected X-School-Context school). None → no rows, never a leak.
+            answers = answers.filter(school_id=resolve_school_id(request))
             if u.role == Role.TEACHER:
                 answers = answers.filter(attempt__student__assigned_teacher_id=u.id)
         # PENDING first, then most-recently submitted.
@@ -801,8 +807,9 @@ class QuizAssignmentViewSet(TenantScopedViewSet):
                 Q(student_id=u.id) | Q(klass_id__in=list(enrolled_classes))
             )
         else:
-            # Teachers + principals + sub-admins see everything in their school.
-            qs = qs.filter(school_id=u.school_id)
+            # Teachers + principals + sub-admins see everything in their acting
+            # school (own school, or a roaming actor's validated context school).
+            qs = qs.filter(school_id=resolve_school_id(self.request))
 
         # Optional filters
         quiz_id = self.request.query_params.get("quiz")
@@ -823,7 +830,7 @@ class QuizAssignmentViewSet(TenantScopedViewSet):
         if self._user_is_main_admin():
             school_id = self.request.data.get("school")
         else:
-            school_id = u.school_id
+            school_id = require_school_id(self.request)
         serializer.save(school_id=school_id, assigned_by=u)
 
     def perform_destroy(self, instance):
@@ -897,7 +904,7 @@ class AnswerFeedbackView(APIView):
 
         qs = Answer.objects.select_related("question", "attempt", "attempt__student", "attempt__quiz")
         if u.role != Role.MAIN_ADMIN:
-            qs = qs.filter(school_id=u.school_id)
+            qs = qs.filter(school_id=resolve_school_id(request))
             if u.role == Role.TEACHER:
                 qs = qs.filter(attempt__student__assigned_teacher_id=u.id)
         answer = qs.filter(id=id).first()

@@ -40,6 +40,11 @@ class User(AbstractUser):
         TEACHER = "TEACHER", "Teacher"
         STUDENT = "STUDENT", "Student"
 
+    class TeacherType(models.TextChoices):
+        # Only meaningful when role == TEACHER.
+        SCHOOL = "SCHOOL", "School Teacher"
+        SKILLSHIP = "SKILLSHIP", "Skillship Teacher"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField("email address", unique=True)
     role = models.CharField(max_length=20, choices=Role.choices)
@@ -49,6 +54,13 @@ class User(AbstractUser):
         null=True,
         blank=True,
         related_name="users",
+    )
+    # A Skillship teacher is NOT owned by one school — they're a roaming teacher
+    # the platform sends to schools (workshops / classes). They have school=NULL
+    # and reach a school only through an active SkillshipAssignment (apps.
+    # assignments). School teachers keep teacher_type=SCHOOL + a school FK.
+    teacher_type = models.CharField(
+        max_length=10, choices=TeacherType.choices, default=TeacherType.SCHOOL
     )
     phone = models.CharField(max_length=20, blank=True)
     admission_number = models.CharField(max_length=50, blank=True)
@@ -91,11 +103,25 @@ class User(AbstractUser):
                 name="main_admin_no_school",
                 condition=~models.Q(role="MAIN_ADMIN") | models.Q(school__isnull=True),
             ),
+            # Every non-admin user has a school EXCEPT two roaming roles that
+            # reach schools through grant rows instead of a home FK:
+            #   - a Skillship teacher (via SkillshipAssignment), and
+            #   - a SUB_ADMIN (via SubAdminGrant — a territory of schools).
+            # Both are school-less by design; their access is the active grant.
             models.CheckConstraint(
                 name="non_admin_has_school",
-                condition=models.Q(role="MAIN_ADMIN") | models.Q(school__isnull=False),
+                condition=(
+                    models.Q(role="MAIN_ADMIN")
+                    | models.Q(school__isnull=False)
+                    | (models.Q(role="TEACHER") & models.Q(teacher_type="SKILLSHIP"))
+                    | models.Q(role="SUB_ADMIN")
+                ),
             ),
         ]
+
+    @property
+    def is_skillship_teacher(self) -> bool:
+        return self.role == self.Role.TEACHER and self.teacher_type == self.TeacherType.SKILLSHIP
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} ({self.role})"

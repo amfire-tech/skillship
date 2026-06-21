@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/authStore";
+import { getSchoolContext } from "@/lib/schoolContext";
 
 // ============================================================
 // Skillship API Client — Django DRF backend.
@@ -19,11 +20,17 @@ export const apiClient = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// --- Request Interceptor: Attach JWT access token ---
+// --- Request Interceptor: Attach JWT access token (+ Skillship school ctx) ---
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // For a Skillship teacher, the selected (actively-assigned) school they're
+  // acting in. No-op for everyone else (no context set).
+  const schoolCtx = getSchoolContext();
+  if (schoolCtx) {
+    config.headers["X-School-Context"] = schoolCtx;
   }
   return config;
 });

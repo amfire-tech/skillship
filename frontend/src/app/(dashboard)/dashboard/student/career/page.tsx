@@ -19,7 +19,6 @@ import { RoadmapView } from "@/components/career/RoadmapView";
 import type { CareerRec, RoadmapDetail, RoadmapFull, CareerProfile, Quota } from "@/components/career/types";
 
 type Tab = "roadmap" | "colleges";
-type Lang = "EN" | "HI";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -40,7 +39,6 @@ export default function CareerPilotPage() {
   const toast = useToast();
 
   const [tab, setTab] = useState<Tab>("roadmap");
-  const [lang, setLang] = useState<Lang>("EN");
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -53,13 +51,9 @@ export default function CareerPilotPage() {
     setMessages([{
       role: "assistant",
       ts: Date.now(),
-      content:
-        lang === "HI"
-          ? `नमस्ते ${displayName ?? "Student"}! 👋 मैं आपका AI Career Counselor हूँ। दाईं ओर अपना career roadmap बनाएँ और save करें, या मुझसे career/colleges/exams के बारे में पूछें।`
-          : `Hi ${displayName ?? "Student"}! 👋 I'm your AI Career Counselor. Build & save a career roadmap on the right, or ask me about careers, colleges, or exams like JEE/CUET.`,
+      content: `Hi ${displayName ?? "Student"}! 👋 I'm your AI Career Counselor. Build & save a career roadmap on the right, or ask me about careers, colleges, or exams like JEE/CUET. Ask in any language — Hindi, Marathi, Gujarati, Tamil… — and I'll reply in the same one.`,
     }]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
+  }, [displayName]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, thinking]);
 
@@ -73,7 +67,7 @@ export default function CareerPilotPage() {
       const res = await apiFetch(`/ai/career/ask/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, language: lang === "HI" ? "hi" : "en", context: { student_id: user?.id } }),
+        body: JSON.stringify({ question: q, language: "auto", context: { student_id: user?.id } }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -102,9 +96,9 @@ export default function CareerPilotPage() {
               <p className="flex items-center gap-1 text-[11px] text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Online</p>
             </div>
           </div>
-          <button type="button" onClick={() => setLang(lang === "EN" ? "HI" : "EN")} className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary dark:bg-[var(--background)]">
-            {lang === "EN" ? "EN → हिंदी" : "हिंदी → EN"}
-          </button>
+          <span className="hidden items-center gap-1 rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--muted-foreground)] sm:inline-flex dark:bg-[var(--background)]" title="Ask in any language — I reply in the same one">
+            🌐 Any language
+          </span>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

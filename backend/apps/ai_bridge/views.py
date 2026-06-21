@@ -73,7 +73,20 @@ def _resolve_ai_school(request: Request) -> School:
         if school is None:
             raise ValidationError({"school": "School not found."})
         return school
-    return user.school
+    # Normal school staff carry their own school on the JWT.
+    if user.school_id:
+        return user.school
+    # Skillship (roaming) teacher: bill/audit under the selected, actively-
+    # assigned X-School-Context school. None → no valid context, refuse.
+    from apps.common.tenancy import resolve_school_id
+
+    school_id = resolve_school_id(request)
+    school = School.objects.filter(id=school_id).first() if school_id else None
+    if school is None:
+        raise ValidationError(
+            {"school": "No active school context. Select an assigned school first."}
+        )
+    return school
 
 
 def _student_career_context(user) -> dict:
@@ -196,6 +209,7 @@ class CareerAskView(APIView):
             },
             "question": data["question"],
             "history":  data["history"],
+            "language": data["language"] or "auto",
         }
 
         try:
@@ -370,7 +384,7 @@ class GradeShortView(APIView):
 
         try:
             result = services.grade_short(
-                school=request.user.school,
+                school=_resolve_ai_school(request),
                 user=request.user,
                 payload=ser.validated_data,
             )

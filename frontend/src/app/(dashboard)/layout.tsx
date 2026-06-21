@@ -14,6 +14,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
+import { SchoolContextSwitcher } from "@/components/layout/SchoolContextSwitcher";
+import { SubAdminSchoolSwitcher } from "@/components/layout/SubAdminSchoolSwitcher";
+import { useSubAdminAccess, currentGrant } from "@/store/subAdminAccess";
 import { Sidebar, type SidebarNavItem } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { CommandPalette } from "@/components/shared/CommandPalette";
@@ -83,20 +86,32 @@ function icon(d: string) {
   );
 }
 
-// User-creation links removed (2026-05-28): per the locked-down policy in
-// apps/accounts/permissions.py, only MAIN_ADMIN may create / update / delete
-// users now. Showing "Create Principal" or "Create Teachers" to a sub-admin
-// would lead to a 403 toast — strip the entry instead of dangling a broken
-// path. Sub-admins who need new users now ask the platform super admin.
-const SUB_ADMIN_NAV: SidebarNavItem[] = [
-  { label: "Assigned Tasks",    href: "/dashboard/sub-admin",                     icon: icon("dashboard") },
-  { label: "School Management", href: "/dashboard/sub-admin/schools",             icon: icon("schools")   },
-  { label: "Question Bank",     href: "/dashboard/sub-admin/question-bank",       icon: icon("content")   },
-  { label: "Quiz Creation",     href: "/dashboard/sub-admin/quizzes/new",         icon: icon("quizzes")   },
-  { label: "Quiz Approval",     href: "/dashboard/sub-admin/quizzes",             icon: icon("quizzes")   },
-  { label: "School Analytics",  href: "/dashboard/sub-admin/analytics",           icon: icon("analytics") },
-  { label: "Reports",           href: "/dashboard/sub-admin/reports",             icon: icon("reports")   },
-];
+// A sub-admin's nav is built from the per-school capability grant of the school
+// they're currently acting in (from /subadmin-grants/my-access/). Sections the
+// super admin hasn't switched on for that school simply don't appear — there is
+// no global analytics or revenue here by design. With no grant at all only the
+// dashboard shows (the switcher prompts them to get access).
+type SubGrant = ReturnType<typeof currentGrant>;
+function buildSubAdminNav(grant: SubGrant): SidebarNavItem[] {
+  const nav: SidebarNavItem[] = [
+    { label: "Assigned Tasks", href: "/dashboard/sub-admin", icon: icon("dashboard") },
+  ];
+  if (!grant) return nav;
+  if (grant.can_manage_school) {
+    nav.push({ label: "School Management", href: "/dashboard/sub-admin/schools", icon: icon("schools") });
+  }
+  if (grant.can_onboard_students || grant.can_onboard_teachers) {
+    nav.push({ label: "User Onboarding", href: "/dashboard/sub-admin/onboard", icon: icon("users") });
+  }
+  if (grant.can_approve_quizzes) {
+    nav.push({ label: "Question Bank", href: "/dashboard/sub-admin/question-bank", icon: icon("content") });
+    nav.push({ label: "Quiz Creation", href: "/dashboard/sub-admin/quizzes/new", icon: icon("quizzes") });
+    nav.push({ label: "Quiz Approval", href: "/dashboard/sub-admin/quizzes", icon: icon("quizzes") });
+  }
+  nav.push({ label: "School Analytics", href: "/dashboard/sub-admin/analytics", icon: icon("analytics") });
+  nav.push({ label: "Reports", href: "/dashboard/sub-admin/reports", icon: icon("reports") });
+  return nav;
+}
 
 const PRINCIPAL_NAV: SidebarNavItem[] = [
   { label: "School Overview",       href: "/dashboard/principal",                     icon: icon("dashboard") },
@@ -133,8 +148,9 @@ const STUDENT_NAV: SidebarNavItem[] = [
   { label: "Exam Alerts",        href: "/dashboard/student/exam-alerts",      icon: icon("reports")     },
 ];
 
+// SUB_ADMIN is intentionally absent — its nav is built per-request from the
+// acting school's capability grant (see buildSubAdminNav), not a static list.
 const ROLE_NAV: Partial<Record<UserRole, { nav: SidebarNavItem[]; label: string }>> = {
-  SUB_ADMIN: { nav: SUB_ADMIN_NAV, label: "Sub Admin"  },
   PRINCIPAL: { nav: PRINCIPAL_NAV, label: "Principal"  },
   TEACHER:   { nav: TEACHER_NAV,   label: "Teacher"    },
   STUDENT:   { nav: STUDENT_NAV,   label: "Student"    },
@@ -154,6 +170,9 @@ export default function DashboardLayout({
   const refreshAuth = useAuthStore((s) => s.refreshAuth);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  // Sub-admin capability grant for the school they're acting in (null for every
+  // other role / before grants load) — gates the sidebar nav below.
+  const subGrant = useSubAdminAccess(currentGrant);
   const closeSidebar = useCallback(() => setMobileSidebarOpen(false), []);
   const toggleSidebar = useCallback(() => setMobileSidebarOpen((v) => !v), []);
 
@@ -245,7 +264,10 @@ export default function DashboardLayout({
   }
 
   const roleConfig = ROLE_NAV[user.role as UserRole];
-  if (roleConfig) {
+  const isSubAdmin = user.role === "SUB_ADMIN";
+  if (roleConfig || isSubAdmin) {
+    const navItems = isSubAdmin ? buildSubAdminNav(subGrant) : roleConfig!.nav;
+    const roleLabel = isSubAdmin ? "Sub Admin" : roleConfig!.label;
     return (
       <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
         {/* Mobile overlay */}
@@ -254,11 +276,23 @@ export default function DashboardLayout({
         )}
         {/* Sidebar — slides in on mobile, always visible on md+ */}
         <div className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:relative md:translate-x-0 md:z-auto ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <Sidebar navItems={roleConfig.nav} roleLabel={roleConfig.label} onClose={closeSidebar} />
+          <Sidebar navItems={navItems} roleLabel={roleLabel} onClose={closeSidebar} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <Header onMenuClick={toggleSidebar} />
           <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
+            {/* Skillship-teacher school switcher (self-hides for normal teachers) */}
+            {user.role === "TEACHER" && (
+              <div className="mb-4">
+                <SchoolContextSwitcher />
+              </div>
+            )}
+            {/* Sub-admin territory switcher — sets the X-School-Context for all calls */}
+            {isSubAdmin && (
+              <div className="mb-4">
+                <SubAdminSchoolSwitcher />
+              </div>
+            )}
             <PageTransition pathname={pathname}>{children}</PageTransition>
           </main>
         </div>

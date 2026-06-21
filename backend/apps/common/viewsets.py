@@ -29,9 +29,11 @@ Why we read `request.user.school_id` and NOT `request.school_id`:
 
 from __future__ import annotations
 
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.viewsets import ModelViewSet
 
 from .permissions import Role
+from .tenancy import resolve_school_id
 
 
 class TenantScopedViewSet(ModelViewSet):
@@ -52,7 +54,11 @@ class TenantScopedViewSet(ModelViewSet):
         qs = super().get_queryset()
         if self._user_is_main_admin():
             return qs
-        return qs.filter(school_id=self.request.user.school_id)
+        # resolve_school_id: own school for normal users; the validated
+        # X-School-Context school for a Skillship teacher; None if a Skillship
+        # teacher hasn't selected (or isn't assigned to) a school — in which
+        # case filter(school_id=None) safely returns nothing (no leakage).
+        return qs.filter(school_id=resolve_school_id(self.request))
 
     def perform_create(self, serializer):
         if self._user_is_main_admin():
@@ -62,9 +68,17 @@ class TenantScopedViewSet(ModelViewSet):
             school_id = self.request.data.get("school")
             serializer.save(school_id=school_id)
         else:
-            # Everyone else has their school stamped from the JWT user —
+            # Everyone else has their school stamped from the resolver —
             # never from request data. This is non-negotiable.
-            serializer.save(school_id=self.request.user.school_id)
+            school_id = resolve_school_id(self.request)
+            if school_id is None:
+                # A Skillship teacher with no/invalid school context. Refuse the
+                # write rather than create a row with a null tenant.
+                raise PermissionDenied(
+                    "No active school context. Select an assigned school first "
+                    "(send the X-School-Context header)."
+                )
+            serializer.save(school_id=school_id)
 
     # ── Internals ───────────────────────────────────────────────────────────
 

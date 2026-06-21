@@ -45,6 +45,7 @@ LOCAL_APPS = [
     "apps.schools",
     "apps.billing",
     "apps.academics",
+    "apps.assignments",
     "apps.quizzes",
     "apps.content",
     "apps.analytics",
@@ -193,6 +194,14 @@ SPECTACULAR_SETTINGS = {
 # ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS: list[str] = []  # overridden per environment
 CORS_ALLOW_CREDENTIALS = True
+# Skillship (roaming) teachers send the school they're acting in via the
+# `X-School-Context` request header. It is NOT in django-cors-headers' default
+# allowlist, so without this the browser preflight is rejected and EVERY scoped
+# request fails with a "Network error" — which is exactly what breaks the
+# Skillship teacher dashboard. Extend the defaults to permit it.
+from corsheaders.defaults import default_headers as _cors_default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = (*_cors_default_headers, "x-school-context")
 
 # ── Celery ────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")

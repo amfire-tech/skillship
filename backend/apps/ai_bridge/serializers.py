@@ -29,6 +29,12 @@ class CareerAskSerializer(serializers.Serializer):
         default=list,
         max_length=20,
     )
+    # Reply-language hint. "auto" (default) lets the model detect the language of
+    # the student's message and answer in it; "en"/"hi"/etc. is a soft fallback
+    # used only when the message itself is too short/ambiguous to detect.
+    language = serializers.CharField(
+        max_length=16, required=False, allow_blank=True, default="auto",
+    )
 
 
 class CollegeFinderSerializer(serializers.Serializer):

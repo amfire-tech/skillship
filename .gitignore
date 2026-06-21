@@ -39,6 +39,9 @@ npm-debug.log*
 yarn-debug.log*
 *.tsbuildinfo
 
+# --- Local dev run logs (runserver / uvicorn output, never committed) ---
+*.log
+
 # --- IDE ---
 .vscode/
 .idea/

@@ -23,6 +23,7 @@ from apps.accounts.models import User
 from apps.common.permissions import (
     IsMainAdmin, IsPrincipal, IsSchoolStaff, IsStudent, IsTeacher, Role,
 )
+from apps.common.tenancy import resolve_school_id
 from apps.common.viewsets import TenantScopedViewSet
 from apps.schools.models import School
 
@@ -78,14 +79,17 @@ class TeacherDashboardView(APIView):
 
     def get(self, request):
         four_weeks_ago = date.today() - timedelta(weeks=4)
+        # Acting school — a normal teacher's own school, or a Skillship teacher's
+        # selected X-School-Context school. None → empty dashboard (no leak).
+        school_id = resolve_school_id(request)
 
         class_stats = ClassWeeklyStats.objects.filter(
-            school_id=request.user.school_id,
+            school_id=school_id,
             week_start_date__gte=four_weeks_ago,
         ).select_related("klass").order_by("-week_start_date")[:20]
 
         risk_signals = RiskSignal.objects.filter(
-            school_id=request.user.school_id,
+            school_id=school_id,
             acknowledged_by__isnull=True,
         ).order_by("-created_at")[:10]
 
@@ -160,7 +164,9 @@ class BenchmarkingView(APIView):
                 if not school_id:
                     raise ValidationError({"detail": "MAIN_ADMIN must pass ?school_id= for level=class."})
             else:
-                school_id = user.school_id
+                school_id = resolve_school_id(request)
+                if not school_id:
+                    raise PermissionDenied("No active school context. Select an assigned school first.")
             data = bench.compute_class_benchmarking(school_id=school_id, date_range=window)
             return Response({**data, "from": window.start, "to": window.end})
 
@@ -193,7 +199,7 @@ class StudentSkillBreakdownView(APIView):
         target = get_object_or_404(User, id=target_id, role=User.Role.STUDENT)
         if user.role == Role.STUDENT and user.id != target.id:
             raise Http404()
-        if user.role != Role.MAIN_ADMIN and target.school_id != user.school_id:
+        if user.role != Role.MAIN_ADMIN and target.school_id != resolve_school_id(request):
             raise Http404()
 
         window = _resolve_window(request)
@@ -224,7 +230,7 @@ class ClassSkillBreakdownView(APIView):
         if user.role == Role.STUDENT:
             raise PermissionDenied("Students cannot view class skill breakdowns.")
         klass = get_object_or_404(Class, id=class_id)
-        if user.role != Role.MAIN_ADMIN and klass.school_id != user.school_id:
+        if user.role != Role.MAIN_ADMIN and klass.school_id != resolve_school_id(request):
             raise Http404()
 
         window = _resolve_window(request)
@@ -291,7 +297,7 @@ class StudentReportExportView(APIView):
         target = get_object_or_404(User, id=student_id, role=User.Role.STUDENT)
         if user.role == Role.STUDENT and user.id != target.id:
             raise Http404()
-        if user.role != Role.MAIN_ADMIN and target.school_id != user.school_id:
+        if user.role != Role.MAIN_ADMIN and target.school_id != resolve_school_id(request):
             raise Http404()
 
         fmt = _resolve_format(request)
@@ -314,7 +320,7 @@ class ClassReportExportView(APIView):
             Class.objects.select_related("academic_year"),
             id=class_id,
         )
-        if user.role != Role.MAIN_ADMIN and klass.school_id != user.school_id:
+        if user.role != Role.MAIN_ADMIN and klass.school_id != resolve_school_id(request):
             raise Http404()
 
         fmt = _resolve_format(request)

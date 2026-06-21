@@ -33,6 +33,7 @@ async def ask_career_question(request: CareerAskRequest, client: GeminiClient):
             student_context=request.student_context,
             question=request.question,
             history=request.history,
+            language=request.language,
         )
     except genai_errors.APIError as exc:
         raise HTTPException(

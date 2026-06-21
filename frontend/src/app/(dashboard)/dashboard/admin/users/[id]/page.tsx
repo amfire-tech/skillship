@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import { API_BASE, getToken } from "@/lib/auth";
+import { SubAdminAccessPanel } from "@/components/admin/SubAdminAccessPanel";
 
 interface ApiUser {
   id: string;
@@ -15,6 +16,7 @@ interface ApiUser {
   role: string;
   school: string | null;
   school_name: string | null;
+  teacher_type?: string;
   phone: string | null;
   admission_number: string | null;
   current_class: string | null;
@@ -61,9 +63,10 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", admission_number: "", assigned_teacher: "", klass: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", phone: "", admission_number: "", assigned_teacher: "", klass: "", teacher_type: "SCHOOL", school: "" });
   const [teachers, setTeachers] = useState<TeacherOpt[]>([]);
   const [classes, setClasses] = useState<ClassOpt[]>([]);
+  const [allSchools, setAllSchools] = useState<{ id: string; name: string }[]>([]);
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -82,17 +85,37 @@ export default function UserDetailPage() {
       if (!res.ok) { setFetchError(res.status === 404 ? "User not found." : "Failed to load user."); setLoading(false); return; }
       const data: ApiUser = await res.json();
       setUser(data);
-      setForm({ first_name: data.first_name, last_name: data.last_name, email: data.email, phone: data.phone ?? "", admission_number: data.admission_number ?? "", assigned_teacher: data.assigned_teacher ?? "", klass: data.current_class_id ?? "" });
+      setForm({ first_name: data.first_name, last_name: data.last_name, email: data.email, phone: data.phone ?? "", admission_number: data.admission_number ?? "", assigned_teacher: data.assigned_teacher ?? "", klass: data.current_class_id ?? "", teacher_type: data.teacher_type ?? "SCHOOL", school: data.school ?? "" });
+      // For teachers, load the schools list so the admin can move them / set type.
+      if (data.role === "TEACHER") {
+        try {
+          const sRes = await fetch(`${API_BASE}/schools/?page_size=200`, { headers: { Authorization: `Bearer ${token}` } });
+          if (sRes.ok) { const sd = await sRes.json(); setAllSchools((sd.results ?? sd ?? []).map((s: any) => ({ id: s.id, name: s.name }))); }
+        } catch { /* leave empty */ }
+      }
       // For students, load their school's teachers + classes for the dropdowns.
       if (data.role === "STUDENT" && data.school) {
         try {
-          const [tRes, cRes] = await Promise.all([
+          const [tRes, cRes, ssRes] = await Promise.all([
             fetch(`${API_BASE}/users/?role=TEACHER&school=${data.school}&page_size=100`, { headers: { Authorization: `Bearer ${token}` } }),
             fetch(`${API_BASE}/academics/classes/?page_size=200`, { headers: { Authorization: `Bearer ${token}` } }),
+            // Skillship teachers are school-less, so they don't show up under
+            // ?school=. Pull the ones ACTIVELY assigned to this student's school
+            // and add them to the dropdown (the backend allows assigning them).
+            fetch(`${API_BASE}/assignments/skillship/?school=${data.school}&active=true`, { headers: { Authorization: `Bearer ${token}` } }),
           ]);
           if (tRes.ok) {
             const td = await tRes.json();
-            setTeachers((td.results ?? []).map((t: any) => ({ id: t.id, name: `${t.first_name} ${t.last_name}`.trim() || t.username || t.email })));
+            const schoolTeachers = (td.results ?? []).map((t: any) => ({ id: t.id, name: `${t.first_name} ${t.last_name}`.trim() || t.username || t.email }));
+            let skillship: { id: string; name: string }[] = [];
+            if (ssRes.ok) {
+              const sd = await ssRes.json();
+              const seen = new Set<string>();
+              skillship = (sd.results ?? sd ?? [])
+                .filter((a: any) => { if (seen.has(a.teacher)) return false; seen.add(a.teacher); return true; })
+                .map((a: any) => ({ id: a.teacher, name: `${a.teacher_name} (Skillship)` }));
+            }
+            setTeachers([...schoolTeachers, ...skillship]);
           }
           if (cRes.ok) {
             const cd = await cRes.json();
@@ -122,6 +145,13 @@ export default function UserDetailPage() {
       const payload: Record<string, unknown> = { ...form, assigned_teacher: form.assigned_teacher || null };
       if (user.role === "STUDENT") payload.klass = form.klass || null;
       else delete payload.klass;
+      if (user.role === "TEACHER") {
+        // Skillship teachers carry no school; the backend also auto-clears it.
+        payload.school = form.teacher_type === "SKILLSHIP" ? null : (form.school || null);
+      } else {
+        delete payload.teacher_type;
+        delete payload.school;
+      }
       const res = await fetch(`${API_BASE}/users/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -241,7 +271,7 @@ export default function UserDetailPage() {
           </button>
           {editing ? (
             <>
-              <button type="button" onClick={() => { setEditing(false); setForm({ first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone ?? "", admission_number: user.admission_number ?? "", assigned_teacher: user.assigned_teacher ?? "", klass: user.current_class_id ?? "" }); }}
+              <button type="button" onClick={() => { setEditing(false); setForm({ first_name: user.first_name, last_name: user.last_name, email: user.email, phone: user.phone ?? "", admission_number: user.admission_number ?? "", assigned_teacher: user.assigned_teacher ?? "", klass: user.current_class_id ?? "", teacher_type: user.teacher_type ?? "SCHOOL", school: user.school ?? "" }); }}
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)]">Cancel</button>
               <button type="button" onClick={save} disabled={saving}
                 className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">
@@ -292,6 +322,37 @@ export default function UserDetailPage() {
                 />
               </div>
             ))}
+            {user.role === "TEACHER" && (
+              <>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Teacher Type</label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {([
+                      { value: "SCHOOL", label: "School Teacher", desc: "Belongs to one school" },
+                      { value: "SKILLSHIP", label: "Skillship Teacher", desc: "Roaming — assigned to schools" },
+                    ] as const).map((t) => (
+                      <button key={t.value} type="button" onClick={() => setForm((f) => ({ ...f, teacher_type: t.value }))}
+                        className={`rounded-xl border p-3 text-left transition-all ${form.teacher_type === t.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-[var(--border)] bg-[var(--muted)]/30 hover:border-primary/30"}`}>
+                        <p className="text-sm font-bold text-[var(--foreground)]">{t.label}</p>
+                        <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{t.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {form.teacher_type === "SCHOOL" ? (
+                  <div className="flex flex-col gap-1 sm:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">School</label>
+                    <select value={form.school} onChange={(e) => setForm((f) => ({ ...f, school: e.target.value }))}
+                      className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10">
+                      <option value="">— Select a school —</option>
+                      {allSchools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-[var(--muted-foreground)] sm:col-span-2">Skillship teachers have no fixed school — manage their school access from <span className="font-semibold">Skillship Teachers</span>.</p>
+                )}
+              </>
+            )}
             {user.role === "STUDENT" && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Class</label>
@@ -333,6 +394,9 @@ export default function UserDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Sub-admin: per-school capability grants (the delegation surface) */}
+      {user.role === "SUB_ADMIN" && <SubAdminAccessPanel subadminId={user.id} />}
 
       {/* Suspend confirm dialog */}
       {suspendOpen && (

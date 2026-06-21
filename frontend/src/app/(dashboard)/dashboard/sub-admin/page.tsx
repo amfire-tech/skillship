@@ -284,12 +284,18 @@ export default function SubAdminDashboard() {
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); return; }
     try {
-      const res = await fetch(`${API_BASE}/quizzes/${quizId}/`, {
-        method: "PATCH",
+      // Status is read-only on the serializer — transitions go through the
+      // gated action endpoints (publish requires can_approve_quizzes here).
+      const path = action === "approve" ? "publish" : "return-to-draft";
+      const res = await fetch(`${API_BASE}/quizzes/${quizId}/${path}/`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ status: action === "approve" ? "PUBLISHED" : "DRAFT" }),
+        body: "{}",
       });
-      if (!res.ok) { toast(`Failed to ${action} quiz`, "error"); return; }
+      if (!res.ok) {
+        toast(res.status === 403 ? "You don't have quiz-approval access for this school" : `Failed to ${action} quiz`, "error");
+        return;
+      }
       setReviewQuizzes((prev) => (prev ?? []).filter((q) => q.id !== quizId));
       setStats((s) => ({
         ...s,

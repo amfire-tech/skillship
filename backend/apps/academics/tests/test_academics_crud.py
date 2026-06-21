@@ -399,7 +399,15 @@ class TestAcademicsClosedToTeachersAndStudents:
     def test_list_is_403(self, request, api_client, password, login, user_fixture, url):
         user = request.getfixturevalue(user_fixture)
         login(api_client, user, password)
-        assert api_client.get(url).status_code == 403
+        resp = api_client.get(url)
+        # A TEACHER may READ their own school's classes — the ClassViewSet is
+        # tenant-scoped (no cross-school leak) and teachers need class context for
+        # rosters/assignments (CanReadClassesOrManage). Every other (role,
+        # endpoint) pairing stays fully closed.
+        if user_fixture == "teacher_a" and url == CLASSES_URL:
+            assert resp.status_code == 200
+        else:
+            assert resp.status_code == 403
 
     def test_create_is_403(self, request, api_client, password, login, user_fixture, url):
         user = request.getfixturevalue(user_fixture)

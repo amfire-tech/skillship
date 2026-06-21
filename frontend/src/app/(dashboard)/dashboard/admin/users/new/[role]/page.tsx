@@ -75,6 +75,12 @@ export default function CreateUserRolePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState<{ name: string } | null>(null);
   const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
+  // Teacher type: a Skillship teacher isn't tied to one school (no school field).
+  const isTeacher = role.toUpperCase() === "TEACHER";
+  const [teacherType, setTeacherType] = useState<"SCHOOL" | "SKILLSHIP">("SCHOOL");
+  const isSkillship = isTeacher && teacherType === "SKILLSHIP";
+  // Drop the school field entirely for Skillship teachers — they're school-less.
+  const effectiveFields = isSkillship ? (meta?.fields ?? []).filter((f) => f !== "school") : (meta?.fields ?? []);
 
   useEffect(() => {
     if (!meta?.fields.includes("school")) return;
@@ -130,7 +136,7 @@ export default function CreateUserRolePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validateFields(meta.fields, values);
+    const errs = validateFields(effectiveFields, values);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
@@ -158,8 +164,9 @@ export default function CreateUserRolePage() {
       role,
       phone: values.phone ?? "",
       password: values.password ?? "",
-      school: values.school || null,
+      school: isSkillship ? null : (values.school || null),
       admission_number: values.admission_number ?? "",
+      ...(isTeacher ? { teacher_type: teacherType } : {}),
     };
 
     try {
@@ -281,8 +288,29 @@ export default function CreateUserRolePage() {
               </div>
             )}
 
+            {isTeacher && (
+              <div className="mb-5 grid gap-1.5">
+                <label className="text-xs font-semibold text-[var(--muted-foreground)]">Teacher Type</label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {([
+                    { value: "SCHOOL" as const, label: "School Teacher", desc: "Belongs to one school" },
+                    { value: "SKILLSHIP" as const, label: "Skillship Teacher", desc: "Roaming — assigned to schools later" },
+                  ]).map((t) => (
+                    <button key={t.value} type="button" onClick={() => setTeacherType(t.value)}
+                      className={`rounded-xl border p-3 text-left transition-all ${teacherType === t.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-[var(--border)] bg-[var(--muted)]/30 hover:border-primary/30"}`}>
+                      <p className="text-sm font-bold text-[var(--foreground)]">{t.label}</p>
+                      <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+                {isSkillship && (
+                  <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">No school needed now — assign this teacher to schools &amp; classes from <span className="font-semibold">Skillship Teachers</span> after creating.</p>
+                )}
+              </div>
+            )}
+
             <div className="grid gap-5 md:grid-cols-2">
-              {meta.fields.map((key, i) => {
+              {effectiveFields.map((key, i) => {
                 const f = fieldMeta[key];
                 const isFullWidth = key === "school" || key === "password";
                 const fieldId = `field-${key}`;

@@ -39,13 +39,17 @@ class CanUseAI(BasePermission):
         # Per-user switch (teacher / student).
         if not getattr(user, "ai_enabled", True):
             return False
-        # School-wide switch (SchoolSettings.ai_enabled).
-        if user.school_id:
+        # School-wide switch (SchoolSettings.ai_enabled) for the ACTING school —
+        # own school, or a Skillship teacher's selected X-School-Context school.
+        from apps.common.tenancy import resolve_school_id
+
+        acting_school_id = resolve_school_id(request)
+        if acting_school_id:
             from apps.schools.models import SchoolSettings
 
             enabled = (
                 SchoolSettings.objects
-                .filter(school_id=user.school_id)
+                .filter(school_id=acting_school_id)
                 .values_list("ai_enabled", flat=True)
                 .first()
             )

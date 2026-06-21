@@ -144,6 +144,7 @@ class UserSerializer(serializers.ModelSerializer):
             "school",
             "school_name",
             "school_logo",
+            "teacher_type",
             "phone",
             "admission_number",
             "current_class",
@@ -162,7 +163,7 @@ class UserSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id", "email", "username", "first_name", "last_name",
-            "role", "school", "phone", "admission_number",
+            "role", "school", "teacher_type", "phone", "admission_number",
             "current_class", "current_class_id", "class_name", "roll_number", "rank_in_class",
             "class_size", "certificates_count",
             "assigned_teacher", "assigned_teacher_name",
@@ -223,16 +224,25 @@ class LoginSerializer(serializers.Serializer):
 # ── User CRUD serializers (used by /api/v1/users/) ──────────────────────────
 
 
-def _validate_role_school_invariant(role: str, school) -> None:
+def _validate_role_school_invariant(role: str, school, teacher_type=None) -> None:
     """The same invariant the DB CheckConstraints enforce, raised early so the
-    API user gets a friendly 400 instead of a bare IntegrityError."""
+    API user gets a friendly 400 instead of a bare IntegrityError.
+
+    Exception: a Skillship teacher (role=TEACHER, teacher_type=SKILLSHIP) is
+    school-less by design — they reach schools via SkillshipAssignment instead.
+    """
+    is_skillship = role == User.Role.TEACHER and teacher_type == User.TeacherType.SKILLSHIP
     if role == User.Role.MAIN_ADMIN and school is not None:
         raise serializers.ValidationError(
             {"school": "MAIN_ADMIN must not be attached to a school."}
         )
-    if role != User.Role.MAIN_ADMIN and school is None:
+    if is_skillship and school is not None:
         raise serializers.ValidationError(
-            {"school": "Non-admin users must be attached to a school."}
+            {"school": "A Skillship teacher is not tied to one school — leave it empty."}
+        )
+    if role != User.Role.MAIN_ADMIN and not is_skillship and school is None:
+        raise serializers.ValidationError(
+            {"school": "This user must be attached to a school."}
         )
 
 
@@ -269,6 +279,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "school",
+            "teacher_type",
             "phone",
             "admission_number",
             "password",
@@ -278,6 +289,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "email": {"required": True},
             "username": {"required": True},
             "role": {"required": True},
+            "teacher_type": {"required": False},
         }
 
     def validate_password(self, value):
@@ -307,7 +319,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
         # role/school invariant below (which the DB also enforces).
         target_role = attrs.get("role")
         target_school = attrs.get("school")
-        _validate_role_school_invariant(target_role, target_school)
+        target_teacher_type = attrs.get("teacher_type", User.TeacherType.SCHOOL)
+        _validate_role_school_invariant(target_role, target_school, target_teacher_type)
         return attrs
 
     def create(self, validated_data):
@@ -358,7 +371,13 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     can enforce password validators and (later) emit an auth-revocation event.
     """
 
-    school = serializers.PrimaryKeyRelatedField(read_only=True, pk_field=serializers.UUIDField())
+    # `school` is writable here ONLY for teachers (MAIN_ADMIN moving a teacher
+    # between schools / converting to Skillship). For other roles the change is
+    # dropped in validate(). `role` stays read-only.
+    school = serializers.PrimaryKeyRelatedField(
+        queryset=School.objects.all(), required=False, allow_null=True,
+        pk_field=serializers.UUIDField(),
+    )
     assigned_teacher = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role=User.Role.TEACHER),
         required=False,
@@ -386,6 +405,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "school",
+            "teacher_type",
             "phone",
             "admission_number",
             "assigned_teacher",
@@ -393,7 +413,25 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "is_active",
             "ai_enabled",
         ]
-        read_only_fields = ["id", "role", "school"]
+        read_only_fields = ["id", "role"]
+
+    def validate(self, attrs):
+        # School / teacher_type may only be adjusted for TEACHER accounts, and
+        # must satisfy the role/school invariant. Switching to a Skillship
+        # teacher auto-clears the school (they aren't tied to one).
+        instance = self.instance
+        if instance is None:
+            return attrs
+        if instance.role != User.Role.TEACHER:
+            attrs.pop("teacher_type", None)
+            attrs.pop("school", None)
+            return attrs
+        new_type = attrs.get("teacher_type", instance.teacher_type)
+        if new_type == User.TeacherType.SKILLSHIP:
+            attrs["school"] = None
+        new_school = attrs.get("school", instance.school)
+        _validate_role_school_invariant(User.Role.TEACHER, new_school, new_type)
+        return attrs
 
     def validate_klass(self, value):
         # The class must belong to the same school as the student being edited.
@@ -419,8 +457,23 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_assigned_teacher(self, value):
-        # The teacher must belong to the same school as the student being edited.
-        if value is not None and self.instance is not None and value.school_id != self.instance.school_id:
+        # A student's teacher is either (a) a normal teacher in the SAME school,
+        # or (b) a Skillship teacher with an ACTIVE assignment to that school.
+        if value is None or self.instance is None:
+            return value
+        student_school_id = self.instance.school_id
+        if getattr(value, "is_skillship_teacher", False):
+            from apps.assignments.models import SkillshipAssignment
+
+            assigned = SkillshipAssignment.objects.filter(
+                teacher_id=value.id, school_id=student_school_id, is_active=True
+            ).exists()
+            if not assigned:
+                raise serializers.ValidationError(
+                    "This Skillship teacher isn't actively assigned to the student's school."
+                )
+            return value
+        if value.school_id != student_school_id:
             raise serializers.ValidationError("Teacher must belong to the same school as the student.")
         return value
 
@@ -487,6 +540,11 @@ class GenerateCredentialsSerializer(serializers.Serializer):
         queryset=School.objects.all(), pk_field=serializers.UUIDField()
     )
     count = serializers.IntegerField(min_value=1, max_value=500)
+    # Which kind of blank login to mint. STUDENT (default) accounts self-complete
+    # on first login; TEACHER accounts are staff logins (name set later by admin).
+    role = serializers.ChoiceField(
+        choices=[User.Role.STUDENT, User.Role.TEACHER], default=User.Role.STUDENT,
+    )
 
 
 class AssignTeacherSerializer(serializers.Serializer):
@@ -514,12 +572,29 @@ class AssignTeacherSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         teacher = attrs.get("teacher")
-        if teacher is not None:
-            bad = [str(s.id) for s in attrs["students"] if s.school_id != teacher.school_id]
+        if teacher is None:
+            return attrs
+        students = attrs["students"]
+        # A Skillship teacher may be assigned students from any school they have
+        # an ACTIVE assignment to; a normal teacher only their own school's.
+        if getattr(teacher, "is_skillship_teacher", False):
+            from apps.assignments.models import SkillshipAssignment
+
+            assigned_schools = set(
+                SkillshipAssignment.objects.filter(teacher_id=teacher.id, is_active=True)
+                .values_list("school_id", flat=True)
+            )
+            bad = [str(s.id) for s in students if s.school_id not in assigned_schools]
             if bad:
                 raise serializers.ValidationError(
-                    {"students": "All students must be in the same school as the teacher."}
+                    {"students": "This Skillship teacher isn't actively assigned to all of those students' schools."}
                 )
+            return attrs
+        bad = [str(s.id) for s in students if s.school_id != teacher.school_id]
+        if bad:
+            raise serializers.ValidationError(
+                {"students": "All students must be in the same school as the teacher."}
+            )
         return attrs
 
 

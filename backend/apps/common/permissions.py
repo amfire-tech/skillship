@@ -55,10 +55,17 @@ class IsSchoolStaff(BasePermission):
     STAFF_ROLES = {Role.SUB_ADMIN, Role.PRINCIPAL, Role.TEACHER}
 
     def has_permission(self, request, view):
+        # The *acting* school: own school for normal staff, or a Skillship
+        # teacher's selected (actively-assigned) school. resolve_school_id
+        # returns the concrete value (request.school_id is a lazy proxy that is
+        # never `None` by identity), so a Skillship teacher passes once they've
+        # picked an assigned school and is blocked otherwise.
+        from .tenancy import resolve_school_id
+
         return (
             request.user.is_authenticated
             and request.user.role in self.STAFF_ROLES
-            and request.user.school_id is not None
+            and resolve_school_id(request) is not None
         )
 
 

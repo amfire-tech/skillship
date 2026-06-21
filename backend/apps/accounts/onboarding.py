@@ -227,9 +227,12 @@ def onboard_class(
 MAX_GENERATE = 500
 
 
-def generate_blank_credentials(*, school: School, count: int) -> dict[str, Any]:
-    """Create `count` blank STUDENT accounts for `school` and return their
-    plaintext logins ONCE so the caller can print credential slips.
+def generate_blank_credentials(
+    *, school: School, count: int, role: str = User.Role.STUDENT,
+) -> dict[str, Any]:
+    """Create `count` blank accounts (STUDENT by default, or TEACHER) for
+    `school` and return their plaintext logins ONCE so the caller can print
+    credential slips.
 
     Unlike `onboard_class`, no names / roll numbers / class are known yet: the
     Super Admin just wants N ready-to-hand-out logins. Each account carries a
@@ -256,6 +259,12 @@ def generate_blank_credentials(*, school: School, count: int) -> dict[str, Any]:
             "generated_count": 0, "error_count": 0,
             "school_name": school.name, "students": [], "errors": [],
         }
+
+    is_teacher = role == User.Role.TEACHER
+    # Teachers are staff and never use the student first-login profile flow, so
+    # their account is "complete" from the start (the dashboard layout only
+    # redirects STUDENTs with profile_completed=False). Students self-complete.
+    profile_completed = is_teacher
 
     slug = school.slug
     email_suffix = f"@{slug}.{_LOGIN_DOMAIN_SUFFIX}"
@@ -284,8 +293,8 @@ def generate_blank_credentials(*, school: School, count: int) -> dict[str, Any]:
         taken_emails.add(email.lower())
         taken_usernames.add(username.lower())
         draft = User(
-            username=username, email=email, role=User.Role.STUDENT,
-            school=school, is_active=True, profile_completed=False,
+            username=username, email=email, role=role,
+            school=school, is_active=True, profile_completed=profile_completed,
         )
         drafts.append(draft)
         plaintexts.append(_valid_password_for(draft))

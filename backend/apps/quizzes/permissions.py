@@ -42,7 +42,28 @@ def _is_main_admin(user) -> bool:
 def _same_school(request, obj) -> bool:
     if _is_main_admin(request.user):
         return True
-    return getattr(obj, "school_id", None) == request.user.school_id
+    # The actor's *acting* school: own school for normal staff/students, or the
+    # validated X-School-Context school for a roaming actor (Skillship teacher /
+    # sub-admin). Using the resolver keeps every roaming role honest in one place.
+    # Compare as strings — the resolver yields a str (header value) while
+    # obj.school_id is a UUID, and `UUID == str` is always False.
+    from apps.common.tenancy import resolve_school_id
+
+    acting = resolve_school_id(request)
+    return acting is not None and str(getattr(obj, "school_id", None)) == str(acting)
+
+
+def _surface_ok(user) -> bool:
+    """Staff surface check that tolerates a roaming actor with no home school.
+
+    A SUB_ADMIN is school-less (school_id is None) and reaches a school only via
+    an active grant resolved per request — so we let them past the surface and
+    enforce the concrete grant downstream (resolver on writes, _same_school +
+    capability on objects). Everyone else must have a home school.
+    """
+    if user.role == Role.SUB_ADMIN:
+        return True
+    return user.school_id is not None
 
 
 # ── Authoring (banks + questions + quiz drafts) ─────────────────────────────
@@ -57,7 +78,7 @@ class CanAuthorContent(BasePermission):
             return False
         if _is_main_admin(u):
             return True
-        return u.role in _AUTHOR_ROLES and u.school_id is not None
+        return u.role in _AUTHOR_ROLES and _surface_ok(u)
 
     def has_object_permission(self, request, view, obj):
         return _same_school(request, obj)
@@ -80,11 +101,21 @@ class CanPublishQuiz(BasePermission):
         return bool(
             u and u.is_authenticated
             and u.role in _REVIEW_ROLES
-            and u.school_id is not None
+            and _surface_ok(u)
         )
 
     def has_object_permission(self, request, view, obj):
-        return _same_school(request, obj)
+        if not _same_school(request, obj):
+            return False
+        # A sub-admin may approve/return a quiz only in a school where the
+        # super-admin switched on can_approve_quizzes. PRINCIPAL/MAIN_ADMIN are
+        # unrestricted here — both they and the sub-admin can act ("both can
+        # approve"), and the resulting status stays visible to the super-admin.
+        if request.user.role == Role.SUB_ADMIN:
+            from apps.assignments.access import subadmin_can
+
+            return subadmin_can(request.user, obj.school_id, "can_approve_quizzes")
+        return True
 
 
 # ── Quiz read access (combines staff + student-published-only) ─────────────
@@ -125,7 +156,7 @@ class CanTakeQuiz(BasePermission):
         return bool(
             u and u.is_authenticated
             and u.role in (_STAFF_ROLES | {Role.STUDENT})
-            and u.school_id is not None
+            and _surface_ok(u)
         )
 
     def has_object_permission(self, request, view, obj):

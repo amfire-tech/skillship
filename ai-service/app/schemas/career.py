@@ -13,6 +13,9 @@ class CareerAskRequest(BaseModel):
     question: str
     # [{"role": "user"|"assistant", "content": "..."}]
     history: list[dict] = Field(default_factory=list)
+    # "auto" = detect the language of `question` and answer in it (native script).
+    # A concrete code ("en", "hi", ...) is only a fallback for ambiguous messages.
+    language: str = "auto"
 
 
 class Citation(BaseModel):

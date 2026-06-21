@@ -33,7 +33,7 @@ Two layers in one class because they always travel together:
 
 from __future__ import annotations
 
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from apps.common.permissions import Role
 
@@ -53,3 +53,46 @@ class CanManageUsers(BasePermission):
         # has_permission(), but we still spell it out so anyone reading
         # this class sees the policy in one place.
         return actor.role == Role.MAIN_ADMIN
+
+
+class CanManageUsersOrOnboard(BasePermission):
+    """User-management surface with delegated, onboarding-only sub-admin access.
+
+    MAIN_ADMIN keeps full CRUD. A SUB_ADMIN is allowed ONLY to read their granted
+    schools' users and run the onboarding actions (onboard-class,
+    generate-credentials, assign-teacher) — never to create/update/delete
+    accounts directly, set passwords, create principals/admins, or bulk-upload.
+    The per-school capability (can_onboard_students / can_onboard_teachers) is
+    enforced inside each action against the acting X-School-Context school.
+    """
+
+    # Read + onboarding actions a granted sub-admin may reach. Everything else
+    # on the viewset (create/update/partial_update/destroy/set_password/
+    # bulk_upload) stays MAIN_ADMIN-only.
+    SUBADMIN_ACTIONS = frozenset({
+        "list", "retrieve",
+        "onboard_class", "generate_credentials", "assign_teacher",
+        "student_stats", "student_ids",
+    })
+
+    def has_permission(self, request, view):
+        u = request.user
+        if not (u and u.is_authenticated):
+            return False
+        if u.role == Role.MAIN_ADMIN:
+            return True
+        if u.role == Role.SUB_ADMIN:
+            return getattr(view, "action", None) in self.SUBADMIN_ACTIONS
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        u = request.user
+        if u.role == Role.MAIN_ADMIN:
+            return True
+        # A sub-admin only ever reaches an object check on a safe (read) method;
+        # the target must live in one of their granted schools.
+        if u.role == Role.SUB_ADMIN and request.method in SAFE_METHODS:
+            from apps.assignments.access import has_active_grant
+
+            return has_active_grant(u, getattr(obj, "school_id", None))
+        return False

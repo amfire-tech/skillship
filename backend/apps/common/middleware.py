@@ -22,14 +22,7 @@ from __future__ import annotations
 
 from django.utils.functional import SimpleLazyObject
 
-
-def _resolve_school_id(request):
-    user = getattr(request, "user", None)
-    if user is None or not user.is_authenticated:
-        return None
-    # MAIN_ADMIN has school_id=None by design (the role/school check
-    # constraint in apps.accounts.models enforces this).
-    return getattr(user, "school_id", None)
+from .tenancy import resolve_school_id
 
 
 class TenantMiddleware:
@@ -37,5 +30,8 @@ class TenantMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        request.school_id = SimpleLazyObject(lambda: _resolve_school_id(request))
+        # Single source of truth (apps.common.tenancy): MAIN_ADMIN → None,
+        # Skillship teacher → header-named school IF actively assigned, everyone
+        # else → own school. Lazy so it reads the DRF-authenticated user.
+        request.school_id = SimpleLazyObject(lambda: resolve_school_id(request))
         return self.get_response(request)

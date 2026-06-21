@@ -71,13 +71,14 @@ class CanReadClassesOrManage(CanManageAcademics):
 
     def has_permission(self, request, view):
         u = request.user
-        if (
-            request.method in SAFE_METHODS
-            and u and u.is_authenticated
-            and u.role == Role.TEACHER
-            and u.school_id is not None
-        ):
-            return True
+        if request.method in SAFE_METHODS and u and u.is_authenticated and u.role == Role.TEACHER:
+            from apps.common.tenancy import resolve_school_id
+
+            # Concrete acting school — a normal teacher's own school, or a
+            # Skillship teacher's selected, actively-assigned school. (Don't use
+            # request.school_id here: it's a lazy proxy, never None by identity.)
+            if resolve_school_id(request) is not None:
+                return True
         return super().has_permission(request, view)
 
 

@@ -44,7 +44,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.common.permissions import Role
 
 from .models import User
-from .permissions import CanManageUsers
+from .permissions import CanManageUsers, CanManageUsersOrOnboard
 from .serializers import (
     LoginSerializer,
     PasswordSetSerializer,
@@ -337,9 +337,26 @@ class StudentRosterView(ListAPIView):
         )
 
         if actor.role == Role.TEACHER:
-            return qs.filter(assigned_teacher_id=actor.id)
+            # Scope to the school this teacher is acting in. For a normal teacher
+            # that's their own school; for a Skillship (roaming) teacher it's the
+            # active X-School-Context school they're assigned to. Without this a
+            # Skillship teacher would see EVERY student assigned to them across
+            # ALL schools — a cross-tenant leak (the one rule that can't break).
+            from apps.common.tenancy import resolve_school_id
+
+            school_id = resolve_school_id(self.request)
+            if not school_id:
+                return qs.none()
+            return qs.filter(assigned_teacher_id=actor.id, school_id=school_id)
         if actor.role == Role.PRINCIPAL:
             return qs.filter(school_id=actor.school_id)
+        if actor.role == Role.SUB_ADMIN:
+            # Roaming sub-admin: students of the validated X-School-Context school
+            # they're acting in (None → empty, never a cross-tenant leak).
+            from apps.common.tenancy import resolve_school_id
+
+            school_id = resolve_school_id(self.request)
+            return qs.filter(school_id=school_id) if school_id else qs.none()
         if actor.role == Role.MAIN_ADMIN:
             params = self.request.query_params
             school = params.get("school")
@@ -453,8 +470,15 @@ class TeacherDirectoryView(ListAPIView):
             .order_by("first_name", "last_name", "email")
         )
 
-        if actor.role in (Role.PRINCIPAL, Role.SUB_ADMIN):
+        if actor.role == Role.PRINCIPAL:
             return qs.filter(school_id=actor.school_id)
+        if actor.role == Role.SUB_ADMIN:
+            # Roaming sub-admin: scope to the validated X-School-Context school
+            # they're currently acting in (None → no rows, never a leak).
+            from apps.common.tenancy import resolve_school_id
+
+            school_id = resolve_school_id(self.request)
+            return qs.filter(school_id=school_id) if school_id else qs.none()
         if actor.role == Role.MAIN_ADMIN:
             params = self.request.query_params
             school = params.get("school")
@@ -492,17 +516,34 @@ class UsersViewSet(ModelViewSet):
         only the super admin can change a student's locked profile.
     """
 
-    permission_classes = [IsAuthenticated, CanManageUsers]
+    permission_classes = [IsAuthenticated, CanManageUsersOrOnboard]
     lookup_field = "id"
 
-    def get_queryset(self):
-        # MAIN_ADMIN is the only role that reaches this surface (CanManageUsers
-        # gates has_permission), so they see every user — optionally narrowed by
-        # query params for the User Management screen: ?role=, ?school=<uuid>,
-        # ?search=. select_related("school") keeps school_name cheap on the list.
-        qs = User.objects.select_related("school").order_by("-date_joined")
-        params = self.request.query_params
+    def _subadmin_school_or_403(self, capability: str):
+        """For a SUB_ADMIN: the acting (X-School-Context) school id, requiring an
+        active grant with `capability`. Returns None for MAIN_ADMIN (who targets
+        a school via the request body). Raises 403 otherwise."""
+        u = self.request.user
+        if u.role == Role.MAIN_ADMIN:
+            return None
+        from apps.assignments.access import subadmin_can
+        from apps.common.tenancy import require_school_id
 
+        school_id = require_school_id(self.request)  # 403 if no active context
+        if not subadmin_can(u, school_id, capability):
+            raise PermissionDenied(
+                f"You don't have {capability.replace('can_', '').replace('_', ' ')} "
+                "access to your current school."
+            )
+        return school_id
+
+    @staticmethod
+    def _apply_filters(qs, params):
+        """Apply the User Management screen's query filters (?role=, ?school=,
+        ?activation=, ?assigned=, ?search=) to `qs`. Shared by the paginated list
+        and the `student-ids` action so "select all matching" can never drift out
+        of sync with what the list actually shows. Returns None on a malformed
+        school id so callers can short-circuit to an empty result."""
         role = params.get("role")
         if role:
             qs = qs.filter(role=role)
@@ -512,8 +553,24 @@ class UsersViewSet(ModelViewSet):
             try:
                 uuid.UUID(str(school))
             except (ValueError, TypeError):
-                return qs.none()  # malformed school id → no matches, not a 500
+                return None  # malformed school id → caller returns no matches
             qs = qs.filter(school_id=school)
+
+        # Activation filter (students): a "generated" account is one minted by
+        # credential generation that the student has not yet activated via
+        # first-login (profile_completed=False); "activated" = they completed it.
+        activation = (params.get("activation") or "").lower()
+        if activation == "activated":
+            qs = qs.filter(profile_completed=True)
+        elif activation in ("generated", "pending"):
+            qs = qs.filter(profile_completed=False)
+
+        # Assignment filter (students): with / without an assigned teacher.
+        assigned = (params.get("assigned") or "").lower()
+        if assigned in ("true", "1", "yes"):
+            qs = qs.filter(assigned_teacher__isnull=False)
+        elif assigned in ("false", "0", "no"):
+            qs = qs.filter(assigned_teacher__isnull=True)
 
         search = (params.get("search") or "").strip()
         if search:
@@ -525,6 +582,19 @@ class UsersViewSet(ModelViewSet):
                 | Q(admission_number__icontains=search)
             )
         return qs
+
+    def get_queryset(self):
+        # MAIN_ADMIN sees every user; a granted SUB_ADMIN sees only users in the
+        # schools they hold an active grant for (their territory), then both are
+        # narrowed by the same query params. select_related keeps school_name cheap.
+        qs = User.objects.select_related("school").order_by("-date_joined")
+        u = self.request.user
+        if u.role == Role.SUB_ADMIN:
+            from apps.assignments.access import active_school_ids
+
+            qs = qs.filter(school_id__in=active_school_ids(u))
+        filtered = self._apply_filters(qs, self.request.query_params)
+        return qs.none() if filtered is None else filtered
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -618,7 +688,13 @@ class UsersViewSet(ModelViewSet):
         from . import onboarding
         from .serializers import OnboardClassSerializer
 
-        serializer = OnboardClassSerializer(data=request.data)
+        # A sub-admin onboards only into the school they're acting in, and only
+        # with can_onboard_students. Forcing `school` here means the serializer
+        # also rejects a class from any other school.
+        forced_school = self._subadmin_school_or_403("can_onboard_students")
+        payload = request.data if forced_school is None else {**request.data, "school": str(forced_school)}
+
+        serializer = OnboardClassSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
@@ -651,15 +727,103 @@ class UsersViewSet(ModelViewSet):
         from . import onboarding
         from .serializers import GenerateCredentialsSerializer
 
-        serializer = GenerateCredentialsSerializer(data=request.data)
+        # Gate on the capability that matches the requested role: minting teacher
+        # logins needs can_onboard_teachers; student logins need can_onboard_students.
+        requested_role = request.data.get("role") or User.Role.STUDENT
+        capability = (
+            "can_onboard_teachers"
+            if requested_role == User.Role.TEACHER
+            else "can_onboard_students"
+        )
+        forced_school = self._subadmin_school_or_403(capability)
+        payload = request.data if forced_school is None else {**request.data, "school": str(forced_school)}
+
+        serializer = GenerateCredentialsSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         result = onboarding.generate_blank_credentials(
-            school=data["school"], count=data["count"],
+            school=data["school"], count=data["count"], role=data["role"],
         )
         code = status.HTTP_200_OK if result["error_count"] == 0 else status.HTTP_207_MULTI_STATUS
         return Response(result, status=code)
+
+    # ── Student activation / assignment stats ────────────────────────────────
+
+    @action(detail=False, methods=["get"], url_path="student-stats")
+    def student_stats(self, request):
+        """
+        GET /api/v1/users/student-stats/?school=<uuid>   (MAIN_ADMIN only)
+
+        Headline counts for the User Management → Students view so the super
+        admin can see, at a glance, how many student accounts are still just
+        GENERATED (credentials minted, not yet activated by first-login) vs
+        ACTIVATED, and how many already have a teacher.
+
+        Response: {total, activated, generated, assigned, unassigned}
+        """
+        from django.db.models import Count
+
+        zeros = {"total": 0, "activated": 0, "generated": 0, "assigned": 0, "unassigned": 0}
+        qs = User.objects.filter(role=User.Role.STUDENT)
+        if request.user.role == Role.SUB_ADMIN:
+            # Pinned to the school the sub-admin is acting in (active grant).
+            from apps.common.tenancy import resolve_school_id
+
+            acting = resolve_school_id(request)
+            if not acting:
+                return Response(zeros)
+            qs = qs.filter(school_id=acting)
+        else:
+            school = request.query_params.get("school")
+            if school:
+                try:
+                    uuid.UUID(str(school))
+                except (ValueError, TypeError):
+                    return Response(zeros)
+                qs = qs.filter(school_id=school)
+
+        agg = qs.aggregate(
+            total=Count("id"),
+            activated=Count("id", filter=Q(profile_completed=True)),
+            assigned=Count("id", filter=Q(assigned_teacher__isnull=False)),
+        )
+        total = agg["total"] or 0
+        activated = agg["activated"] or 0
+        assigned = agg["assigned"] or 0
+        return Response({
+            "total": total,
+            "activated": activated,
+            "generated": total - activated,
+            "assigned": assigned,
+            "unassigned": total - assigned,
+        })
+
+    @action(detail=False, methods=["get"], url_path="student-ids")
+    def student_ids(self, request):
+        """
+        GET /api/v1/users/student-ids/?school=&activation=&assigned=&search=
+
+        Flat list of the student UUIDs matching the SAME filters as the list view
+        — ids only, unpaginated — so the UI can offer "select all N matching"
+        across pages without fetching every serialized row. MAIN_ADMIN only.
+
+        Response: {"ids": ["<uuid>", ...], "count": N}
+        """
+        qs = User.objects.filter(role=User.Role.STUDENT)
+        # Force the student role regardless of any ?role= in the params.
+        params = request.query_params.copy()
+        params["role"] = User.Role.STUDENT
+        if request.user.role == Role.SUB_ADMIN:
+            # Confine "select all matching" to the sub-admin's granted schools.
+            from apps.assignments.access import active_school_ids
+
+            qs = qs.filter(school_id__in=active_school_ids(request.user))
+        filtered = self._apply_filters(qs, params)
+        if filtered is None:
+            return Response({"ids": [], "count": 0})
+        ids = [str(i) for i in filtered.values_list("id", flat=True)]
+        return Response({"ids": ids, "count": len(ids)})
 
     # ── Bulk assign students to a teacher ────────────────────────────────────
 
@@ -674,15 +838,63 @@ class UsersViewSet(ModelViewSet):
         every student must belong to the same school (validated). The teacher
         then sees these students on their dashboard (GET /users/roster/).
 
-        Response: {updated_count}
+        Idempotent by design: assigned_teacher is a single FK, so re-submitting a
+        student already assigned to this teacher can never create a duplicate or
+        error — it is simply counted as `already_assigned` and skipped. Duplicate
+        ids in the payload are de-duplicated. This makes "select the same student
+        again with some new ones" safe: only the genuinely-new ones are written.
+
+        Response: {requested, assigned_count, already_assigned, unassigned_count}
         """
         from .serializers import AssignTeacherSerializer
 
         serializer = AssignTeacherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         teacher = serializer.validated_data["teacher"]
-        students = serializer.validated_data["students"]
-        updated = User.objects.filter(id__in=[s.id for s in students]).update(
-            assigned_teacher=teacher
+        # De-dupe ids so counts are honest even if the client sent a student twice.
+        student_ids = {s.id for s in serializer.validated_data["students"]}
+
+        # A sub-admin may only assign within the school they're acting in (and
+        # only with can_onboard_students). The serializer already guarantees the
+        # teacher and students share a school; we additionally pin it to theirs.
+        if request.user.role == Role.SUB_ADMIN:
+            acting = self._subadmin_school_or_403("can_onboard_students")
+            students = serializer.validated_data["students"]
+            out_of_scope = any(str(s.school_id) != str(acting) for s in students)
+            if (teacher is not None and str(teacher.school_id) != str(acting)) or out_of_scope:
+                raise PermissionDenied("Teacher and students must be in your current school.")
+
+        if teacher is None:
+            # Unassign — only the rows that currently HAVE a teacher are touched.
+            unassigned = (
+                User.objects.filter(id__in=student_ids, assigned_teacher__isnull=False)
+                .update(assigned_teacher=None)
+            )
+            return Response(
+                {
+                    "requested": len(student_ids),
+                    "assigned_count": 0,
+                    "already_assigned": 0,
+                    "unassigned_count": unassigned,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Already-on-this-teacher rows are left untouched (no duplicate / no error).
+        already = User.objects.filter(
+            id__in=student_ids, assigned_teacher_id=teacher.id
+        ).count()
+        newly = (
+            User.objects.filter(id__in=student_ids)
+            .exclude(assigned_teacher_id=teacher.id)
+            .update(assigned_teacher=teacher)
         )
-        return Response({"updated_count": updated}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "requested": len(student_ids),
+                "assigned_count": newly,
+                "already_assigned": already,
+                "unassigned_count": 0,
+            },
+            status=status.HTTP_200_OK,
+        )

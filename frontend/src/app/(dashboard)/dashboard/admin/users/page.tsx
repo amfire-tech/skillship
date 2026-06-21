@@ -33,6 +33,9 @@ interface ApiUser {
 
 interface SchoolOpt { id: string; name: string }
 interface TeacherOpt { id: string; name: string }
+interface StudentStats { total: number; activated: number; generated: number; assigned: number; unassigned: number }
+
+type Activation = "all" | "activated" | "generated";
 
 const PAGE_SIZE = 50;
 
@@ -90,6 +93,8 @@ export default function UserManagementPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [activeRole, setActiveRole] = useState<Role>("STUDENT");
+  const [activation, setActivation] = useState<Activation>("all");
+  const [stats, setStats] = useState<StudentStats | null>(null);
   const [schoolId, setSchoolId] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -126,10 +131,43 @@ export default function UserManagementPage() {
       if (!token) return;
       try {
         const list = await fetchAll(`${API_BASE}/users/?role=TEACHER&school=${schoolId}&page_size=100`, token);
-        setTeachers(list.map((t) => ({ id: t.id, name: displayName(t) || t.email })));
+        const schoolTeachers = list.map((t) => ({ id: t.id, name: displayName(t) || t.email }));
+        // Skillship teachers have no school, so they're absent above. Add the
+        // ones ACTIVELY assigned to this school (the backend accepts them).
+        let skillship: TeacherOpt[] = [];
+        try {
+          const ssRes = await fetch(`${API_BASE}/assignments/skillship/?school=${schoolId}&active=true`, { headers: { Authorization: `Bearer ${token}` } });
+          if (ssRes.ok) {
+            const sd = await ssRes.json();
+            const seen = new Set<string>();
+            skillship = (sd.results ?? sd ?? [])
+              .filter((a: { teacher: string }) => (seen.has(a.teacher) ? false : (seen.add(a.teacher), true)))
+              .map((a: { teacher: string; teacher_name: string }) => ({ id: a.teacher, name: `${a.teacher_name} (Skillship)` }));
+          }
+        } catch { /* skillship list optional */ }
+        setTeachers([...schoolTeachers, ...skillship]);
       } catch { setTeachers([]); }
     })();
   }, [bulkMode, schoolId]);
+
+  // Student activation / assignment counts for the sub-filter chips. Recomputed
+  // whenever the Students tab is active or the school filter changes.
+  useEffect(() => {
+    if (activeRole !== "STUDENT") { setStats(null); return; }
+    let cancelled = false;
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const url = `${API_BASE}/users/student-stats/${schoolId ? `?school=${schoolId}` : ""}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) { if (!cancelled) setStats(null); return; }
+        const data = await res.json();
+        if (!cancelled) setStats(data);
+      } catch { if (!cancelled) setStats(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeRole, schoolId]);
 
   // Debounce the search box → committed search term (and reset to page 1).
   useEffect(() => {
@@ -147,6 +185,7 @@ export default function UserManagementPage() {
     if (activeRole !== "all") qs.set("role", activeRole);
     if (schoolId) qs.set("school", schoolId);
     if (search) qs.set("search", search);
+    if (activeRole === "STUDENT" && activation !== "all") qs.set("activation", activation);
     try {
       const res = await fetch(`${API_BASE}/users/?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -160,12 +199,13 @@ export default function UserManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeRole, schoolId, search, page]);
+  }, [activeRole, schoolId, search, page, activation]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  function selectRole(value: Role) { setActiveRole(value); setPage(1); }
+  function selectRole(value: Role) { setActiveRole(value); setActivation("all"); setPage(1); }
   function selectSchool(value: string) { setSchoolId(value); setPage(1); }
+  function selectActivation(value: Activation) { setActivation(value); setPage(1); }
 
   const studentIdsOnPage = useMemo(
     () => users.filter((u) => u.role === "STUDENT").map((u) => u.id),
@@ -181,6 +221,32 @@ export default function UserManagementPage() {
       if (studentIdsOnPage.every((id) => prev.has(id))) return new Set();
       return new Set(studentIdsOnPage);
     });
+  }
+
+  // Select EVERY student matching the current filter (across all pages), not
+  // just the 50 on screen. Fetches an ids-only list so a 5k-student school
+  // doesn't pull 5k serialized rows.
+  const [selectingAll, setSelectingAll] = useState(false);
+  async function selectAllMatching() {
+    setSelectingAll(true);
+    const token = await getToken();
+    if (!token) { toast("Session expired", "error"); setSelectingAll(false); return; }
+    const qs = new URLSearchParams();
+    if (schoolId) qs.set("school", schoolId);
+    if (search) qs.set("search", search);
+    if (activation !== "all") qs.set("activation", activation);
+    try {
+      const res = await fetch(`${API_BASE}/users/student-ids/?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { toast("Couldn't select all. Try again.", "error"); return; }
+      const data = await res.json();
+      setSelected(new Set<string>(data.ids ?? []));
+    } catch {
+      toast("Network error while selecting all", "error");
+    } finally {
+      setSelectingAll(false);
+    }
   }
 
   async function assignTeacher() {
@@ -200,8 +266,17 @@ export default function UserManagementPage() {
         return;
       }
       const data = await res.json().catch(() => ({}));
-      const who = assignTo ? teachers.find((t) => t.id === assignTo)?.name ?? "teacher" : "no teacher (unassigned)";
-      toast(`${data.updated_count ?? selected.size} student(s) → ${who}`, "success");
+      if (assignTo) {
+        const who = teachers.find((t) => t.id === assignTo)?.name ?? "teacher";
+        const newly = data.assigned_count ?? 0;
+        const already = data.already_assigned ?? 0;
+        const msg = already > 0
+          ? `${newly} assigned to ${who}${newly === 0 ? " (all were already assigned)" : `, ${already} already assigned`}`
+          : `${newly} student(s) → ${who}`;
+        toast(msg, already > 0 && newly === 0 ? "info" : "success");
+      } else {
+        toast(`${data.unassigned_count ?? 0} student(s) unassigned`, "info");
+      }
       await loadUsers();
     } catch {
       toast("Network error", "error");
@@ -317,6 +392,43 @@ export default function UserManagementPage() {
         </div>
       </div>
 
+      {/* Activation sub-filter (Students only): generated (not yet activated)
+          vs activated, with live counts so the super admin sees both at a glance. */}
+      {activeRole === "STUDENT" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            { value: "all", label: "All students", n: stats?.total },
+            { value: "activated", label: "Activated", n: stats?.activated },
+            { value: "generated", label: "Generated (pending)", n: stats?.generated },
+          ] as { value: Activation; label: string; n?: number }[]).map((c) => {
+            const active = activation === c.value;
+            return (
+              <button
+                key={c.value}
+                onClick={() => selectActivation(c.value)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/40 hover:text-primary"
+                }`}
+              >
+                {c.label}
+                {typeof c.n === "number" && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-primary/15 text-primary" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
+                    {c.n.toLocaleString("en-IN")}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {stats && (
+            <span className="ml-1 text-xs text-[var(--muted-foreground)]">
+              · {stats.assigned.toLocaleString("en-IN")} assigned to a teacher, {stats.unassigned.toLocaleString("en-IN")} unassigned
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Count summary + bulk-assign hint */}
       <p className="text-sm text-[var(--muted-foreground)]">
         {loading ? "Loading…" : (
@@ -351,6 +463,34 @@ export default function UserManagementPage() {
           </button>
           <button onClick={() => setSelected(new Set())} className="text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">Clear</button>
           {teachers.length === 0 && <span className="text-xs text-amber-600">No teachers in this school yet — create one first.</span>}
+        </div>
+      )}
+
+      {/* Cross-page "select all matching" — selection only ever covers the 50 on
+          screen until the admin explicitly opts into the whole filtered set. */}
+      {bulkMode && allSelected && count > studentIdsOnPage.length && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2.5 text-sm">
+          {selected.size >= count ? (
+            <>
+              <span className="text-[var(--foreground)]">
+                All <span className="font-bold">{count.toLocaleString("en-IN")}</span> students matching this filter are selected.
+              </span>
+              <button onClick={() => setSelected(new Set())} className="font-semibold text-primary hover:underline">Clear selection</button>
+            </>
+          ) : (
+            <>
+              <span className="text-[var(--muted-foreground)]">
+                All <span className="font-semibold text-[var(--foreground)]">{studentIdsOnPage.length}</span> on this page are selected.
+              </span>
+              <button
+                onClick={selectAllMatching}
+                disabled={selectingAll}
+                className="font-semibold text-primary hover:underline disabled:opacity-60"
+              >
+                {selectingAll ? "Selecting…" : `Select all ${count.toLocaleString("en-IN")} matching this filter`}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -418,6 +558,11 @@ export default function UserManagementPage() {
                             <div>
                               <p className="font-semibold text-[var(--foreground)]">{fullName}</p>
                               <p className="text-xs text-[var(--muted-foreground)] font-mono">{u.email}</p>
+                              {isStudent && (
+                                u.profile_completed
+                                  ? <span className="mt-1 inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-500">Activated</span>
+                                  : <span className="mt-1 inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">Generated · pending</span>
+                              )}
                             </div>
                           </div>
                         </td>
