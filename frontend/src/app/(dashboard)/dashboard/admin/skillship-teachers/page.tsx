@@ -50,6 +50,9 @@ export default function SkillshipTeachersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Assignment currently being edited (schedule changes after creation).
+  const [editing, setEditing] = useState<Assignment | null>(null);
+
   useEffect(() => { document.title = "Skillship Teachers — Skillship"; }, []);
 
   const headers = useCallback(async () => {
@@ -253,17 +256,151 @@ export default function SkillshipTeachersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {a.is_active ? (
-                        <button type="button" onClick={() => setActive(a.id, false)} className="text-xs font-semibold text-red-500 hover:underline">Revoke</button>
-                      ) : (
-                        <button type="button" onClick={() => setActive(a.id, true)} className="text-xs font-semibold text-primary hover:underline">Restore</button>
-                      )}
+                      <div className="flex items-center justify-end gap-3">
+                        <button type="button" onClick={() => setEditing(a)} className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary hover:underline">Edit</button>
+                        {a.is_active ? (
+                          <button type="button" onClick={() => setActive(a.id, false)} className="text-xs font-semibold text-red-500 hover:underline">Revoke</button>
+                        ) : (
+                          <button type="button" onClick={() => setActive(a.id, true)} className="text-xs font-semibold text-primary hover:underline">Restore</button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {editing && (
+        <EditAssignmentModal
+          assignment={editing}
+          classes={classes}
+          headers={headers}
+          onClose={() => setEditing(null)}
+          onSaved={async () => { setEditing(null); await load(); toast("Schedule updated", "success"); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Edit modal ──────────────────────────────────────────────────────────────
+// Lets the super-admin change an existing assignment's class + visit schedule
+// (days, date range, specific dates, note) after creation — PATCHes the row.
+function EditAssignmentModal({
+  assignment, classes, headers, onClose, onSaved,
+}: {
+  assignment: Assignment;
+  classes: ClassOpt[];
+  headers: () => Promise<Record<string, string> | undefined>;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [klass, setKlass] = useState(assignment.klass ?? "");
+  const [weekdays, setWeekdays] = useState<number[]>(assignment.weekdays ?? []);
+  const [dateFrom, setDateFrom] = useState(assignment.date_from ?? "");
+  const [dateTo, setDateTo] = useState(assignment.date_to ?? "");
+  const [specificDates, setSpecificDates] = useState((assignment.specific_dates ?? []).join(", "));
+  const [note, setNote] = useState(assignment.note ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const classesForSchool = classes.filter((c) => c.school === assignment.school);
+  const inputCls = "h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]";
+
+  function toggleWeekday(d: number) {
+    setWeekdays((w) => (w.includes(d) ? w.filter((x) => x !== d) : [...w, d].sort()));
+  }
+
+  async function save() {
+    setError(null);
+    setSaving(true);
+    const h = await headers();
+    if (!h) { setSaving(false); return; }
+    const dates = specificDates.split(",").map((s) => s.trim()).filter(Boolean);
+    try {
+      const res = await fetch(`${API_BASE}/assignments/skillship/${assignment.id}/`, {
+        method: "PATCH",
+        headers: h,
+        body: JSON.stringify({
+          klass: klass || null,
+          weekdays, specific_dates: dates,
+          date_from: dateFrom || null, date_to: dateTo || null, note,
+        }),
+      });
+      if (res.ok) { onSaved(); }
+      else {
+        const data = await res.json().catch(() => ({}));
+        setError(Object.values(data).flat().join(" ") || "Failed to save.");
+      }
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-xl dark:bg-[var(--background)]" onClick={(e) => e.stopPropagation()}>
+        <div className="h-1.5 w-full bg-gradient-to-r from-primary to-accent" />
+        <div className="space-y-4 p-6">
+          <div>
+            <h3 className="text-base font-bold text-[var(--foreground)]">Edit schedule</h3>
+            <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{assignment.school_name} — change the class and visit days.</p>
+          </div>
+          {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Class (optional)</span>
+            <select value={klass} onChange={(e) => setKlass(e.target.value)} className={inputCls}>
+              <option value="">— Whole school —</option>
+              {classesForSchool.map((c) => <option key={c.id} value={c.id}>Grade {c.grade}-{c.section}</option>)}
+            </select>
+          </label>
+
+          <div className="grid gap-1.5">
+            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Recurring weekdays</span>
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((w, i) => (
+                <button key={w} type="button" onClick={() => toggleWeekday(i)}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all ${weekdays.includes(i) ? "border-primary bg-primary/10 text-primary" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30"}`}>
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="grid gap-1.5">
+              <span className="text-xs font-semibold text-[var(--muted-foreground)]">From</span>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputCls} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-xs font-semibold text-[var(--muted-foreground)]">To</span>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputCls} />
+            </label>
+          </div>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Specific dates (comma-separated)</span>
+            <input value={specificDates} onChange={(e) => setSpecificDates(e.target.value)} placeholder="2026-07-01, 2026-07-08" className={inputCls} />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Note</span>
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Robotics workshop" className={inputCls} />
+          </label>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="h-10 rounded-full border border-[var(--border)] px-5 text-sm font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Cancel</button>
+            <button type="button" onClick={save} disabled={saving}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-6 text-sm font-semibold text-white hover:-translate-y-0.5 transition-all disabled:opacity-70">
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

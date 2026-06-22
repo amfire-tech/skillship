@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
+import { TeachingScheduleCard } from "@/components/teacher/TeachingScheduleCard";
 
 interface AcademicClass {
   id: string;
@@ -190,6 +191,9 @@ export default function TeacherHomePage() {
           Welcome back, <span className="font-semibold text-[var(--foreground)]">{displayName ?? "Teacher"}</span>
         </p>
       </div>
+
+      {/* Skillship (roaming) teacher's schedule — self-hides for normal teachers */}
+      <TeachingScheduleCard />
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

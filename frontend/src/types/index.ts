@@ -21,6 +21,10 @@ export interface User {
   first_name: string;
   last_name: string;
   role: UserRole;
+  // For TEACHER only: SCHOOL (home-school) vs SKILLSHIP (roaming, multi-school).
+  // Drives skillship-only surfaces (schedule card, daily teaching log). Returned
+  // on /auth/me/; absent/SCHOOL for everyone else.
+  teacher_type?: "SCHOOL" | "SKILLSHIP";
   school: string | null;
   school_name?: string | null;
   // School logo as a base64 data-URL. Only returned on /auth/me/ (not on the

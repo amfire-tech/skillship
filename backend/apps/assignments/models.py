@@ -21,7 +21,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 
-from apps.common.models import TimeStampedModel
+from apps.common.models import TenantModel, TimeStampedModel
 
 
 class SkillshipAssignment(TimeStampedModel):
@@ -76,6 +76,49 @@ class SkillshipAssignment(TimeStampedModel):
     def __str__(self):
         state = "active" if self.is_active else "revoked"
         return f"{self.teacher_id} → {self.school_id} ({state})"
+
+
+class DailyTeachingLog(TenantModel):
+    """A Skillship (roaming) teacher's daily record of what they taught at a
+    school. After each visit the teacher logs {date, subject, description}; the
+    super-admin reads these to see what every roaming teacher actually did, in
+    which school, on which day.
+
+    Tenant-scoped (TenantModel → school FK + UUID pk): the row is stamped with
+    the school the teacher was acting in (X-School-Context, via
+    require_school_id), so the super-admin sees each log against its school and
+    the multi-tenancy rule still holds. Only SKILLSHIP teachers create these —
+    a normal school teacher has no daily-log surface (enforced in the viewset).
+    """
+
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="daily_teaching_logs",
+        limit_choices_to={"role": "TEACHER", "teacher_type": "SKILLSHIP"},
+    )
+    # The day the teaching happened (teacher-pickable, defaults to today on the
+    # client). Not unique — a teacher may take several subjects the same day.
+    date = models.DateField()
+    subject = models.CharField(max_length=120)
+    description = models.TextField()
+
+    # Optional attendance proof: a geo-stamped photo (base64 data-URL, same
+    # storage pattern as School.logo — kept out of list responses for weight)
+    # plus the GPS coordinates the browser reported when it was taken. Lets the
+    # super-admin confirm the teacher was physically at the school.
+    photo = models.TextField(blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
+    class Meta(TenantModel.Meta):
+        ordering = ["-date", "-created_at"]
+        indexes = TenantModel.Meta.indexes + [
+            models.Index(fields=["teacher", "date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.teacher_id} · {self.date} · {self.subject}"
 
 
 class SubAdminGrant(TimeStampedModel):

@@ -18,9 +18,16 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.models import User
 from apps.common.permissions import IsMainAdmin
+from apps.common.tenancy import require_school_id
+from apps.common.viewsets import TenantScopedViewSet
 
-from .models import SkillshipAssignment, SubAdminGrant
-from .serializers import SkillshipAssignmentSerializer, SubAdminGrantSerializer
+from .models import DailyTeachingLog, SkillshipAssignment, SubAdminGrant
+from .serializers import (
+    DailyTeachingLogListSerializer,
+    DailyTeachingLogSerializer,
+    SkillshipAssignmentSerializer,
+    SubAdminGrantSerializer,
+)
 
 
 class SkillshipAssignmentViewSet(ModelViewSet):
@@ -79,6 +86,76 @@ class SkillshipAssignmentViewSet(ModelViewSet):
         obj.is_active = True
         obj.save(update_fields=["is_active", "updated_at"])
         return Response(self.get_serializer(obj).data)
+
+
+class DailyTeachingLogViewSet(TenantScopedViewSet):
+    """Daily teaching logs for Skillship (roaming) teachers.
+
+    - A SKILLSHIP teacher creates + reads their OWN logs, scoped to the school
+      they're currently acting in (X-School-Context). Tenant scoping comes from
+      TenantScopedViewSet; we further filter to teacher_id=self so one teacher
+      never sees another's logs even within the same school.
+    - MAIN_ADMIN reads EVERY teacher's logs across all schools (the super-admin
+      "what did my teachers do today" view), with ?teacher / ?school / ?date /
+      ?date_from / ?date_to filters. Creating is teacher-only.
+    - A normal SCHOOL teacher has no daily-log surface: creation is refused and
+      the list is empty (they have no SKILLSHIP logs).
+    """
+
+    serializer_class = DailyTeachingLogSerializer
+    queryset = DailyTeachingLog.objects.select_related("teacher", "school")
+    lookup_field = "id"
+
+    def get_serializer_class(self):
+        # Lists drop the heavy base64 photo; detail/create/update keep it.
+        if self.action == "list":
+            return DailyTeachingLogListSerializer
+        return DailyTeachingLogSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()  # tenant-scoped (MAIN_ADMIN bypasses)
+        if self.action == "list":
+            # Never load the (potentially MBs) photo column for list responses.
+            qs = qs.defer("photo")
+        user = self.request.user
+        if user.role == User.Role.TEACHER:
+            # A teacher only ever sees their own logs.
+            qs = qs.filter(teacher_id=user.id)
+        else:
+            # MAIN_ADMIN — allow narrowing to one teacher / school / date(s).
+            params = self.request.query_params
+            teacher = params.get("teacher")
+            school = params.get("school")
+            on = params.get("date")
+            date_from = params.get("date_from")
+            date_to = params.get("date_to")
+            if teacher:
+                qs = qs.filter(teacher_id=teacher)
+            if school:
+                qs = qs.filter(school_id=school)
+            if on:
+                qs = qs.filter(date=on)
+            if date_from:
+                qs = qs.filter(date__gte=date_from)
+            if date_to:
+                qs = qs.filter(date__lte=date_to)
+        return qs.order_by("-date", "-created_at")
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        # Only a Skillship teacher submits daily logs.
+        if not (user.role == User.Role.TEACHER and getattr(user, "is_skillship_teacher", False)):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Only Skillship teachers can submit daily logs.")
+        # Stamp school from the acting context (raises 403 if none) + teacher
+        # from the request — never from request data.
+        school_id = require_school_id(self.request)
+        serializer.save(teacher=user, school_id=school_id)
+
+    def perform_update(self, serializer):
+        # Edits keep the original teacher/school; only the day's details change.
+        serializer.save()
 
 
 class SubAdminGrantViewSet(ModelViewSet):

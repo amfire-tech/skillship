@@ -135,6 +135,18 @@ const TEACHER_NAV: SidebarNavItem[] = [
   { label: "AI Tools",            href: "/dashboard/teacher/ai-tools", icon: icon("career")    },
 ];
 
+// Skillship (roaming) teachers get an extra "Daily Log" surface to record what
+// they taught each day at each school. A normal SCHOOL teacher never sees it.
+const TEACHER_DAILY_LOG_ITEM: SidebarNavItem = {
+  label: "Daily Log", href: "/dashboard/teacher/daily-log", icon: icon("planner"),
+};
+
+function buildTeacherNav(isSkillship: boolean): SidebarNavItem[] {
+  if (!isSkillship) return TEACHER_NAV;
+  // Insert just after "My Classes" so the schedule + log live together up top.
+  return [TEACHER_NAV[0], TEACHER_DAILY_LOG_ITEM, ...TEACHER_NAV.slice(1)];
+}
+
 const STUDENT_NAV: SidebarNavItem[] = [
   { label: "My Learning",        href: "/dashboard/student",                  icon: icon("dashboard")   },
   { label: "Quiz Attempt",       href: "/dashboard/student/quizzes",          icon: icon("quizzes")     },
@@ -265,8 +277,13 @@ export default function DashboardLayout({
 
   const roleConfig = ROLE_NAV[user.role as UserRole];
   const isSubAdmin = user.role === "SUB_ADMIN";
+  const isSkillshipTeacher = user.role === "TEACHER" && user.teacher_type === "SKILLSHIP";
   if (roleConfig || isSubAdmin) {
-    const navItems = isSubAdmin ? buildSubAdminNav(subGrant) : roleConfig!.nav;
+    const navItems = isSubAdmin
+      ? buildSubAdminNav(subGrant)
+      : user.role === "TEACHER"
+      ? buildTeacherNav(isSkillshipTeacher)
+      : roleConfig!.nav;
     const roleLabel = isSubAdmin ? "Sub Admin" : roleConfig!.label;
     return (
       <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">

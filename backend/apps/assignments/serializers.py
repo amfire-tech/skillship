@@ -12,7 +12,69 @@ from apps.academics.models import Class
 from apps.accounts.models import User
 from apps.schools.models import School
 
-from .models import SkillshipAssignment, SubAdminGrant
+from .models import DailyTeachingLog, SkillshipAssignment, SubAdminGrant
+
+
+class DailyTeachingLogSerializer(serializers.ModelSerializer):
+    """One daily teaching log (full — includes the proof photo). `teacher`,
+    `school` and the names are read-only — the viewset stamps teacher
+    (request.user) and school (acting context) so a teacher can never forge
+    another teacher's / school's log. The teacher MAY submit `photo` (a base64
+    data-URL) + `latitude`/`longitude` as attendance proof. Used for
+    create/retrieve; lists use the lighter serializer below."""
+
+    id = serializers.UUIDField(read_only=True)
+    teacher_name = serializers.SerializerMethodField()
+    school_name = serializers.SerializerMethodField()
+    has_photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DailyTeachingLog
+        fields = [
+            "id",
+            "teacher", "teacher_name",
+            "school", "school_name",
+            "date", "subject", "description",
+            "photo", "has_photo", "latitude", "longitude",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "teacher", "school", "created_at", "updated_at"]
+
+    def get_teacher_name(self, obj) -> str:
+        t = obj.teacher
+        return (t.get_full_name() or t.username) if t else ""
+
+    def get_school_name(self, obj) -> str:
+        return obj.school.name if obj.school_id else ""
+
+    def get_has_photo(self, obj) -> bool:
+        return bool(obj.photo)
+
+    def validate_subject(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Subject is required.")
+        return value.strip()
+
+    def validate_description(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Description is required.")
+        return value
+
+    def validate_photo(self, value):
+        # Keep proof photos sane — a data-URL over ~3 MB is almost certainly an
+        # un-resized capture; the client downscales, so reject the outliers.
+        if value and len(value) > 4_000_000:
+            raise serializers.ValidationError("Photo is too large — please retry (it should auto-compress).")
+        return value
+
+
+class DailyTeachingLogListSerializer(DailyTeachingLogSerializer):
+    """List view — everything except the heavy base64 `photo` blob (so a
+    super-admin can scroll hundreds of logs cheaply). `has_photo` + the GPS
+    coords still come through, and the full photo is on the detail endpoint."""
+
+    class Meta(DailyTeachingLogSerializer.Meta):
+        fields = [f for f in DailyTeachingLogSerializer.Meta.fields if f != "photo"]
 
 
 class SubAdminGrantSerializer(serializers.ModelSerializer):
