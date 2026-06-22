@@ -62,6 +62,74 @@ def test_admin_alert_is_school_scoped(api_client, main_admin, school_a, principa
     assert _alerts_for(principal_b).count() == 0
 
 
+def test_admin_alerts_students(api_client, main_admin, school_a, student_a, teacher_a, login):
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["STUDENT"], "title": "Holiday", "body": "School closed tomorrow."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert _alerts_for(student_a).count() == 1
+    assert _alerts_for(teacher_a).count() == 0
+
+
+def test_admin_alerts_subadmin_roaming(api_client, main_admin, school_a, login, password):
+    """A roaming SUB_ADMIN (school=NULL) with an active grant for the school gets
+    the alert, the notification is stamped with that school, and they see it on
+    their own feed (the bell is recipient-scoped, not school-scoped)."""
+    from apps.accounts.models import User
+    from apps.assignments.models import SubAdminGrant
+
+    sub = User.objects.create_user(
+        username="sub1", email="sub1@x.test", password=password,
+        role=User.Role.SUB_ADMIN, school=None,
+    )
+    SubAdminGrant.objects.create(subadmin=sub, school=school_a, is_active=True, can_manage_school=True)
+
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["SUB_ADMIN"], "title": "FYI", "body": "Territory update."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert res.data["sent"] == 1
+    notif = _alerts_for(sub).first()
+    assert notif is not None
+    assert str(notif.school_id) == str(school_a.id)
+
+    # The sub-admin (school=NULL) can read it on their own feed.
+    sc = api_client.__class__()
+    login(sc, sub)
+    feed = sc.get("/api/v1/notifications/")
+    titles = [n["title"] for n in (feed.data.get("results") or feed.data)]
+    assert "FYI" in titles
+
+
+def test_admin_alerts_teacher_includes_skillship(api_client, main_admin, school_a, login, password):
+    """Targeting TEACHER also reaches Skillship (roaming) teachers actively
+    assigned to the school, even though their own school is NULL."""
+    from apps.accounts.models import User
+    from apps.assignments.models import SkillshipAssignment
+
+    roamer = User.objects.create_user(
+        username="roam1", email="roam1@x.test", password=password,
+        role=User.Role.TEACHER, teacher_type=User.TeacherType.SKILLSHIP, school=None,
+    )
+    SkillshipAssignment.objects.create(teacher=roamer, school=school_a, is_active=True)
+
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["TEACHER"], "title": "Plans", "body": "Send weekly plans."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert _alerts_for(roamer).count() == 1
+    assert str(_alerts_for(roamer).first().school_id) == str(school_a.id)
+
+
 def test_admin_alert_validation(api_client, main_admin, school_a, login):
     login(api_client, main_admin)
     res = api_client.post(SEND, {"school": str(school_a.id), "roles": [], "title": "x", "body": "y"}, format="json")

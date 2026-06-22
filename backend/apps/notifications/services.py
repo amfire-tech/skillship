@@ -72,10 +72,17 @@ def send_notification(
     return created
 
 
-def send_in_app(recipient, title: str, body: str, data: dict | None = None) -> Notification:
-    """Shortcut for a quick in-app notification without a template."""
+def send_in_app(
+    recipient, title: str, body: str, data: dict | None = None, school_id=None
+) -> Notification:
+    """Shortcut for a quick in-app notification without a template.
+
+    `school_id` defaults to the recipient's own school, but callers may pass it
+    explicitly — required for roaming recipients (a SUB_ADMIN or Skillship
+    teacher has school=NULL, yet the Notification is a TenantModel and must
+    belong to the school the alert is about)."""
     notif = Notification.objects.create(
-        school_id=recipient.school_id,
+        school_id=school_id or recipient.school_id,
         recipient=recipient,
         channel=Notification.Channel.IN_APP,
         title=title,
@@ -87,14 +94,15 @@ def send_in_app(recipient, title: str, body: str, data: dict | None = None) -> N
     return notif
 
 
-def send_alert(recipient, title: str, body: str, category: str = "") -> Notification:
+def send_alert(recipient, title: str, body: str, category: str = "", school_id=None) -> Notification:
     """Create an in-app alert AND fire a best-effort browser push.
 
     Used by the super-admin alert composer. The in-app row is the source of
     truth (always created); the web push is a bonus that reaches the user even
-    when the dashboard tab is closed.
+    when the dashboard tab is closed. Pass `school_id` for roaming recipients
+    (SUB_ADMIN / Skillship teacher) whose own school is NULL.
     """
-    notif = send_in_app(recipient, title, body, {"category": category})
+    notif = send_in_app(recipient, title, body, {"category": category}, school_id=school_id)
     send_web_push(recipient, title=title, body=body, data={"category": category, "url": "/dashboard"})
     return notif
 

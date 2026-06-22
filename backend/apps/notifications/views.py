@@ -29,9 +29,12 @@ class NotificationViewSet(TenantScopedViewSet):
     queryset = Notification.objects.none()
 
     def get_queryset(self):
-        # Every user only sees their own notifications
+        # Every user only sees their own notifications. Scope by recipient ONLY
+        # (not school) — recipient=user is already a complete, leak-proof scope,
+        # and a roaming user (SUB_ADMIN / Skillship teacher, school=NULL) would
+        # otherwise never see alerts a super-admin addressed to them about a
+        # specific school.
         return Notification.objects.filter(
-            school_id=self.request.user.school_id,
             recipient=self.request.user,
         ).order_by("-created_at")
 
@@ -78,14 +81,56 @@ class NotificationTemplateViewSet(TenantScopedViewSet):
 # ── Super-admin alert composer ────────────────────────────────────────────────
 
 
-ALERTABLE_ROLES = {Role.PRINCIPAL, Role.TEACHER}
+ALERTABLE_ROLES = {Role.PRINCIPAL, Role.TEACHER, Role.STUDENT, Role.SUB_ADMIN}
+
+
+def _alert_recipients(school_id, roles):
+    """Every active user the super-admin can reach for `school_id` under the
+    chosen `roles`. Handles both school-bound roles and roaming actors:
+
+      - PRINCIPAL / TEACHER (SCHOOL) / STUDENT → users whose own school is this.
+      - TEACHER also includes Skillship (roaming) teachers ACTIVELY assigned to
+        this school — they have school=NULL but teach here.
+      - SUB_ADMIN → roaming sub-admins with an ACTIVE grant for this school.
+
+    Returns a de-duplicated list of User instances.
+    """
+    roles = set(roles)
+    by_id = {}
+
+    direct_roles = roles & {Role.PRINCIPAL, Role.TEACHER, Role.STUDENT}
+    if direct_roles:
+        for u in User.objects.filter(school_id=school_id, role__in=direct_roles, is_active=True):
+            by_id[u.id] = u
+
+    if Role.TEACHER in roles:
+        from apps.assignments.models import SkillshipAssignment
+
+        ids = (
+            SkillshipAssignment.objects.filter(school_id=school_id, is_active=True)
+            .values_list("teacher_id", flat=True)
+        )
+        for u in User.objects.filter(id__in=ids, is_active=True):
+            by_id[u.id] = u
+
+    if Role.SUB_ADMIN in roles:
+        from apps.assignments.models import SubAdminGrant
+
+        ids = (
+            SubAdminGrant.objects.filter(school_id=school_id, is_active=True)
+            .values_list("subadmin_id", flat=True)
+        )
+        for u in User.objects.filter(id__in=ids, is_active=True):
+            by_id[u.id] = u
+
+    return list(by_id.values())
 
 
 class AdminAlertView(APIView):
     """POST /api/v1/notifications/admin/send/ — MAIN_ADMIN sends an alert.
 
-    Body: { school: <uuid>, roles: ["PRINCIPAL","TEACHER"], title, body,
-            category? }
+    Body: { school: <uuid>, roles: ["PRINCIPAL","TEACHER","STUDENT","SUB_ADMIN"],
+            title, body, category? }
     Creates one in-app Notification per matching recipient in that school and
     fires a best-effort browser push to each. Like the billing endpoints, this
     is a plain APIView (not tenant-scoped) because MAIN_ADMIN has school=NULL.
@@ -109,14 +154,15 @@ class AdminAlertView(APIView):
             raise ValidationError({"body": "A message is required."})
         roles = [r for r in roles if r in ALERTABLE_ROLES]
         if not roles:
-            raise ValidationError({"roles": "Choose at least one of PRINCIPAL or TEACHER."})
+            raise ValidationError(
+                {"roles": "Choose at least one of Principal, Teachers, Students or Sub-Admins."}
+            )
 
-        recipients = User.objects.filter(
-            school_id=school, role__in=roles, is_active=True
-        )
         sent = 0
-        for user in recipients:
-            send_alert(user, title=title, body=body, category=category)
+        for user in _alert_recipients(school, roles):
+            # Stamp the alert with the target school so a roaming recipient's
+            # (school=NULL) notification still belongs to the right tenant.
+            send_alert(user, title=title, body=body, category=category, school_id=school)
             sent += 1
 
         return Response({"sent": sent}, status=status.HTTP_201_CREATED)

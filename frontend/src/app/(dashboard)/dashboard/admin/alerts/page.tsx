@@ -28,6 +28,8 @@ export default function AdminAlertsPage() {
   const [school, setSchool] = useState("");
   const [toPrincipal, setToPrincipal] = useState(true);
   const [toTeacher, setToTeacher] = useState(false);
+  const [toStudent, setToStudent] = useState(false);
+  const [toSubAdmin, setToSubAdmin] = useState(false);
   const [category, setCategory] = useState("PAYMENT");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -53,9 +55,14 @@ export default function AdminAlertsPage() {
 
   async function send() {
     setError(null);
-    const roles = [toPrincipal && "PRINCIPAL", toTeacher && "TEACHER"].filter(Boolean);
+    const roles = [
+      toPrincipal && "PRINCIPAL",
+      toTeacher && "TEACHER",
+      toStudent && "STUDENT",
+      toSubAdmin && "SUB_ADMIN",
+    ].filter(Boolean);
     if (!school) { setError("Pick a school."); return; }
-    if (roles.length === 0) { setError("Choose Principal and/or Teachers."); return; }
+    if (roles.length === 0) { setError("Choose at least one recipient group."); return; }
     if (!title.trim()) { setError("Add a title."); return; }
     if (!body.trim()) { setError("Add a message."); return; }
 
@@ -88,7 +95,7 @@ export default function AdminAlertsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Send Alert" subtitle="Notify a school's principal or teachers — on their dashboard and via browser push" />
+      <PageHeader title="Send Alert" subtitle="Notify a school's principal, teachers, students or sub-admins — on their dashboard and via browser push" />
 
       <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
         <div className="h-1.5 w-full bg-gradient-to-r from-primary to-accent" />
@@ -107,13 +114,15 @@ export default function AdminAlertsPage() {
           {/* Recipients */}
           <div className="grid gap-1.5">
             <label className="text-xs font-semibold text-[var(--muted-foreground)]">Send to</label>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { on: toPrincipal, set: setToPrincipal, label: "Principal" },
                 { on: toTeacher, set: setToTeacher, label: "Teachers" },
+                { on: toStudent, set: setToStudent, label: "Students" },
+                { on: toSubAdmin, set: setToSubAdmin, label: "Sub-Admins" },
               ].map((r) => (
                 <button key={r.label} type="button" onClick={() => r.set(!r.on)}
-                  className={`flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${r.on ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30"}`}>
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${r.on ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30"}`}>
                   {r.on ? "✓ " : ""}{r.label}
                 </button>
               ))}
