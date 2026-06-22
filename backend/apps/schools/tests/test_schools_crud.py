@@ -105,6 +105,39 @@ class TestSchoolsCrudAsMainAdmin:
         assert response.status_code == 204
         assert not School.objects.filter(pk=school_a.id).exists()
 
+    def test_destroy_school_with_data_cascades(
+        self, api_client, main_admin, password, login, school_a
+    ):
+        """Regression: a school holding tenant data (users, academic year, class,
+        course, question bank) must still delete. These FKs use on_delete=PROTECT,
+        which previously made `School.delete()` raise ProtectedError ("Failed to
+        remove school"). perform_destroy now tears the tenant down leaf-first."""
+        import datetime
+
+        from apps.academics.models import AcademicYear, Class, Course
+        from apps.accounts.models import User
+        from apps.quizzes.models import QuestionBank
+
+        teacher = User.objects.create_user(
+            username="t-del", email="t-del@x.test", password=password,
+            role=User.Role.TEACHER, teacher_type=User.TeacherType.SCHOOL, school=school_a,
+        )
+        ay = AcademicYear.objects.create(
+            school=school_a, name="2026-27",
+            start_date=datetime.date(2026, 4, 1), end_date=datetime.date(2027, 3, 31),
+        )
+        Class.objects.create(school=school_a, academic_year=ay, grade=9, section="A")
+        course = Course.objects.create(school=school_a, name="Maths", code="MATH-9")
+        QuestionBank.objects.create(school=school_a, course=course, name="Algebra", created_by=teacher)
+
+        login(api_client, main_admin, password)
+        response = api_client.delete(_detail_url(school_a))
+        assert response.status_code == 204, response.content
+        assert not School.objects.filter(pk=school_a.id).exists()
+        # The tenant data went with it — no orphans, no ProtectedError.
+        assert not Course.objects.filter(school_id=school_a.id).exists()
+        assert not User.objects.filter(school_id=school_a.id).exists()
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(

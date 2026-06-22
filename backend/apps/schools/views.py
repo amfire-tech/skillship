@@ -17,6 +17,7 @@ Why /schools/ uses a regular ModelViewSet (not TenantScopedViewSet):
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
@@ -82,6 +83,42 @@ class SchoolViewSet(ModelViewSet):
 
             return qs.filter(id__in=active_school_ids(u))
         return qs
+
+    def perform_destroy(self, instance):
+        """Hard-delete a school AND all of its tenant data.
+
+        Several intra-tenant FKs use on_delete=PROTECT (User.school,
+        Class.academic_year, QuestionBank.course, Quiz.course/bank,
+        QuizAttempt.quiz/student, AnswerSubmission.question,
+        QuizAssignment.assigned_by). Django's deletion collector raises
+        ProtectedError on these *even when the referencing rows are themselves
+        part of the same cascade*, so a plain `School.delete()` fails for any
+        school that has data (that's the "Failed to remove school" the admin
+        saw). We therefore tear the tenant down leaf-first inside a transaction,
+        then let `School.delete()` cascade everything that remains — every other
+        tenant model is on_delete=CASCADE off `school`.
+
+        Roaming actors (Skillship teachers / sub-admins) have school=NULL and are
+        NOT deleted here; only their assignment/grant rows to this school go (via
+        the final cascade), which correctly just revokes their access to it.
+        """
+        # Local imports avoid an app-loading cycle (schools is imported early).
+        from apps.academics.models import AcademicYear, Class, Course
+        from apps.accounts.models import User
+        from apps.quizzes.models import QuestionBank, Quiz, QuizAssignment, QuizAttempt
+
+        school_id = instance.id
+        with transaction.atomic():
+            # Order matters — each step clears a PROTECT that blocks the next.
+            QuizAttempt.objects.filter(school_id=school_id).delete()       # frees Quiz + student
+            QuizAssignment.objects.filter(school_id=school_id).delete()    # frees assigned_by
+            Quiz.objects.filter(school_id=school_id).delete()              # frees Course + bank
+            QuestionBank.objects.filter(school_id=school_id).delete()      # frees Course (cascades Questions)
+            Course.objects.filter(school_id=school_id).delete()
+            Class.objects.filter(school_id=school_id).delete()             # frees AcademicYear (cascades Enrollments)
+            AcademicYear.objects.filter(school_id=school_id).delete()
+            User.objects.filter(school_id=school_id).delete()              # frees School (User.school is PROTECT)
+            instance.delete()                                             # cascades all remaining tenant data
 
 
 class SchoolSettingsView(APIView):
