@@ -15,6 +15,7 @@ import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 
 interface SchoolOpt { id: string; name: string; city?: string }
+interface SubAdminOpt { id: string; first_name: string; last_name: string; email: string }
 
 const CATEGORIES = [
   { value: "PAYMENT", label: "Payment reminder" },
@@ -30,6 +31,13 @@ export default function AdminAlertsPage() {
   const [toTeacher, setToTeacher] = useState(false);
   const [toStudent, setToStudent] = useState(false);
   const [toSubAdmin, setToSubAdmin] = useState(false);
+  // When Teachers is selected, the super-admin can target school teachers,
+  // Skillship (roaming) teachers, or both. Default: both.
+  const [teacherSchool, setTeacherSchool] = useState(true);
+  const [teacherSkillship, setTeacherSkillship] = useState(true);
+  // When Sub-Admins is selected, pick one by name ("" = all granted to school).
+  const [subadmins, setSubadmins] = useState<SubAdminOpt[]>([]);
+  const [subAdminId, setSubAdminId] = useState("");
   const [category, setCategory] = useState("PAYMENT");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -53,6 +61,17 @@ export default function AdminAlertsPage() {
 
   useEffect(() => { loadSchools(); }, [loadSchools]);
 
+  const loadSubAdmins = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/users/?role=SUB_ADMIN`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setSubadmins(asArray<SubAdminOpt>(await res.json()).filter((s) => (s as unknown as { is_active?: boolean }).is_active !== false));
+    } catch { /* surfaced on send */ }
+  }, []);
+
+  useEffect(() => { loadSubAdmins(); }, [loadSubAdmins]);
+
   async function send() {
     setError(null);
     const roles = [
@@ -66,6 +85,14 @@ export default function AdminAlertsPage() {
     if (!title.trim()) { setError("Add a title."); return; }
     if (!body.trim()) { setError("Add a message."); return; }
 
+    const teacher_types = toTeacher
+      ? [teacherSchool && "SCHOOL", teacherSkillship && "SKILLSHIP"].filter(Boolean)
+      : [];
+    if (toTeacher && teacher_types.length === 0) {
+      setError("Pick at least one teacher group — School or Skillship.");
+      return;
+    }
+
     setSending(true);
     const token = await getToken();
     if (!token) { setError("Session expired."); setSending(false); return; }
@@ -73,7 +100,11 @@ export default function AdminAlertsPage() {
       const res = await fetch(`${API_BASE}/notifications/admin/send/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ school, roles, category, title: title.trim(), body: body.trim() }),
+        body: JSON.stringify({
+          school, roles, category, title: title.trim(), body: body.trim(),
+          ...(toTeacher ? { teacher_types } : {}),
+          ...(toSubAdmin && subAdminId ? { subadmin_id: subAdminId } : {}),
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -127,6 +158,38 @@ export default function AdminAlertsPage() {
                 </button>
               ))}
             </div>
+
+            {/* Teacher scope — school vs Skillship (roaming) teachers */}
+            {toTeacher && (
+              <div className="mt-1 rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Which teachers</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { on: teacherSchool, set: setTeacherSchool, label: "School teachers" },
+                    { on: teacherSkillship, set: setTeacherSkillship, label: "Skillship teachers" },
+                  ].map((t) => (
+                    <button key={t.label} type="button" onClick={() => t.set(!t.on)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${t.on ? "border-primary bg-primary/5 text-primary ring-2 ring-primary/20" : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30"}`}>
+                      {t.on ? "✓ " : ""}{t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sub-admin picker — one by name, or all granted to this school */}
+            {toSubAdmin && (
+              <div className="mt-1 grid gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 p-3">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Which sub-admin</label>
+                <select value={subAdminId} onChange={(e) => setSubAdminId(e.target.value)} className={inputCls}>
+                  <option value="">All sub-admins assigned to this school</option>
+                  {subadmins.map((s) => {
+                    const name = `${s.first_name} ${s.last_name}`.trim() || s.email;
+                    return <option key={s.id} value={s.id}>{name}{s.email ? ` · ${s.email}` : ""}</option>;
+                  })}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Category */}

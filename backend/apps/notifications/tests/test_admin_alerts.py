@@ -130,6 +130,80 @@ def test_admin_alerts_teacher_includes_skillship(api_client, main_admin, school_
     assert str(_alerts_for(roamer).first().school_id) == str(school_a.id)
 
 
+def test_admin_alerts_teacher_types_school_only(api_client, main_admin, school_a, teacher_a, login, password):
+    """teacher_types=["SCHOOL"] reaches school teachers but NOT roaming Skillship
+    teachers assigned to the school."""
+    from apps.accounts.models import User
+    from apps.assignments.models import SkillshipAssignment
+
+    roamer = User.objects.create_user(
+        username="roam2", email="roam2@x.test", password=password,
+        role=User.Role.TEACHER, teacher_type=User.TeacherType.SKILLSHIP, school=None,
+    )
+    SkillshipAssignment.objects.create(teacher=roamer, school=school_a, is_active=True)
+
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["TEACHER"], "teacher_types": ["SCHOOL"],
+         "title": "School only", "body": "Hi school staff."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert _alerts_for(teacher_a).count() == 1
+    assert _alerts_for(roamer).count() == 0
+
+
+def test_admin_alerts_teacher_types_skillship_only(api_client, main_admin, school_a, teacher_a, login, password):
+    """teacher_types=["SKILLSHIP"] reaches only the roaming teacher."""
+    from apps.accounts.models import User
+    from apps.assignments.models import SkillshipAssignment
+
+    roamer = User.objects.create_user(
+        username="roam3", email="roam3@x.test", password=password,
+        role=User.Role.TEACHER, teacher_type=User.TeacherType.SKILLSHIP, school=None,
+    )
+    SkillshipAssignment.objects.create(teacher=roamer, school=school_a, is_active=True)
+
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["TEACHER"], "teacher_types": ["SKILLSHIP"],
+         "title": "Roamers", "body": "Hi Skillship staff."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert _alerts_for(roamer).count() == 1
+    assert _alerts_for(teacher_a).count() == 0
+
+
+def test_admin_alerts_specific_subadmin(api_client, main_admin, school_a, login, password):
+    """subadmin_id targets exactly one sub-admin, not every granted one."""
+    from apps.accounts.models import User
+    from apps.assignments.models import SubAdminGrant
+
+    target = User.objects.create_user(
+        username="subT", email="subt@x.test", password=password, role=User.Role.SUB_ADMIN, school=None,
+    )
+    other = User.objects.create_user(
+        username="subO", email="subo@x.test", password=password, role=User.Role.SUB_ADMIN, school=None,
+    )
+    SubAdminGrant.objects.create(subadmin=target, school=school_a, is_active=True, can_manage_school=True)
+    SubAdminGrant.objects.create(subadmin=other, school=school_a, is_active=True, can_manage_school=True)
+
+    login(api_client, main_admin)
+    res = api_client.post(
+        SEND,
+        {"school": str(school_a.id), "roles": ["SUB_ADMIN"], "subadmin_id": str(target.id),
+         "title": "Just you", "body": "A word."},
+        format="json",
+    )
+    assert res.status_code == 201, res.content
+    assert res.data["sent"] == 1
+    assert _alerts_for(target).count() == 1
+    assert _alerts_for(other).count() == 0
+
+
 def test_admin_alert_validation(api_client, main_admin, school_a, login):
     login(api_client, main_admin)
     res = api_client.post(SEND, {"school": str(school_a.id), "roles": [], "title": "x", "body": "y"}, format="json")

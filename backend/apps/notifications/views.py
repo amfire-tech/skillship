@@ -84,44 +84,62 @@ class NotificationTemplateViewSet(TenantScopedViewSet):
 ALERTABLE_ROLES = {Role.PRINCIPAL, Role.TEACHER, Role.STUDENT, Role.SUB_ADMIN}
 
 
-def _alert_recipients(school_id, roles):
+def _alert_recipients(school_id, roles, teacher_types=None, subadmin_id=None):
     """Every active user the super-admin can reach for `school_id` under the
     chosen `roles`. Handles both school-bound roles and roaming actors:
 
-      - PRINCIPAL / TEACHER (SCHOOL) / STUDENT → users whose own school is this.
-      - TEACHER also includes Skillship (roaming) teachers ACTIVELY assigned to
-        this school — they have school=NULL but teach here.
-      - SUB_ADMIN → roaming sub-admins with an ACTIVE grant for this school.
+      - PRINCIPAL / STUDENT → users whose own school is this.
+      - TEACHER → SCHOOL teachers of this school and/or Skillship (roaming)
+        teachers ACTIVELY assigned to it (school=NULL but teach here). Pass
+        `teacher_types` (subset of {"SCHOOL", "SKILLSHIP"}) to target one group;
+        omitted/empty → both (back-compat).
+      - SUB_ADMIN → if `subadmin_id` is given, exactly that sub-admin (picked by
+        name in the composer); otherwise every roaming sub-admin with an ACTIVE
+        grant for this school.
 
     Returns a de-duplicated list of User instances.
     """
     roles = set(roles)
     by_id = {}
 
-    direct_roles = roles & {Role.PRINCIPAL, Role.TEACHER, Role.STUDENT}
+    direct_roles = roles & {Role.PRINCIPAL, Role.STUDENT}
     if direct_roles:
         for u in User.objects.filter(school_id=school_id, role__in=direct_roles, is_active=True):
             by_id[u.id] = u
 
     if Role.TEACHER in roles:
-        from apps.assignments.models import SkillshipAssignment
+        types = set(teacher_types) if teacher_types else {"SCHOOL", "SKILLSHIP"}
 
-        ids = (
-            SkillshipAssignment.objects.filter(school_id=school_id, is_active=True)
-            .values_list("teacher_id", flat=True)
-        )
-        for u in User.objects.filter(id__in=ids, is_active=True):
-            by_id[u.id] = u
+        if "SCHOOL" in types:
+            for u in User.objects.filter(school_id=school_id, role=Role.TEACHER, is_active=True):
+                by_id[u.id] = u
+
+        if "SKILLSHIP" in types:
+            from apps.assignments.models import SkillshipAssignment
+
+            ids = (
+                SkillshipAssignment.objects.filter(school_id=school_id, is_active=True)
+                .values_list("teacher_id", flat=True)
+            )
+            for u in User.objects.filter(id__in=ids, is_active=True):
+                by_id[u.id] = u
 
     if Role.SUB_ADMIN in roles:
-        from apps.assignments.models import SubAdminGrant
+        if subadmin_id:
+            # Super-admin picked one sub-admin by name — reach them directly,
+            # regardless of which school's grant they hold (the alert is still
+            # stamped with the chosen school, and their bell is recipient-scoped).
+            for u in User.objects.filter(id=subadmin_id, role=Role.SUB_ADMIN, is_active=True):
+                by_id[u.id] = u
+        else:
+            from apps.assignments.models import SubAdminGrant
 
-        ids = (
-            SubAdminGrant.objects.filter(school_id=school_id, is_active=True)
-            .values_list("subadmin_id", flat=True)
-        )
-        for u in User.objects.filter(id__in=ids, is_active=True):
-            by_id[u.id] = u
+            ids = (
+                SubAdminGrant.objects.filter(school_id=school_id, is_active=True)
+                .values_list("subadmin_id", flat=True)
+            )
+            for u in User.objects.filter(id__in=ids, is_active=True):
+                by_id[u.id] = u
 
     return list(by_id.values())
 
@@ -145,6 +163,8 @@ class AdminAlertView(APIView):
         title = (data.get("title") or "").strip()
         body = (data.get("body") or "").strip()
         category = (data.get("category") or "").strip()
+        teacher_types = [t for t in (data.get("teacher_types") or []) if t in {"SCHOOL", "SKILLSHIP"}]
+        subadmin_id = data.get("subadmin_id") or None
 
         if not school:
             raise ValidationError({"school": "Pick a school to alert."})
@@ -159,7 +179,7 @@ class AdminAlertView(APIView):
             )
 
         sent = 0
-        for user in _alert_recipients(school, roles):
+        for user in _alert_recipients(school, roles, teacher_types=teacher_types, subadmin_id=subadmin_id):
             # Stamp the alert with the target school so a roaming recipient's
             # (school=NULL) notification still belongs to the right tenant.
             send_alert(user, title=title, body=body, category=category, school_id=school)
