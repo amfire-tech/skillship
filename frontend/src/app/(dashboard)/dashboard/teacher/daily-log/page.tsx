@@ -123,8 +123,16 @@ export default function TeacherDailyLogPage() {
     e.preventDefault();
     setError(null);
     setOkMsg(null);
+    if (!date) {
+      setError("Please pick the date.");
+      return;
+    }
     if (!subject.trim() || !description.trim()) {
       setError("Please fill in both the subject and what you taught.");
+      return;
+    }
+    if (!photo) {
+      setError("An attendance photo is required — take or upload one before submitting.");
       return;
     }
     setSaving(true);
@@ -187,7 +195,7 @@ export default function TeacherDailyLogPage() {
         className="space-y-4 rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]"
       >
         <div>
-          <label htmlFor="log-date" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Date</label>
+          <label htmlFor="log-date" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Date <span className="text-red-500">*</span></label>
           <input
             id="log-date" type="date" value={date} max={todayISO()}
             onChange={(e) => setDate(e.target.value)}
@@ -196,7 +204,7 @@ export default function TeacherDailyLogPage() {
         </div>
 
         <div>
-          <label htmlFor="log-subject" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Subject</label>
+          <label htmlFor="log-subject" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Subject <span className="text-red-500">*</span></label>
           <input
             id="log-subject" type="text" value={subject} placeholder="e.g. Mathematics — Class 9A"
             onChange={(e) => setSubject(e.target.value)}
@@ -205,7 +213,7 @@ export default function TeacherDailyLogPage() {
         </div>
 
         <div>
-          <label htmlFor="log-desc" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">What did you teach today?</label>
+          <label htmlFor="log-desc" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">What did you teach today? <span className="text-red-500">*</span></label>
           <textarea
             id="log-desc" value={description} rows={5} placeholder="Topics covered, activities done, homework given, anything to note…"
             onChange={(e) => setDescription(e.target.value)}
@@ -213,10 +221,10 @@ export default function TeacherDailyLogPage() {
           />
         </div>
 
-        {/* Attendance photo (optional) */}
+        {/* Attendance photo (required) */}
         <div>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-            Attendance photo <span className="font-normal normal-case text-[var(--muted-foreground)]/70">— optional</span>
+            Attendance photo <span className="font-semibold normal-case text-red-500">*</span>
           </label>
 
           {photo ? (
