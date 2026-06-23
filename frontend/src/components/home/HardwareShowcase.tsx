@@ -17,7 +17,8 @@
 
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import Image from "next/image";
+import { motion, useInView, type Variants } from "framer-motion";
 import { useRef } from "react";
 import {
   Bot, Boxes, Cpu, Award, CheckCircle2, Sparkles,
@@ -32,10 +33,10 @@ interface Product {
   desc: string;
   icon: LucideIcon;
   usedIn: string[];
-  /** Tile gradient — the visual "product photo" until the real one lands. */
-  tile: string;
-  /** Decorative shape overlaid on the tile. */
-  shape: "robot" | "printer" | "kit";
+  /** Real product photo (public/products). */
+  image: string;
+  /** Backdrop behind the photo while it loads / matches the shot's own bg. */
+  imageBg: string;
 }
 
 const PRODUCTS: Product[] = [
@@ -45,8 +46,8 @@ const PRODUCTS: Product[] = [
     desc: "An IR-sensor-driven robotics platform with servo control, switches, and an integrated display. The hero of the Robotics Lab.",
     icon: Bot,
     usedIn: ["Robotics Lab", "Electronics & IoT Lab"],
-    tile: "bg-[linear-gradient(135deg,#F39C32_0%,#D8861F_100%)]",
-    shape: "robot",
+    image: "/products/neobot.png",
+    imageBg: "#ffffff",
   },
   {
     name: "3D Printer",
@@ -54,8 +55,8 @@ const PRODUCTS: Product[] = [
     desc: "An education-grade 3D printer with a touchscreen interface — designed to make rapid prototyping and design thinking accessible from Grade 6 upward.",
     icon: Boxes,
     usedIn: ["3D Printing & Design Lab"],
-    tile: "bg-[linear-gradient(135deg,#2EB6B5_0%,#1F9594_100%)]",
-    shape: "printer",
+    image: "/products/3d-printer.png?v=2",
+    imageBg: "#f1f2f2",
   },
   {
     name: "Skillship Kit",
@@ -63,102 +64,58 @@ const PRODUCTS: Product[] = [
     desc: "A portable case packed with sensors, controllers, and modules. The kit travels home with students — where fun meets learning, literally.",
     icon: Cpu,
     usedIn: ["Electronics & IoT Lab", "AI Lab"],
-    tile: "bg-[linear-gradient(135deg,#5CC9C8_0%,#2EB6B5_100%)]",
-    shape: "kit",
+    image: "/products/skillship-kit.png?v=2",
+    imageBg: "#f1f2f2",
   },
 ];
 
-// Stylised "product shapes" overlaid on each tile — geometric, not photographic.
-// When real product photography lands, replace this with <Image>.
-function ProductShape({ shape }: { shape: Product["shape"] }) {
-  if (shape === "robot") {
-    return (
-      <svg viewBox="0 0 200 200" className="h-full w-full opacity-95">
-        {/* Neobot board */}
-        <rect x="40" y="44" width="120" height="100" rx="12" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" />
-        <rect x="56" y="62" width="88" height="42" rx="6" fill="rgba(15,20,25,0.55)" />
-        <circle cx="64" cy="56" r="3" fill="rgba(255,255,255,0.8)" />
-        <circle cx="136" cy="56" r="3" fill="rgba(255,255,255,0.8)" />
-        {/* pin headers */}
-        {Array.from({ length: 10 }).map((_, i) => (
-          <rect key={i} x={56 + i * 9} y={116} width="6" height="12" fill="rgba(15,20,25,0.5)" />
-        ))}
-        {/* wheels */}
-        <circle cx="44"  cy="156" r="14" fill="rgba(15,20,25,0.75)" />
-        <circle cx="156" cy="156" r="14" fill="rgba(15,20,25,0.75)" />
-        {/* logo dot */}
-        <circle cx="100" cy="83" r="6" fill="#F39C32" />
-      </svg>
-    );
-  }
-  if (shape === "printer") {
-    return (
-      <svg viewBox="0 0 200 200" className="h-full w-full opacity-95">
-        {/* gantry frame */}
-        <rect x="48" y="40" width="104" height="100" rx="4" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" />
-        {/* x-rail */}
-        <rect x="48" y="70" width="104" height="6" fill="rgba(255,255,255,0.35)" />
-        {/* extruder */}
-        <rect x="92" y="62" width="16" height="22" rx="2" fill="rgba(15,20,25,0.7)" />
-        <rect x="98" y="84" width="4" height="8" fill="rgba(255,255,255,0.7)" />
-        {/* print bed */}
-        <rect x="40" y="148" width="120" height="14" rx="3" fill="rgba(255,255,255,0.55)" />
-        <rect x="44" y="152" width="112" height="6" fill="rgba(15,20,25,0.4)" />
-        {/* print object */}
-        <polygon points="100,128 90,148 110,148" fill="rgba(255,255,255,0.9)" />
-        {/* base */}
-        <rect x="36" y="162" width="128" height="10" rx="2" fill="rgba(15,20,25,0.5)" />
-      </svg>
-    );
-  }
-  // kit
-  return (
-    <svg viewBox="0 0 200 200" className="h-full w-full opacity-95">
-      {/* case lid open */}
-      <rect x="36" y="58" width="128" height="80" rx="8" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" />
-      <rect x="36" y="138" width="128" height="32" rx="6" fill="rgba(15,20,25,0.5)" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
-      {/* compartments */}
-      {[0, 1, 2, 3].map((i) => (
-        <rect key={i} x={42 + i * 30} y={144} width="22" height="20" rx="2" fill="rgba(255,255,255,0.18)" />
-      ))}
-      {/* circular sensor */}
-      <circle cx="100" cy="98" r="22" fill="rgba(15,20,25,0.45)" />
-      <circle cx="100" cy="98" r="12" fill="rgba(255,255,255,0.85)" />
-      <circle cx="100" cy="98" r="4"  fill="#F39C32" />
-      {/* corner chips */}
-      <rect x="52"  y="72" width="20" height="12" rx="2" fill="rgba(255,255,255,0.5)" />
-      <rect x="128" y="72" width="20" height="12" rx="2" fill="rgba(255,255,255,0.5)" />
-    </svg>
-  );
-}
+// Card entrance (scroll-reveal) + a springy lift/pop on hover. Variants keep the
+// two transitions independent — slow reveal, snappy hover.
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 26 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, delay: i * 0.1, ease: EASE },
+  }),
+  hover: {
+    y: -12,
+    scale: 1.02,
+    transition: { duration: 0.6, ease: EASE },
+  },
+};
 
 function ProductCard({ p, index }: { p: Product; index: number }) {
   const Icon = p.icon;
   return (
     <motion.article
-      initial={{ opacity: 0, y: 26 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      custom={index}
+      variants={cardVariants}
+      initial="hidden"
+      whileInView="show"
+      whileHover="hover"
       viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.7, delay: index * 0.1, ease: EASE }}
-      className="card-pop group relative flex flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[var(--bg-dark-elev)] shadow-strong"
+      className="group relative flex flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[var(--bg-dark-elev)] shadow-strong transition-[box-shadow,border-color] duration-300 hover:border-white/20 hover:shadow-[0_4px_12px_rgba(0,0,0,0.4),0_24px_50px_-12px_rgba(0,0,0,0.6)]"
     >
-      {/* Product tile — gradient + stylised geometry */}
-      <div className={`relative aspect-[4/3] ${p.tile} overflow-hidden`}>
-        {/* faint grid */}
-        <div className="absolute inset-0 opacity-[0.18] bg-grid-pattern" aria-hidden />
-        {/* the stylised product */}
-        <div className="absolute inset-0 grid place-items-center p-8">
-          <div className="h-full w-full max-w-[260px]">
-            <ProductShape shape={p.shape} />
-          </div>
-        </div>
+      {/* Product tile — real product photo, full-bleed */}
+      <div
+        className="relative aspect-[4/3] overflow-hidden"
+        style={{ backgroundColor: p.imageBg }}
+      >
+        <Image
+          src={p.image}
+          alt={`${p.name} — Skillship product`}
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="object-contain transition-transform duration-[1100ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform group-hover:scale-[1.06]"
+        />
         {/* award badge */}
-        <div className="absolute left-5 top-5 inline-flex items-center gap-1.5 rounded-full bg-black/30 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
+        <div className="absolute left-5 top-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
           <Award size={12} strokeWidth={2.2} />
           Award-winning
         </div>
         {/* product icon chip */}
-        <div className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-xl bg-white/15 text-white backdrop-blur-sm">
+        <div className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-xl bg-white/20 text-white backdrop-blur-sm ring-1 ring-white/20">
           <Icon size={20} strokeWidth={1.8} />
         </div>
       </div>
