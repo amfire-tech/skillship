@@ -102,7 +102,7 @@ export function Navbar() {
       ref={menuRef}
       className={`sticky top-0 z-50 w-full transition-[background-color,backdrop-filter,border-color,box-shadow] duration-300 ease-out-expo ${
         scrolled
-          ? "border-b border-[color:var(--border-subtle)] bg-[var(--background)]/80 backdrop-blur-xl backdrop-saturate-150 shadow-soft"
+          ? "border-b border-[color:var(--border-subtle)] bg-[color-mix(in_srgb,var(--background)_88%,transparent)] backdrop-blur-xl backdrop-saturate-150 shadow-soft"
           : overDark
             ? // Homepage top: sit on the hero's dark surface so the white nav
               // text is legible in BOTH light and dark mode (the sticky navbar
@@ -192,7 +192,7 @@ export function Navbar() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden border-t border-[color:var(--border-subtle)] bg-[var(--background)]/96 backdrop-blur-xl md:hidden"
+            className="overflow-hidden border-t border-[color:var(--border-subtle)] bg-[var(--background)] shadow-soft md:hidden"
           >
             <ul className="mx-auto max-w-[1280px] space-y-1 px-6 py-4" role="list">
               {NAV_LINKS.map((link) => (
