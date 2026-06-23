@@ -11,6 +11,7 @@ import Link from "next/link";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 type ContentType = "VIDEO" | "PDF" | "DOCUMENT";
 type FilterOption = "ALL" | ContentType;
@@ -97,6 +98,7 @@ function SkeletonCard() {
 }
 
 export default function StudentContentPage() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<ContentItem[] | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterOption>("ALL");
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function StudentContentPage() {
     setError(null);
     const token = await getToken();
     if (!token) {
-      setError("Session expired. Please log in again.");
+      setError(t("Session expired. Please log in again."));
       setItems([]);
       return;
     }
@@ -120,7 +122,7 @@ export default function StudentContentPage() {
       setError(err instanceof Error ? err.message : "Failed to load content library.");
       setItems([]);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     document.title = "Content Library — Skillship";
@@ -140,9 +142,9 @@ export default function StudentContentPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Content Library</h1>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">{t("Content Library")}</h1>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-          Browse learning materials uploaded by your teachers
+          {t("Browse learning materials uploaded by your teachers")}
         </p>
       </div>
 
@@ -166,7 +168,7 @@ export default function StudentContentPage() {
                 : "border border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/40 hover:text-[var(--foreground)]"
             }`}
           >
-            {f.label}
+            {t(f.label)}
           </button>
         ))}
       </div>
@@ -180,9 +182,9 @@ export default function StudentContentPage() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title={activeFilter === "ALL" ? "No content uploaded yet" : `No ${activeFilter.toLowerCase()} files`}
-          description={activeFilter === "ALL" ? "Your teachers haven't uploaded any materials yet — videos, PDFs and notes will appear here once they do." : "Try a different filter or check back soon."}
-          action={activeFilter !== "ALL" ? { label: "Show all", onClick: () => setActiveFilter("ALL") } : undefined}
+          title={activeFilter === "ALL" ? t("No content uploaded yet") : `No ${activeFilter.toLowerCase()} files`}
+          description={activeFilter === "ALL" ? t("Your teachers haven't uploaded any materials yet — videos, PDFs and notes will appear here once they do.") : t("Try a different filter or check back soon.")}
+          action={activeFilter !== "ALL" ? { label: t("Show all"), onClick: () => setActiveFilter("ALL") } : undefined}
           icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /></svg>}
         />
       ) : (
@@ -222,7 +224,7 @@ export default function StudentContentPage() {
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
                   </svg>
-                  View
+                  {t("View")}
                 </Link>
               </div>
             </div>

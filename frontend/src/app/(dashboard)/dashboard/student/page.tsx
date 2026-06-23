@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Quiz {
   id: string;
@@ -67,6 +68,7 @@ function initials(name: string) { return (name || "?").trim().split(/\s+/).slice
 
 export default function StudentMyLearning() {
   const { user, displayName } = useAuth();
+  const { t, lang } = useLanguage();
   const [upcoming, setUpcoming] = useState<Quiz[] | null>(null);
   const [recent, setRecent] = useState<Attempt[] | null>(null);
   const [summary, setSummary] = useState<AttemptSummary | null>(null);
@@ -127,7 +129,7 @@ export default function StudentMyLearning() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              Hello, {displayName ?? "Student"} <span aria-hidden="true">👋</span>
+              {t("Hello")}, {displayName ?? t("Student")} <span aria-hidden="true">👋</span>
             </h1>
             <p className="mt-1.5 text-sm text-white/85">
               {profile?.class_name ?? "—"}{profile?.roll_number ? ` · Roll No. ${profile.roll_number}` : ""}{profile?.school_name ? ` · ${profile.school_name}` : ""}
@@ -135,9 +137,9 @@ export default function StudentMyLearning() {
           </div>
           {profile?.rank_in_class != null && (
             <div className="text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80">Current Rank</p>
-              <p className="text-3xl font-bold md:text-4xl">{ordinal(profile.rank_in_class)}</p>
-              {profile.class_name && <p className="text-xs text-white/85">in {profile.class_name}</p>}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80">{t("Current Rank")}</p>
+              <p className="text-3xl font-bold md:text-4xl">{lang === "en" ? ordinal(profile.rank_in_class) : profile.rank_in_class}</p>
+              {profile.class_name && <p className="text-xs text-white/85">{t("in")} {profile.class_name}</p>}
             </div>
           )}
         </div>
@@ -145,10 +147,10 @@ export default function StudentMyLearning() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Quizzes Completed" value={summary?.completed ?? null} icon={<BookIcon />}      tone="blue"   delta={completedDelta} suffix="vs last month" />
-        <Stat label="Average Score"     value={summary?.avg_score == null ? "—" : `${summary.avg_score}%`} icon={<StarIcon />} tone="amber"  delta={scoreDelta} suffix="vs last month" />
-        <Stat label="Rank in Class"     value={profile?.rank_in_class != null ? `#${profile.rank_in_class}` : "—"} icon={<TargetIcon />} tone="violet" />
-        <Stat label="Certificates Earned" value={profile?.certificates_count ?? null} icon={<MedalIcon />} tone="teal" />
+        <Stat label={t("Quizzes Completed")} value={summary?.completed ?? null} icon={<BookIcon />}      tone="blue"   delta={completedDelta} suffix={t("vs last month")} />
+        <Stat label={t("Average Score")}     value={summary?.avg_score == null ? "—" : `${summary.avg_score}%`} icon={<StarIcon />} tone="amber"  delta={scoreDelta} suffix={t("vs last month")} />
+        <Stat label={t("Rank in Class")}     value={profile?.rank_in_class != null ? `#${profile.rank_in_class}` : "—"} icon={<TargetIcon />} tone="violet" />
+        <Stat label={t("Certificates Earned")} value={profile?.certificates_count ?? null} icon={<MedalIcon />} tone="teal" />
       </div>
 
       {/* AI Career Guide */}
@@ -160,22 +162,22 @@ export default function StudentMyLearning() {
           <div className="flex items-center gap-2">
             <span aria-hidden="true">✨</span>
             <span aria-hidden="true">🤖</span>
-            <h2 className="text-base font-bold tracking-tight text-primary">Your AI Career Guide</h2>
+            <h2 className="text-base font-bold tracking-tight text-primary">{t("Your AI Career Guide")}</h2>
           </div>
-          <span className="rounded-full border border-primary/30 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary dark:bg-[var(--background)]">AI Powered</span>
+          <span className="rounded-full border border-primary/30 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary dark:bg-[var(--background)]">{t("AI Powered")}</span>
         </div>
         <div className="grid gap-5 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-bold text-[var(--foreground)]">Recommended Career Path</p>
+              <p className="text-sm font-bold text-[var(--foreground)]">{t("Recommended Career Path")}</p>
               {profile?.career_match_pct != null && (
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">{profile.career_match_pct}% Match</span>
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">{profile.career_match_pct}% {t("Match")}</span>
               )}
             </div>
             <p className="mt-2 text-sm leading-relaxed text-[var(--muted-foreground)]">
               {profile?.career_path
-                ? <>Based on your quiz performance, interests, and learning patterns, our AI recommends a career in <strong className="text-primary">{profile.career_path}</strong>. Open the Career Pilot to explore the full roadmap.</>
-                : <>Take a few quizzes and complete your profile — the AI Career Pilot will suggest a personalised path based on your strengths.</>}
+                ? <>{t("career-intro")} <strong className="text-primary">{profile.career_path}</strong>{t("career-outro")}</>
+                : <>{t("career-empty")}</>}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {(profile?.career_path?.split(/\s*\/\s*|\s*,\s*/) ?? []).slice(0, 3).map((tag) => (
@@ -185,11 +187,11 @@ export default function StudentMyLearning() {
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
             <Link href="/dashboard/student/career" className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5">
-              Chat with Career AI
+              {t("Chat with Career AI")}
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
             </Link>
             <Link href="/dashboard/student/career?tab=roadmap" className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-white px-5 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5 dark:bg-[var(--background)]">
-              View My Roadmap
+              {t("View My Roadmap")}
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </Link>
           </div>
@@ -200,14 +202,14 @@ export default function StudentMyLearning() {
       <div className="grid gap-6 lg:grid-cols-2">
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="min-w-0 rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
-            <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Upcoming Quizzes</h2>
-            <Link href="/dashboard/student/quizzes" className="text-xs font-semibold text-primary hover:underline">View all →</Link>
+            <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Upcoming Quizzes")}</h2>
+            <Link href="/dashboard/student/quizzes" className="text-xs font-semibold text-primary hover:underline">{t("View all")} →</Link>
           </div>
           <div className="space-y-3 p-4">
             {upcoming === null
               ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-[var(--muted)]/40" />)
               : upcoming.length === 0
-                ? <div className="py-10 text-center text-sm text-[var(--muted-foreground)]">No upcoming quizzes — check back soon.</div>
+                ? <div className="py-10 text-center text-sm text-[var(--muted-foreground)]">{t("No upcoming quizzes — check back soon.")}</div>
                 : upcoming.map((q) => (
                   <div key={q.id} className="flex items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 px-4 py-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
@@ -216,12 +218,12 @@ export default function StudentMyLearning() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-[var(--foreground)]">{q.title}</p>
                       <p className="text-xs text-[var(--muted-foreground)]">
-                        {q.due_date ? fmtDate(q.due_date) : "Open now"}
-                        {q.duration_minutes ? ` · ${q.duration_minutes} min` : ""}
+                        {q.due_date ? fmtDate(q.due_date) : t("Open now")}
+                        {q.duration_minutes ? ` · ${q.duration_minutes} ${t("min")}` : ""}
                       </p>
                     </div>
                     <Link href={`/dashboard/student/quizzes/${q.id}`} className="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-gradient-to-r from-primary to-accent px-4 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5">
-                      Attempt Now
+                      {t("Attempt Now")}
                     </Link>
                   </div>
                 ))}
@@ -230,24 +232,24 @@ export default function StudentMyLearning() {
 
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.25 }} className="min-w-0 rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
-            <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Recent Results</h2>
-            <Link href="/dashboard/student/results" className="text-xs font-semibold text-primary hover:underline">View all →</Link>
+            <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Recent Results")}</h2>
+            <Link href="/dashboard/student/results" className="text-xs font-semibold text-primary hover:underline">{t("View all")} →</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                  <th className="px-6 py-3">Quiz Name</th>
-                  <th className="px-3 py-3">Score</th>
-                  <th className="px-3 py-3">Rank</th>
-                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">{t("Quiz Name")}</th>
+                  <th className="px-3 py-3">{t("Score")}</th>
+                  <th className="px-3 py-3">{t("Rank")}</th>
+                  <th className="px-6 py-3">{t("Date")}</th>
                 </tr>
               </thead>
               <tbody>
                 {recent === null
                   ? Array.from({ length: 4 }).map((_, i) => <tr key={i} className="border-b border-[var(--border)]/60 last:border-0">{Array.from({ length: 4 }).map((__, j) => <td key={j} className="px-3 py-3.5"><div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} /></td>)}</tr>)
                   : recent.length === 0
-                    ? <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[var(--muted-foreground)]">No results yet — start with an upcoming quiz.</td></tr>
+                    ? <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[var(--muted-foreground)]">{t("No results yet — start with an upcoming quiz.")}</td></tr>
                     : recent.map((a) => (
                       <tr key={a.id} className="border-b border-[var(--border)]/60 last:border-0 hover:bg-[var(--muted)]/30">
                         <td className="px-6 py-3.5 max-w-[200px]">

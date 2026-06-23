@@ -17,6 +17,7 @@ import { apiFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
 import { RoadmapView } from "@/components/career/RoadmapView";
 import type { CareerRec, RoadmapDetail, RoadmapFull, CareerProfile, Quota } from "@/components/career/types";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 type Tab = "roadmap" | "colleges";
 
@@ -37,6 +38,7 @@ const QUICK_PROMPTS = [
 export default function CareerPilotPage() {
   const { user, displayName } = useAuth();
   const toast = useToast();
+  const { t } = useLanguage();
 
   const [tab, setTab] = useState<Tab>("roadmap");
 
@@ -93,11 +95,11 @@ export default function CareerPilotPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white"><BotIcon /></div>
             <div>
               <p className="text-sm font-bold text-[var(--foreground)]">AI Career Counselor</p>
-              <p className="flex items-center gap-1 text-[11px] text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Online</p>
+              <p className="flex items-center gap-1 text-[11px] text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {t("Online")}</p>
             </div>
           </div>
           <span className="hidden items-center gap-1 rounded-full border border-[var(--border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--muted-foreground)] sm:inline-flex dark:bg-[var(--background)]" title="Ask in any language — I reply in the same one">
-            🌐 Any language
+            🌐 {t("Any language")}
           </span>
         </div>
 
@@ -114,7 +116,7 @@ export default function CareerPilotPage() {
             ))}
           </div>
           <form onSubmit={(e) => { e.preventDefault(); send(); }} className="relative">
-            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask me anything about your career…" className="h-11 w-full rounded-full border border-[var(--border)] bg-[var(--muted)]/40 pl-4 pr-12 text-sm outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 dark:focus:bg-[var(--background)]" />
+            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={t("Ask me anything about your career…")} className="h-11 w-full rounded-full border border-[var(--border)] bg-[var(--muted)]/40 pl-4 pr-12 text-sm outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 dark:focus:bg-[var(--background)]" />
             <button type="submit" disabled={!input.trim() || thinking} aria-label="Send" className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-primary to-accent text-white disabled:opacity-50">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
             </button>
@@ -125,8 +127,8 @@ export default function CareerPilotPage() {
       {/* ── Build & save ── (first on mobile) */}
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="order-1 flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm lg:order-2 dark:bg-[var(--background)]">
         <nav className="flex border-b border-[var(--border)] px-2 pt-2" role="tablist">
-          {([{ k: "roadmap", label: "Build a Roadmap" }, { k: "colleges", label: "College Finder" }] as { k: Tab; label: string }[]).map((t) => (
-            <button key={t.k} role="tab" aria-selected={tab === t.k} onClick={() => setTab(t.k)} className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${tab === t.k ? "border-b-2 border-primary text-primary" : "border-b-2 border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>{t.label}</button>
+          {([{ k: "roadmap", label: "Build a Roadmap" }, { k: "colleges", label: "College Finder" }] as { k: Tab; label: string }[]).map((tabDef) => (
+            <button key={tabDef.k} role="tab" aria-selected={tab === tabDef.k} onClick={() => setTab(tabDef.k)} className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${tab === tabDef.k ? "border-b-2 border-primary text-primary" : "border-b-2 border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>{t(tabDef.label)}</button>
           ))}
         </nav>
 
@@ -145,6 +147,7 @@ export default function CareerPilotPage() {
 
 function BuildRoadmap({ studentName }: { studentName: string }) {
   const toast = useToast();
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<CareerProfile | null>(null);
@@ -202,10 +205,10 @@ function BuildRoadmap({ studentName }: { studentName: string }) {
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4" role="tabpanel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Build a Career Roadmap</h3>
-          {profile?.career_slug && <p className="mt-0.5 text-sm text-[var(--muted-foreground)]">Current objective: <span className="font-semibold text-primary">{profile.career_title}</span></p>}
+          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Build a Career Roadmap")}</h3>
+          {profile?.career_slug && <p className="mt-0.5 text-sm text-[var(--muted-foreground)]">{t("Current objective:")} <span className="font-semibold text-primary">{profile.career_title}</span></p>}
         </div>
-        {roadmapQuota && <span className="text-[11px] text-[var(--muted-foreground)]">Roadmaps: <b className="text-[var(--foreground)]">{roadmapQuota.used}/{roadmapQuota.limit}</b> this month</span>}
+        {roadmapQuota && <span className="text-[11px] text-[var(--muted-foreground)]">{t("Roadmaps:")} <b className="text-[var(--foreground)]">{roadmapQuota.used}/{roadmapQuota.limit}</b> {t("this month")}</span>}
       </div>
 
       {openRoadmap ? (
@@ -216,12 +219,12 @@ function BuildRoadmap({ studentName }: { studentName: string }) {
             <>
               {savedId === openRoadmap.roadmap_id ? (
                 <>
-                  <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-emerald-100 px-4 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">📌 Saved</span>
-                  <Link href="/dashboard/student/roadmaps" className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white">Go to Saved Roadmaps →</Link>
+                  <span className="inline-flex h-10 items-center gap-1.5 rounded-full bg-emerald-100 px-4 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">📌 {t("Saved")}</span>
+                  <Link href="/dashboard/student/roadmaps" className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white">{t("Go to Saved Roadmaps")} →</Link>
                 </>
               ) : (
                 <button onClick={saveRoadmap} disabled={busy} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white disabled:opacity-50">
-                  {busy ? "Saving…" : "Save roadmap"}
+                  {busy ? t("Saving…") : t("Save roadmap")}
                 </button>
               )}
             </>
@@ -230,7 +233,7 @@ function BuildRoadmap({ studentName }: { studentName: string }) {
       ) : (
         <>
           {needsClass && (
-            <div className="rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">Add your class in your profile so we can tailor the roadmap to your grade.</div>
+            <div className="rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">{t("Add your class in your profile so we can tailor the roadmap to your grade.")}</div>
           )}
 
           <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/20 p-4">
@@ -255,13 +258,13 @@ function BuildRoadmap({ studentName }: { studentName: string }) {
                   {r.reason && <p className="mt-1 text-xs text-[var(--muted-foreground)]">{r.reason}</p>}
                   {r.blurb && <p className="mt-1 text-xs text-[var(--muted-foreground)]">{r.blurb}</p>}
                   <button onClick={() => generateRoadmap(r.slug)} disabled={!!genCareer || roadmapExhausted || needsClass} className="mt-3 inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-                    {genCareer === r.slug ? "Building roadmap…" : "Build roadmap"}
+                    {genCareer === r.slug ? t("Building roadmap…") : t("Build roadmap")}
                   </button>
                 </div>
               ))}
             </div>
           )}
-          {roadmapExhausted && <p className="text-center text-xs text-[var(--muted-foreground)]">You've used all your roadmaps for this month.</p>}
+          {roadmapExhausted && <p className="text-center text-xs text-[var(--muted-foreground)]">{t("You've used all your roadmaps for this month.")}</p>}
         </>
       )}
     </motion.div>
@@ -382,6 +385,7 @@ interface AiCollegeResponse { state: string; city: string; specialization: strin
 
 function CollegeFinderTab() {
   const toast = useToast();
+  const { t } = useLanguage();
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [spec, setSpec] = useState("");
@@ -406,7 +410,7 @@ function CollegeFinderTab() {
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4" role="tabpanel">
       <div>
-        <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">College Finder</h3>
+        <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("College Finder")}</h3>
         <p className="mt-1 text-xs text-[var(--muted-foreground)]">AI picks the best colleges based on NIRF rankings for the state, city, and specialization you choose.</p>
       </div>
 
@@ -429,7 +433,7 @@ function CollegeFinderTab() {
             {SPECIALIZATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
-        <button type="submit" disabled={!canSubmit} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Searching…" : "Find Colleges"}</button>
+        <button type="submit" disabled={!canSubmit} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? t("Searching…") : t("Find Colleges")}</button>
       </form>
 
       {busy && <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-[var(--muted)]/40" />)}</div>}

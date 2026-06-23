@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { LanguageProvider } from "@/providers/LanguageProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import { OrganizationJsonLd } from "@/components/seo/OrganizationJsonLd";
 import { siteConfig } from "@/config/site";
@@ -64,7 +65,9 @@ export default function RootLayout({
         </a>
         <QueryProvider>
           <ThemeProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <LanguageProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </LanguageProvider>
           </ThemeProvider>
         </QueryProvider>
       </body>

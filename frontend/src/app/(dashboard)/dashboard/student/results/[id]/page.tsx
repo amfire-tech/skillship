@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { API_BASE, getToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
 import { SkillshipLockup } from "@/components/brand/SkillshipMark";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Attempt {
   id: string;
@@ -62,6 +63,7 @@ function fmtDate(iso?: string) { if (!iso) return "—"; try { return new Date(i
 export default function ResultDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
+  const { t } = useLanguage();
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -161,25 +163,25 @@ export default function ResultDetailPage() {
       {/* Brand letterhead — official Skillship logo + wordmark (from the brand
           PDF). Marks this as a shareable, certificate-grade result page. */}
       <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
-        <SkillshipLockup badgeSize={40} wordmarkSize="lg" subLabel="Quiz Result" />
+        <SkillshipLockup badgeSize={40} wordmarkSize="lg" subLabel={t("Quiz Result")} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/dashboard/student/results" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-          Back to Dashboard
+          {t("Back to Dashboard")}
         </Link>
         <div className="flex items-center gap-2">
           {attempt?.certificate_available && (
             <button type="button" onClick={shareCertificate} disabled={sharing} className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-sm disabled:opacity-60">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /><line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /></svg>
-              {sharing ? "Preparing…" : "Share Certificate"}
+              {sharing ? t("Preparing…") : t("Share Certificate")}
             </button>
           )}
           {attempt?.quiz_id && (
             <Link href={`/dashboard/student/quizzes/${attempt.quiz_id}`} className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--foreground)] hover:border-primary/30 hover:text-primary dark:bg-[var(--background)]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-              Retry Quiz
+              {t("Retry Quiz")}
             </Link>
           )}
         </div>
@@ -195,11 +197,11 @@ export default function ResultDetailPage() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 p-6 text-white shadow-[0_30px_60px_-20px_rgba(245,158,11,0.4)] md:p-7">
           <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-            Awaiting teacher review
+            {t("Awaiting teacher review")}
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">&ldquo;{attempt?.quiz_title ?? "Quiz"}&rdquo; submitted</h1>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">&ldquo;{attempt?.quiz_title ?? t("Quiz")}&rdquo; {t("submitted")}</h1>
           <p className="mt-1.5 text-sm text-white/90">
-            Your written answers are being graded by your teacher. Your marks will appear here once every answer has been reviewed.
+            {t("Your written answers are being graded by your teacher. Your marks will appear here once every answer has been reviewed.")}
           </p>
         </motion.div>
       ) : (
@@ -208,11 +210,11 @@ export default function ResultDetailPage() {
             <div>
               <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="9 12 11 14 15 10" /></svg>
-                {passed ? "Quiz Passed!" : "Keep Going"}
+                {passed ? t("Quiz Passed!") : t("Keep Going")}
               </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">Result for &ldquo;{attempt?.quiz_title ?? "Quiz"}&rdquo;</h1>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">{t("Result for")} &ldquo;{attempt?.quiz_title ?? t("Quiz")}&rdquo;</h1>
               <p className="mt-1.5 text-sm text-white/85">
-                Attempted on {fmtDate(attempt?.submitted_at ?? attempt?.attempted_at ?? attempt?.created_at)}
+                {t("Attempted on")} {fmtDate(attempt?.submitted_at ?? attempt?.attempted_at ?? attempt?.created_at)}
                 {attempt?.class_name ? ` · ${attempt.class_name}` : ""}
                 {attempt?.school_name ? ` · ${attempt.school_name}` : ""}
               </p>
@@ -221,12 +223,12 @@ export default function ResultDetailPage() {
               {typeof attempt?.points_earned === "number" && typeof attempt?.points_total === "number" ? (
                 <>
                   <p className="text-4xl font-bold md:text-5xl">{attempt.points_earned}<span className="text-2xl">/{attempt.points_total}</span></p>
-                  <p className="mt-0.5 text-sm text-white/85">marks{score != null ? ` · ${score}%` : ""}</p>
+                  <p className="mt-0.5 text-sm text-white/85">{t("marks")}{score != null ? ` · ${score}%` : ""}</p>
                 </>
               ) : (
                 <p className="text-4xl font-bold md:text-5xl">{score ?? "—"}/100</p>
               )}
-              {attempt?.rank && <p className="mt-1 text-sm text-white/85">Rank: {ordinal(attempt.rank)}{attempt.total_in_class ? ` of ${attempt.total_in_class}` : ""}</p>}
+              {attempt?.rank && <p className="mt-1 text-sm text-white/85">{t("Rank:")} {ordinal(attempt.rank)}{attempt.total_in_class ? ` ${t("of")} ${attempt.total_in_class}` : ""}</p>}
             </div>
           </div>
         </motion.div>
@@ -236,16 +238,16 @@ export default function ResultDetailPage() {
       {!attempt?.awaiting_review && (
       <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_minmax(0,2fr)]">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
-          <h2 className="text-center text-base font-bold tracking-tight text-[var(--foreground)]">Score Breakdown</h2>
+          <h2 className="text-center text-base font-bold tracking-tight text-[var(--foreground)]">{t("Score Breakdown")}</h2>
           <div className="mt-5 flex justify-center">
             <Donut percent={score ?? 0} passed={passed} loading={loading} />
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-            <Stat n={correct} label="Correct" tone="text-emerald-600" loading={loading} />
-            <Stat n={wrong}   label="Wrong"   tone="text-red-500"     loading={loading} />
-            <Stat n={skipped} label="Skipped" tone="text-[var(--muted-foreground)]" loading={loading} />
+            <Stat n={correct} label={t("Correct")} tone="text-emerald-600" loading={loading} />
+            <Stat n={wrong}   label={t("Wrong")}   tone="text-red-500"     loading={loading} />
+            <Stat n={skipped} label={t("Skipped")} tone="text-[var(--muted-foreground)]" loading={loading} />
           </div>
-          {total > 0 && <p className="mt-3 text-center text-xs text-[var(--muted-foreground)]">{total} questions total</p>}
+          {total > 0 && <p className="mt-3 text-center text-xs text-[var(--muted-foreground)]">{total} {t("questions total")}</p>}
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.15 }} className="rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-white to-accent/5 dark:from-primary/10 dark:via-[var(--background)] dark:to-accent/10">
@@ -253,9 +255,9 @@ export default function ResultDetailPage() {
             <div className="flex items-center gap-2">
               <span aria-hidden="true">✨</span>
               <span aria-hidden="true">🤖</span>
-              <h2 className="text-base font-bold tracking-tight text-primary">AI Analysis of Your Performance</h2>
+              <h2 className="text-base font-bold tracking-tight text-primary">{t("AI Analysis of Your Performance")}</h2>
             </div>
-            <span className="rounded-full border border-primary/30 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary dark:bg-[var(--background)]">AI Powered</span>
+            <span className="rounded-full border border-primary/30 bg-white px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary dark:bg-[var(--background)]">{t("AI Powered")}</span>
           </div>
           <div className="space-y-4 p-6">
             {loading ? (
@@ -298,13 +300,13 @@ export default function ResultDetailPage() {
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="9" r="6" /><path d="m9 14 -2 7 5 -3 5 3 -2 -7" /></svg>
                       </span>
                       <div>
-                        <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Certificate Earned!</p>
+                        <p className="text-sm font-bold text-amber-900 dark:text-amber-200">{t("Certificate Earned!")}</p>
                         <p className="text-xs text-amber-800/80 dark:text-amber-200/80">You&apos;ve qualified for the {attempt?.quiz_title ?? "quiz"} completion certificate.</p>
                       </div>
                     </div>
                     <button type="button" onClick={downloadCertificate} disabled={downloading} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-amber-500 px-4 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-60">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-                      {downloading ? "Preparing…" : "Download"}
+                      {downloading ? t("Preparing…") : t("Download")}
                     </button>
                   </div>
                 )}
@@ -319,14 +321,14 @@ export default function ResultDetailPage() {
       {!attempt?.awaiting_review && (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
         <div className="border-b border-[var(--border)] px-6 py-5">
-          <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Question Review</h2>
-          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">See correct answers and explanations</p>
+          <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Question Review")}</h2>
+          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{t("See correct answers and explanations")}</p>
         </div>
         <div className="space-y-4 p-6">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-[var(--muted)]/40" />)
           ) : (attempt?.questions?.length ?? 0) === 0 ? (
-            <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">Question-level review not available for this attempt.</p>
+            <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">{t("Question-level review not available for this attempt.")}</p>
           ) : (
             (attempt?.questions ?? []).map((q, i) => {
               const isShort = q.type === "SHORT_ANSWER";
@@ -341,19 +343,19 @@ export default function ResultDetailPage() {
                     </span>
                     <p className="flex-1 text-sm font-semibold text-[var(--foreground)]">Q{i + 1}. {q.text ?? "—"}</p>
                     <span className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">
-                      {q.points_awarded ?? 0}/{q.points ?? 1} marks
+                      {q.points_awarded ?? 0}/{q.points ?? 1} {t("marks")}
                     </span>
                   </div>
                   <div className="mt-3 space-y-2 pl-10">
                     {isShort ? (
                       <>
                         <div className="rounded-lg bg-[var(--muted)]/50 px-3 py-2 text-sm">
-                          <span className="font-semibold text-[var(--foreground)]">Your answer:</span>{" "}
-                          <span className="text-[var(--foreground)]">{q.student_answer_text || "Not answered"}</span>
+                          <span className="font-semibold text-[var(--foreground)]">{t("Your answer:")}</span>{" "}
+                          <span className="text-[var(--foreground)]">{q.student_answer_text || t("Not answered")}</span>
                         </div>
                         {q.expected_answer && (
                           <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm dark:bg-emerald-500/10">
-                            <span className="font-semibold text-[var(--foreground)]">Model answer:</span>{" "}
+                            <span className="font-semibold text-[var(--foreground)]">{t("Model answer:")}</span>{" "}
                             <span className="text-emerald-700 dark:text-emerald-300">{q.expected_answer}</span>
                           </div>
                         )}
@@ -373,9 +375,9 @@ export default function ResultDetailPage() {
                           >
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-[10px] font-bold">{String(o.id).toUpperCase()}</span>
                             <span className="flex-1">{o.text}</span>
-                            {o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">✓ Correct</span>}
-                            {o.selected && !o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">Your answer</span>}
-                            {o.selected && o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">Your answer</span>}
+                            {o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">✓ {t("Correct")}</span>}
+                            {o.selected && !o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">{t("Your answer")}</span>}
+                            {o.selected && o.is_correct && <span className="text-[10px] font-semibold uppercase tracking-wide">{t("Your answer")}</span>}
                           </li>
                         ))}
                       </ul>
@@ -393,6 +395,7 @@ export default function ResultDetailPage() {
 }
 
 function Donut({ percent, passed, loading }: { percent: number; passed: boolean; loading: boolean }) {
+  const { t } = useLanguage();
   const r = 60, c = 2 * Math.PI * r;
   const filled = Math.max(0, Math.min(100, percent));
   const off = c - (filled / 100) * c;
@@ -408,7 +411,7 @@ function Donut({ percent, passed, loading }: { percent: number; passed: boolean;
           : (
             <>
               <p className="text-3xl font-bold text-[var(--foreground)]">{percent}<span className="text-base">%</span></p>
-              <p className={`text-xs font-bold uppercase tracking-wide ${passed ? "text-emerald-600" : "text-amber-600"}`}>{passed ? "Pass" : "Try Again"}</p>
+              <p className={`text-xs font-bold uppercase tracking-wide ${passed ? "text-emerald-600" : "text-amber-600"}`}>{passed ? t("Pass") : t("Try Again")}</p>
             </>
           )}
       </div>

@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { apiFetch } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Attempt {
   id: string;
@@ -43,6 +44,7 @@ function ordinal(n: number) { const s = ["th","st","nd","rd"], v = n % 100; retu
 function fmtDate(iso?: string) { if (!iso) return "—"; try { return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); } catch { return iso; } }
 
 export default function MyResultsPage() {
+  const { t } = useLanguage();
   const [attempts, setAttempts] = useState<Attempt[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"ALL" | "PASS" | "FAIL">("ALL");
@@ -85,8 +87,8 @@ export default function MyResultsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">My Results</h1>
-        <p className="mt-1 text-sm text-[var(--muted-foreground)]">{attempts === null ? "Loading…" : `${attempts.length} quiz attempt${attempts.length === 1 ? "" : "s"}`}</p>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{t("My Results")}</h1>
+        <p className="mt-1 text-sm text-[var(--muted-foreground)]">{attempts === null ? t("Loading…") : `${attempts.length} ${attempts.length === 1 ? t("quiz attempt") : t("quiz attempts")}`}</p>
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -96,12 +98,12 @@ export default function MyResultsPage() {
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
           </span>
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by quiz title or subject…" className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 pl-9 pr-3 text-sm outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 dark:focus:bg-[var(--background)]" />
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search by quiz title or subject…")} className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 pl-9 pr-3 text-sm outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 dark:focus:bg-[var(--background)]" />
         </div>
         <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 p-1">
           {(["ALL", "PASS", "FAIL"] as const).map((f) => (
             <button key={f} type="button" onClick={() => setFilter(f)} className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors ${filter === f ? "bg-white text-[var(--foreground)] shadow-sm dark:bg-[var(--background)]" : "text-[var(--muted-foreground)]"}`}>
-              {f === "ALL" ? "All" : f === "PASS" ? "Passed" : "Needs review"}
+              {f === "ALL" ? t("All") : f === "PASS" ? t("Passed") : t("Needs review")}
             </button>
           ))}
         </div>
@@ -112,12 +114,12 @@ export default function MyResultsPage() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                <th className="px-6 py-3">Quiz</th>
-                <th className="px-6 py-3">Score</th>
-                <th className="px-6 py-3">Correct / Wrong</th>
-                <th className="px-6 py-3">Rank</th>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3 text-right">Action</th>
+                <th className="px-6 py-3">{t("Quiz")}</th>
+                <th className="px-6 py-3">{t("Score")}</th>
+                <th className="px-6 py-3">{t("Correct / Wrong")}</th>
+                <th className="px-6 py-3">{t("Rank")}</th>
+                <th className="px-6 py-3">{t("Date")}</th>
+                <th className="px-6 py-3 text-right">{t("Action")}</th>
               </tr>
             </thead>
             <tbody>
@@ -130,9 +132,9 @@ export default function MyResultsPage() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-8">
                   <EmptyState
-                    title={attempts?.length === 0 ? "No attempts yet" : "No results match"}
-                    description={attempts?.length === 0 ? "Start with a quiz from the Upcoming Quizzes list — your results will appear here." : "Try clearing the search or switching the pass/fail filter."}
-                    action={attempts?.length === 0 ? { label: "Browse quizzes", href: "/dashboard/student/quizzes" } : undefined}
+                    title={attempts?.length === 0 ? t("No attempts yet") : t("No results match")}
+                    description={attempts?.length === 0 ? t("Start with a quiz from the Upcoming Quizzes list — your results will appear here.") : t("Try clearing the search or switching the pass/fail filter.")}
+                    action={attempts?.length === 0 ? { label: t("Browse quizzes"), href: "/dashboard/student/quizzes" } : undefined}
                     icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /></svg>}
                   />
                 </td></tr>
@@ -152,7 +154,7 @@ export default function MyResultsPage() {
                         {a.awaiting_review ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-                            Pending review
+                            {t("Pending review")}
                           </span>
                         ) : (
                           <div className="flex items-center gap-2">
@@ -161,7 +163,7 @@ export default function MyResultsPage() {
                                 ? `${a.points_earned} / ${a.points_total}`
                                 : (typeof score === "number" ? `${Math.round(Number(score))}%` : "—")}
                             </span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${passed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"}`}>{passed ? "PASS" : "FAIL"}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${passed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"}`}>{passed ? t("Pass") : t("Try Again")}</span>
                           </div>
                         )}
                       </td>
@@ -169,12 +171,12 @@ export default function MyResultsPage() {
                         <span className="font-semibold text-emerald-600">{correct ?? "—"}</span>
                         <span className="mx-1">·</span>
                         <span className="font-semibold text-red-500">{wrong ?? "—"}</span>
-                        {typeof a.skipped === "number" && <><span className="mx-1">·</span><span className="font-semibold text-[var(--muted-foreground)]">{a.skipped} skipped</span></>}
+                        {typeof a.skipped === "number" && <><span className="mx-1">·</span><span className="font-semibold text-[var(--muted-foreground)]">{a.skipped} {t("skipped")}</span></>}
                       </td>
-                      <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{a.rank ? `${ordinal(a.rank)}${a.total_in_class ? ` of ${a.total_in_class}` : ""}` : "—"}</td>
+                      <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{a.rank ? `${ordinal(a.rank)}${a.total_in_class ? ` ${t("of")} ${a.total_in_class}` : ""}` : "—"}</td>
                       <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{fmtDate(a.submitted_at ?? a.attempted_at ?? a.created_at)}</td>
                       <td className="px-6 py-3.5 text-right">
-                        <Link href={`/dashboard/student/results/${a.id}`} className="text-xs font-semibold text-primary hover:underline">View →</Link>
+                        <Link href={`/dashboard/student/results/${a.id}`} className="text-xs font-semibold text-primary hover:underline">{t("View")} →</Link>
                       </td>
                     </tr>
                   );

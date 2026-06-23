@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Attempt {
   id: string;
@@ -31,6 +32,7 @@ function attemptDate(a: Attempt): string | undefined {
 }
 
 export default function ProgressAnalyticsPage() {
+  const { t } = useLanguage();
   const [attempts, setAttempts] = useState<Attempt[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<"3M" | "6M" | "12M">("6M");
@@ -113,13 +115,13 @@ export default function ProgressAnalyticsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Progress Analytics</h1>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Personal score trend &amp; subject strengths</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{t("Progress Analytics")}</h1>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{t("Personal score trend & subject strengths")}</p>
         </div>
         <div className="flex gap-1 rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 p-1">
           {(["3M", "6M", "12M"] as const).map((r) => (
             <button key={r} type="button" onClick={() => setRange(r)} className={`rounded-xl px-4 py-2 text-xs font-medium transition-all ${range === r ? "bg-white shadow-sm text-[var(--foreground)] dark:bg-[var(--background)]" : "text-[var(--muted-foreground)]"}`}>
-              {r === "3M" ? "Last 3 Months" : r === "6M" ? "Last 6 Months" : "Last 12 Months"}
+              {r === "3M" ? t("Last 3 Months") : r === "6M" ? t("Last 6 Months") : t("Last 12 Months")}
             </button>
           ))}
         </div>
@@ -129,29 +131,29 @@ export default function ProgressAnalyticsPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card label="Quizzes Attempted" value={kpi.count} />
-        <Card label="Average Score"     value={kpi.avg === null ? null : `${kpi.avg}%`} />
-        <Card label="Personal Best"     value={kpi.best === null ? null : `${kpi.best}%`} tone="emerald" />
-        <Card label="Daily Streak"      value={kpi.streak === null ? null : `${kpi.streak} day${kpi.streak === 1 ? "" : "s"}`} tone="amber" />
+        <Card label={t("Quizzes Attempted")} value={kpi.count} />
+        <Card label={t("Average Score")}     value={kpi.avg === null ? null : `${kpi.avg}%`} />
+        <Card label={t("Personal Best")}     value={kpi.best === null ? null : `${kpi.best}%`} tone="emerald" />
+        <Card label={t("Daily Streak")}      value={kpi.streak === null ? null : `${kpi.streak} ${kpi.streak === 1 ? t("day") : t("days")}`} tone="amber" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
-          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Score Trend</h3>
-          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">Monthly average (%)</p>
+          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Score Trend")}</h3>
+          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{t("Monthly average (%)")}</p>
           <div className="mt-5 h-56">
             {trend === null ? <div className="h-full w-full animate-pulse rounded-xl bg-[var(--muted)]" />
-              : trend.length < 2 ? <div className="flex h-full items-center justify-center text-xs text-[var(--muted-foreground)]">Take more quizzes to see your trend.</div>
+              : trend.length < 2 ? <div className="flex h-full items-center justify-center text-xs text-[var(--muted-foreground)]">{t("Take more quizzes to see your trend.")}</div>
               : <LineChart data={trend} />}
           </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.05 }} className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
-          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Subject Strength</h3>
-          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">Where you score highest</p>
+          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Subject Strength")}</h3>
+          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{t("Where you score highest")}</p>
           <div className="mt-5 space-y-3">
             {subjects === null ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-4 animate-pulse rounded bg-[var(--muted)]" />)
-              : subjects.length === 0 ? <p className="py-6 text-center text-xs text-[var(--muted-foreground)]">No scored quizzes in this range.</p>
+              : subjects.length === 0 ? <p className="py-6 text-center text-xs text-[var(--muted-foreground)]">{t("No scored quizzes in this range.")}</p>
               : subjects.map((s) => (
                 <div key={s.subject} className="grid grid-cols-[110px_1fr_44px] items-center gap-3 text-xs">
                   <span className="font-medium text-[var(--muted-foreground)]">{s.subject}</span>
@@ -165,16 +167,16 @@ export default function ProgressAnalyticsPage() {
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
         <div className="border-b border-[var(--border)] px-6 py-5">
-          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Recent Attempts</h3>
+          <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{t("Recent Attempts")}</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                <th className="px-6 py-3">Quiz</th>
-                <th className="px-6 py-3">Subject</th>
-                <th className="px-6 py-3">Score</th>
-                <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">{t("Quiz")}</th>
+                <th className="px-6 py-3">{t("Subject")}</th>
+                <th className="px-6 py-3">{t("Score")}</th>
+                <th className="px-6 py-3">{t("Date")}</th>
               </tr>
             </thead>
             <tbody>
@@ -183,9 +185,9 @@ export default function ProgressAnalyticsPage() {
               )) : filtered.length === 0 ? (
                 <tr><td colSpan={4} className="px-6 py-8">
                   <EmptyState
-                    title="No attempts in this range"
-                    description="Try widening the time range or take a quiz from your assignments."
-                    action={{ label: "Browse quizzes", href: "/dashboard/student/quizzes" }}
+                    title={t("No attempts in this range")}
+                    description={t("Try widening the time range or take a quiz from your assignments.")}
+                    action={{ label: t("Browse quizzes"), href: "/dashboard/student/quizzes" }}
                     icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>}
                   />
                 </td></tr>

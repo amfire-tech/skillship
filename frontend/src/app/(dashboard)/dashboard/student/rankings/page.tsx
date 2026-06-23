@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface RankRow {
   id: string;
@@ -33,6 +34,7 @@ function initials(name: string) { return (name || "?").trim().split(/\s+/).slice
 
 export default function RankingsPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [rows, setRows] = useState<RankRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("CLASS");
@@ -72,13 +74,13 @@ export default function RankingsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Rankings</h1>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{scope === "CLASS" ? "Top students in your class" : "Top students across your school"}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{t("Rankings")}</h1>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{scope === "CLASS" ? t("Top students in your class") : t("Top students across your school")}</p>
         </div>
         <div className="flex gap-1 rounded-2xl border border-[var(--border)] bg-[var(--muted)]/40 p-1">
           {(["CLASS", "SCHOOL"] as Scope[]).map((s) => (
             <button key={s} type="button" onClick={() => setScope(s)} className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${scope === s ? "bg-white shadow-sm text-[var(--foreground)] dark:bg-[var(--background)]" : "text-[var(--muted-foreground)]"}`}>
-              {s === "CLASS" ? "My Class" : "My School"}
+              {s === "CLASS" ? t("My Class") : t("My School")}
             </button>
           ))}
         </div>
@@ -95,14 +97,14 @@ export default function RankingsPage() {
                 {ordinal(myRank.rank ?? 0)}
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/80">Your position</p>
-                <p className="text-lg font-bold">{myRank.full_name ?? (`${myRank.first_name ?? ""} ${myRank.last_name ?? ""}`.trim() || "You")}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/80">{t("Your position")}</p>
+                <p className="text-lg font-bold">{myRank.full_name ?? (`${myRank.first_name ?? ""} ${myRank.last_name ?? ""}`.trim() || t("You"))}</p>
                 <p className="text-xs text-white/85">{myRank.class_name ?? myRank.grade ?? ""}{myRank.section ? ` · ${myRank.section}` : ""}</p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold">{typeof myRank.avg_score === "number" ? `${Math.round(myRank.avg_score)}%` : "—"}</p>
-              <p className="text-xs text-white/85">{myRank.quizzes_attempted ?? "—"} quizzes</p>
+              <p className="text-xs text-white/85">{myRank.quizzes_attempted ?? "—"} {t("quizzes")}</p>
             </div>
           </div>
         </motion.div>
@@ -114,11 +116,11 @@ export default function RankingsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                <th className="px-6 py-3">Rank</th>
-                <th className="px-6 py-3">Student</th>
-                <th className="px-6 py-3">Class</th>
-                <th className="px-6 py-3">Quizzes</th>
-                <th className="px-6 py-3">Avg Score</th>
+                <th className="px-6 py-3">{t("Rank")}</th>
+                <th className="px-6 py-3">{t("Student")}</th>
+                <th className="px-6 py-3">{t("Class")}</th>
+                <th className="px-6 py-3">{t("Quizzes")}</th>
+                <th className="px-6 py-3">{t("Avg Score")}</th>
               </tr>
             </thead>
             <tbody>
@@ -131,9 +133,9 @@ export default function RankingsPage() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-8">
                   <EmptyState
-                    title="No rankings yet"
-                    description="Once classmates start attempting quizzes, the leaderboard will populate here."
-                    action={{ label: "Browse quizzes", href: "/dashboard/student/quizzes" }}
+                    title={t("No rankings yet")}
+                    description={t("Once classmates start attempting quizzes, the leaderboard will populate here.")}
+                    action={{ label: t("Browse quizzes"), href: "/dashboard/student/quizzes" }}
                     icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2" /><path d="M8 21h8" /><path d="M12 17v4" /><path d="M7 4h10v5a5 5 0 0 1-10 0z" /></svg>}
                   />
                 </td></tr>
@@ -150,7 +152,7 @@ export default function RankingsPage() {
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">{initials(fullName)}</div>
                           <div>
-                            <p className="font-medium text-[var(--foreground)]">{fullName} {isMe && <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">You</span>}</p>
+                            <p className="font-medium text-[var(--foreground)]">{fullName} {isMe && <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">{t("You")}</span>}</p>
                           </div>
                         </div>
                       </td>

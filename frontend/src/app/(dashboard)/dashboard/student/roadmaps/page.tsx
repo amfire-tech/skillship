@@ -16,10 +16,12 @@ import { apiFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
 import { RoadmapView } from "@/components/career/RoadmapView";
 import type { CareerProfile, Quota, RoadmapDetail, SavedRoadmap } from "@/components/career/types";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 export default function SavedRoadmapsPage() {
   const toast = useToast();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState<SavedRoadmap[] | null>(null);
@@ -60,7 +62,7 @@ export default function SavedRoadmapsPage() {
       const c = await apiFetch(`/career/checklist/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const cd = await c.json().catch(() => ({}));
       if (!c.ok) { toast(cd?.detail ?? `Couldn't create plan (${c.status})`, "error"); return; }
-      toast("Your 30-day plan is ready 🚀", "success");
+      toast(t("Your 30-day plan is ready 🚀"), "success");
       router.push("/dashboard/student/planner");
     } catch { toast("Network error", "error"); } finally { setBusy(false); }
   }
@@ -71,10 +73,10 @@ export default function SavedRoadmapsPage() {
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="mx-auto max-w-3xl space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[var(--foreground)]">Saved Roadmaps</h1>
-          <p className="mt-0.5 text-sm text-[var(--muted-foreground)]">Your saved career roadmaps. Open one to create your 30-day daily plan.</p>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--foreground)]">{t("Saved Roadmaps")}</h1>
+          <p className="mt-0.5 text-sm text-[var(--muted-foreground)]">{t("Your saved career roadmaps. Open one to create your 30-day daily plan.")}</p>
         </div>
-        {checklistQuota && <span className="text-[11px] text-[var(--muted-foreground)]">Plans: <b className="text-[var(--foreground)]">{checklistQuota.used}/{checklistQuota.limit}</b> this month</span>}
+        {checklistQuota && <span className="text-[11px] text-[var(--muted-foreground)]">{t("Plans:")} <b className="text-[var(--foreground)]">{checklistQuota.used}/{checklistQuota.limit}</b> {t("this month")}</span>}
       </div>
 
       {loading ? (
@@ -86,13 +88,13 @@ export default function SavedRoadmapsPage() {
             onBack={() => setOpen(null)}
             footer={
               (open.is_objective || profile?.career_slug === open.career_slug) && hasPlan ? (
-                <Link href="/dashboard/student/planner" className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white">View my planner →</Link>
+                <Link href="/dashboard/student/planner" className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white">{t("View my planner")} →</Link>
               ) : (
                 <>
                   <button onClick={() => createPlan(open)} disabled={busy || checklistExhausted} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-                    {busy ? "Creating…" : checklistExhausted ? "Plan already used this month" : "Create my 30-day plan"}
+                    {busy ? t("Creating…") : checklistExhausted ? t("Plan already used this month") : t("Create my 30-day plan")}
                   </button>
-                  {checklistExhausted && <span className="self-center text-xs text-[var(--muted-foreground)]">One 30-day plan per month.</span>}
+                  {checklistExhausted && <span className="self-center text-xs text-[var(--muted-foreground)]">{t("One 30-day plan per month.")}</span>}
                 </>
               )
             }
@@ -106,19 +108,19 @@ export default function SavedRoadmapsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-bold text-[var(--foreground)]">{s.career_title}</p>
-                    {(s.is_objective || s.career_slug === profile?.career_slug) && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Objective</span>}
+                    {(s.is_objective || s.career_slug === profile?.career_slug) && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">{t("Objective")}</span>}
                   </div>
-                  <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">Grade {s.grade} · {s.board} · saved {new Date(s.created_at).toLocaleDateString()}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">{t("Grade")} {s.grade} · {s.board} · {t("saved")} {new Date(s.created_at).toLocaleDateString()}</p>
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-primary">Open →</span>
+                <span className="shrink-0 text-xs font-semibold text-primary">{t("Open")} →</span>
               </button>
             </li>
           ))}
         </ul>
       ) : (
         <div className="rounded-2xl border border-dashed border-[var(--border)] py-12 text-center">
-          <p className="text-sm text-[var(--muted-foreground)]">You haven't saved any roadmaps yet.</p>
-          <Link href="/dashboard/student/career" className="mt-3 inline-flex h-9 items-center rounded-full bg-gradient-to-r from-primary to-accent px-5 text-xs font-semibold text-white">Build a roadmap in AI Career Pilot</Link>
+          <p className="text-sm text-[var(--muted-foreground)]">{t("You haven't saved any roadmaps yet.")}</p>
+          <Link href="/dashboard/student/career" className="mt-3 inline-flex h-9 items-center rounded-full bg-gradient-to-r from-primary to-accent px-5 text-xs font-semibold text-white">{t("Build a roadmap in AI Career Pilot")}</Link>
         </div>
       )}
     </motion.div>

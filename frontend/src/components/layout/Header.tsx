@@ -15,6 +15,8 @@ import { useAuthStore } from "@/store/authStore";
 import { displayName } from "@/types";
 import { getDefaultRouteForRole } from "@/lib/role-guard";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
+import { useLanguage } from "@/providers/LanguageProvider";
+import { LANGUAGES } from "@/i18n/dictionaries";
 
 interface HeaderProps {
   crumbMap?: Record<string, string>;
@@ -85,6 +87,7 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { theme, setTheme } = useTheme();
+  const { t, lang, setLang } = useLanguage();
   const merged = { ...DEFAULT_CRUMB_MAP, ...crumbMap };
   const crumbs = buildCrumbs(pathname, merged);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -134,10 +137,10 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
           <div key={c.href + i} className="flex items-center gap-2">
             {i > 0 && <ChevronIcon />}
             {i === crumbs.length - 1 ? (
-              <span className="truncate font-semibold text-[var(--foreground)]">{c.label}</span>
+              <span className="truncate font-semibold text-[var(--foreground)]">{t(c.label)}</span>
             ) : (
               <Link href={c.href} className="truncate text-[var(--muted-foreground)] transition-colors hover:text-primary">
-                {c.label}
+                {t(c.label)}
               </Link>
             )}
           </div>
@@ -154,7 +157,7 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <span>Quick jump</span>
+        <span>{t("Quick jump")}</span>
         <kbd className="rounded border border-[var(--border)] bg-white px-1 py-0.5 text-[10px] font-bold text-[var(--muted-foreground)] dark:bg-[var(--background)]">⌘K</kbd>
       </button>
 
@@ -196,6 +199,32 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
               <p className="truncate text-sm font-semibold text-[var(--foreground)]">{user ? displayName(user) : "User"}</p>
               <p className="truncate text-xs text-[var(--muted-foreground)]">{user?.email ?? ""}</p>
             </div>
+
+            {/* Language switcher — students pick their dashboard language here */}
+            <div className="border-b border-[var(--border)] px-4 py-3">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                {t("Language")}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => setLang(l.code)}
+                    aria-pressed={lang === l.code}
+                    className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors ${
+                      lang === l.code
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary"
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Link
               href={dashboardHref}
               role="menuitem"
@@ -203,7 +232,7 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
               className="flex items-center gap-2 px-4 py-2.5 text-sm text-[var(--foreground)] transition-colors hover:bg-primary/5 hover:text-primary"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
-              Dashboard
+              {t("Dashboard")}
             </Link>
             <button
               type="button"
@@ -212,7 +241,7 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
               className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-[var(--foreground)] transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
-              Sign out
+              {t("Sign out")}
             </button>
           </div>
         )}

@@ -11,6 +11,7 @@ import Link from "next/link";
 import { apiFetch, getToken, API_BASE } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Quiz {
   id: string;
@@ -69,6 +70,7 @@ function QuizSkeleton() {
 }
 
 export default function StudentQuizzesPage() {
+  const { t } = useLanguage();
   const [quizzes, setQuizzes] = useState<Quiz[] | null>(null);
   const [assignments, setAssignments] = useState<Assignment[] | null>(null);
   // quizId → the student's latest attempt for that quiz (so cards can show an
@@ -122,9 +124,9 @@ export default function StudentQuizzesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">My Quizzes</h1>
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">{t("My Quizzes")}</h1>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-          Published quizzes assigned to you.
+          {t("Published quizzes assigned to you.")}
         </p>
       </div>
 
@@ -140,7 +142,7 @@ export default function StudentQuizzesPage() {
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-              Assigned to you ({assignments.length})
+              {t("Assigned to you")} ({assignments.length})
             </h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -153,19 +155,19 @@ export default function StudentQuizzesPage() {
                   className="rounded-2xl border border-primary/30 bg-primary/5 p-6 shadow-sm flex flex-col gap-3"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-[var(--foreground)] leading-snug">{a.quiz_title ?? "Assigned quiz"}</h3>
+                    <h3 className="text-sm font-semibold text-[var(--foreground)] leading-snug">{a.quiz_title ?? t("Assigned quiz")}</h3>
                     <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase ${a.student ? "bg-amber-100 text-amber-700" : "bg-cyan-100 text-cyan-700"}`}>
-                      {a.student ? "Personal" : "Class"}
+                      {a.student ? t("Personal") : t("Class")}
                     </span>
                   </div>
                   <StatusPill attempt={attempt} />
                   {a.due_at ? (
                     <p className={`text-[12px] ${overdue ? "text-red-600 font-semibold" : "text-[var(--muted-foreground)]"}`}>
-                      {overdue ? "Overdue · " : "Due "}
+                      {overdue ? `${t("Overdue")} · ` : `${t("Due")} `}
                       <span className="font-medium">{new Date(a.due_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                     </p>
                   ) : (
-                    <p className="text-[12px] text-[var(--muted-foreground)]">No due date</p>
+                    <p className="text-[12px] text-[var(--muted-foreground)]">{t("No due date")}</p>
                   )}
                   <div className="mt-auto flex justify-end">
                     {attempt ? (
@@ -173,14 +175,14 @@ export default function StudentQuizzesPage() {
                         href={`/dashboard/student/results/${attempt.id}`}
                         className="rounded-xl border border-primary/40 bg-white px-4 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5 dark:bg-[var(--background)]"
                       >
-                        View Result
+                        {t("View Result")}
                       </Link>
                     ) : (
                       <Link
                         href={`/dashboard/student/quizzes/${a.quiz}`}
                         className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
                       >
-                        Start
+                        {t("Start")}
                       </Link>
                     )}
                   </div>
@@ -201,8 +203,8 @@ export default function StudentQuizzesPage() {
       {/* Empty state */}
       {quizzes !== null && quizzes.length === 0 && !error && (
         <EmptyState
-          title="No quizzes assigned yet"
-          description="Check back once your teacher publishes a quiz — assignments and adaptive quizzes will appear here."
+          title={t("No quizzes assigned yet")}
+          description={t("Check back once your teacher publishes a quiz — assignments and adaptive quizzes will appear here.")}
           icon={<QuizIcon />}
         />
       )}
@@ -240,7 +242,7 @@ export default function StudentQuizzesPage() {
 
               {quiz.due_date && (
                 <p className="text-[12px] text-[var(--muted-foreground)]">
-                  Due:{" "}
+                  {t("Due")}:{" "}
                   <span className="font-medium text-[var(--foreground)]">
                     {new Date(quiz.due_date).toLocaleDateString()}
                   </span>
@@ -253,14 +255,14 @@ export default function StudentQuizzesPage() {
                     href={`/dashboard/student/results/${attempt.id}`}
                     className="rounded-xl border border-[var(--border)] px-4 py-2 text-[13px] font-semibold text-primary hover:bg-primary/5"
                   >
-                    View Result
+                    {t("View Result")}
                   </Link>
                 ) : (
                   <Link
                     href={`/dashboard/student/quizzes/${quiz.id}`}
                     className="rounded-xl bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
                   >
-                    Start
+                    {t("Start")}
                   </Link>
                 )}
               </div>
@@ -275,19 +277,20 @@ export default function StudentQuizzesPage() {
 
 // ─── Attempted / not-attempted status pill ──────────────────────────────────
 function StatusPill({ attempt }: { attempt?: Attempt }) {
+  const { t } = useLanguage();
   if (attempt) {
     const score = attempt.score_percent ?? attempt.score;
     const pending = attempt.status && attempt.status !== "SUBMITTED";
     return (
       <span className="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-        {pending ? "In progress" : "Attempted"}{!pending && typeof score === "number" ? ` · ${Math.round(Number(score))}%` : ""}
+        {pending ? t("In progress") : t("Attempted")}{!pending && typeof score === "number" ? ` · ${Math.round(Number(score))}%` : ""}
       </span>
     );
   }
   return (
     <span className="inline-flex w-fit items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
-      Not attempted
+      {t("Not attempted")}
     </span>
   );
 }

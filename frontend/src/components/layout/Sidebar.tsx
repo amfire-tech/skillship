@@ -13,6 +13,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { SkillshipLockup } from "@/components/brand/SkillshipMark";
 import { API_BASE, getToken } from "@/lib/auth";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 export interface SidebarNavItem {
   label: string;
@@ -42,6 +43,7 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
   const pathname = usePathname();
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
+  const { t } = useLanguage();
 
   // School branding (logo + name) is a /auth/me-only field, so fetch it once on
   // mount rather than relying on the persisted login user (which omits it).
@@ -73,7 +75,7 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
     <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-[var(--border)] bg-white dark:bg-[var(--background)]">
       {/* Brand */}
       <div className="px-5 py-5">
-        <SkillshipLockup badgeSize={40} wordmarkSize="md" subLabel={roleLabel} />
+        <SkillshipLockup badgeSize={40} wordmarkSize="md" subLabel={t(roleLabel)} />
       </div>
 
       {/* School branding — shows this school's logo + name to its staff/students */}
@@ -91,7 +93,7 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
           )}
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold text-[var(--foreground)]">{school.name ?? "—"}</p>
-            <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">Your School</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">{t("Your School")}</p>
           </div>
         </div>
       )}
@@ -118,7 +120,7 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
                   <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "text-white" : "text-[var(--muted-foreground)] group-hover:text-primary"}`}>
                     {item.icon}
                   </span>
-                  <span className="flex-1 truncate">{item.label}</span>
+                  <span className="flex-1 truncate">{t(item.label)}</span>
                   {active && <ChevronIcon />}
                 </Link>
               </li>
@@ -137,7 +139,7 @@ export function Sidebar({ navItems, roleLabel, onClose }: SidebarProps) {
           <span className="flex h-7 w-7 items-center justify-center rounded-lg">
             <LogoutIcon />
           </span>
-          Logout
+          {t("Logout")}
         </button>
       </div>
     </aside>

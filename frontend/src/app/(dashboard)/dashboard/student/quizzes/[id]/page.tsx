@@ -12,6 +12,7 @@ import Link from "next/link";
 import { API_BASE, getToken } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Quiz {
   id: string;
@@ -35,6 +36,7 @@ export default function StudentQuizTakerPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
+  const { t } = useLanguage();
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[] | null>(null);
@@ -116,9 +118,9 @@ export default function StudentQuizTakerPage() {
       const data = await res.json().catch(() => ({}));
       setAwaitingReview(!!data?.awaiting_review);
       setSubmitted(true);
-      toast("Quiz submitted", "success");
+      toast(t("Quiz submitted"), "success");
     } catch {
-      toast("Could not submit. Please try again.", "error");
+      toast(t("Could not submit. Please try again."), "error");
     } finally {
       setSubmitting(false);
     }
@@ -131,15 +133,15 @@ export default function StudentQuizTakerPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           </div>
-          <h2 className="mt-4 text-xl font-bold text-[var(--foreground)]">Submitted!</h2>
+          <h2 className="mt-4 text-xl font-bold text-[var(--foreground)]">{t("Submitted!")}</h2>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
             {awaitingReview
-              ? "Your written answers will be graded by your teacher — your result will appear once grading is done."
-              : "Your answers have been recorded."}
+              ? t("Your written answers will be graded by your teacher — your result will appear once grading is done.")
+              : t("Your answers have been recorded.")}
           </p>
           <div className="mt-6 flex justify-center gap-3">
-            <Link href="/dashboard/student/quizzes" className="rounded-full border border-[var(--border)] bg-white px-5 py-2 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">All Quizzes</Link>
-            <button onClick={() => router.push("/dashboard/student")} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white hover:opacity-90">Dashboard</button>
+            <Link href="/dashboard/student/quizzes" className="rounded-full border border-[var(--border)] bg-white px-5 py-2 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary">{t("All Quizzes")}</Link>
+            <button onClick={() => router.push("/dashboard/student")} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Dashboard")}</button>
           </div>
         </div>
       </div>
@@ -152,7 +154,7 @@ export default function StudentQuizTakerPage() {
         <div>
           <Link href="/dashboard/student/quizzes" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-            All Quizzes
+            {t("All Quizzes")}
           </Link>
           {loading ? (
             <div className="mt-2 h-7 w-64 animate-pulse rounded bg-[var(--muted)]" />
@@ -163,7 +165,7 @@ export default function StudentQuizTakerPage() {
         </div>
         {timer && (
           <div className="rounded-xl border border-[var(--border)] bg-white px-4 py-2 text-center shadow-sm">
-            <div className="text-xs uppercase tracking-wide text-[var(--muted-foreground)]">Time Left</div>
+            <div className="text-xs uppercase tracking-wide text-[var(--muted-foreground)]">{t("Time Left")}</div>
             <div className={`text-lg font-bold tabular-nums ${secondsLeft! < 60 ? "text-red-600" : "text-[var(--foreground)]"}`}>{timer}</div>
           </div>
         )}
@@ -172,14 +174,14 @@ export default function StudentQuizTakerPage() {
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
-          <button onClick={load} className="ml-3 text-xs font-semibold underline">Retry</button>
+          <button onClick={load} className="ml-3 text-xs font-semibold underline">{t("Retry")}</button>
         </div>
       )}
 
       {!loading && questions !== null && questions.length === 0 && (
         <div className="rounded-2xl border border-[var(--border)] bg-white p-12 text-center shadow-sm">
-          <p className="text-sm font-medium text-[var(--foreground)]">This quiz has no questions yet.</p>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Please check back later.</p>
+          <p className="text-sm font-medium text-[var(--foreground)]">{t("This quiz has no questions yet.")}</p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{t("Please check back later.")}</p>
         </div>
       )}
 
@@ -188,7 +190,7 @@ export default function StudentQuizTakerPage() {
           <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                Question {current + 1} of {total}
+                {t("Question")} {current + 1} {t("of")} {total}
               </span>
               <div className="h-1.5 w-32 rounded-full bg-[var(--muted)]">
                 <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((current + 1) / total) * 100}%` }} />
@@ -204,10 +206,10 @@ export default function StudentQuizTakerPage() {
                     value={answers[q.id] ?? ""}
                     onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                     rows={5}
-                    placeholder="Type your answer here…"
+                    placeholder={t("Type your answer here…")}
                     className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
                   />
-                  <p className="text-xs text-[var(--muted-foreground)]">Your teacher will review and grade this written answer.</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">{t("Your teacher will review and grade this written answer.")}</p>
                 </div>
               ) : (
                 (q.options ?? q.choices?.map((c, i) => ({ id: String(i), text: c })) ?? []).map((opt) => {
@@ -243,7 +245,7 @@ export default function StudentQuizTakerPage() {
                 onClick={() => setCurrent((c) => Math.max(0, c - 1))}
                 className="rounded-full border border-[var(--border)] bg-white px-5 py-2 text-sm font-semibold text-[var(--muted-foreground)] hover:text-primary disabled:opacity-50"
               >
-                Previous
+                {t("Previous")}
               </button>
               {current < total - 1 ? (
                 <button
@@ -251,7 +253,7 @@ export default function StudentQuizTakerPage() {
                   onClick={() => setCurrent((c) => Math.min(total - 1, c + 1))}
                   className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-white hover:opacity-90"
                 >
-                  Next
+                  {t("Next")}
                 </button>
               ) : (
                 <button
@@ -260,7 +262,7 @@ export default function StudentQuizTakerPage() {
                   disabled={submitting}
                   className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
                 >
-                  {submitting ? "Submitting…" : "Submit"}
+                  {submitting ? t("Submitting…") : t("Submit")}
                 </button>
               )}
             </div>
@@ -268,7 +270,7 @@ export default function StudentQuizTakerPage() {
 
           <aside className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Progress</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{t("Progress")}</span>
               <span className="text-xs font-semibold text-[var(--foreground)]">{answered}/{total}</span>
             </div>
             <div className="grid grid-cols-5 gap-2">
@@ -296,7 +298,7 @@ export default function StudentQuizTakerPage() {
               disabled={submitting}
               className="mt-5 w-full rounded-full bg-primary py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
-              {submitting ? "Submitting…" : "Submit Quiz"}
+              {submitting ? t("Submitting…") : t("Submit Quiz")}
             </button>
           </aside>
         </div>

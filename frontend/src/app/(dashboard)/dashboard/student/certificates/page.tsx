@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/auth";
 import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useLanguage } from "@/providers/LanguageProvider";
 
 interface Certificate {
   id: string;
@@ -36,6 +37,7 @@ const BADGE_TONE: Record<string, string> = {
 
 export default function CertificatesPage() {
   const toast = useToast();
+  const { t } = useLanguage();
   const [certs, setCerts] = useState<Certificate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -151,8 +153,8 @@ export default function CertificatesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Certificates</h1>
-        <p className="mt-1 text-sm text-[var(--muted-foreground)]">{certs === null ? "Loading…" : `${certs.length} earned`}</p>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{t("Certificates")}</h1>
+        <p className="mt-1 text-sm text-[var(--muted-foreground)]">{certs === null ? t("Loading…") : `${certs.length} ${t("earned")}`}</p>
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -161,7 +163,7 @@ export default function CertificatesPage() {
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         </span>
-        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title or subject…" className="h-10 w-full max-w-md rounded-full border border-[var(--border)] bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]" />
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Search by title or subject…")} className="h-10 w-full max-w-md rounded-full border border-[var(--border)] bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]" />
       </div>
 
       {filtered === null ? (
@@ -170,9 +172,9 @@ export default function CertificatesPage() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title="No certificates yet"
-          description={certs?.length === 0 ? "Pass a published quiz to earn your first certificate." : "No matches for that search."}
-          action={certs?.length === 0 ? { label: "Browse quizzes", href: "/dashboard/student/quizzes" } : undefined}
+          title={t("No certificates yet")}
+          description={certs?.length === 0 ? t("Pass a published quiz to earn your first certificate.") : t("No matches for that search.")}
+          action={certs?.length === 0 ? { label: t("Browse quizzes"), href: "/dashboard/student/quizzes" } : undefined}
           icon={<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="9" r="6" /><path d="m9 14 -2 7 5 -3 5 3 -2 -7" /></svg>}
         />
       ) : (
@@ -196,8 +198,8 @@ export default function CertificatesPage() {
                 </div>
                 <div className="space-y-3 p-5">
                   <div>
-                    <p className="text-sm font-bold text-[var(--foreground)]">{c.title ?? c.quiz_title ?? "Skillship Certificate"}</p>
-                    <p className="text-xs text-[var(--muted-foreground)]">{c.subject ?? ""}{c.subject && c.issued_at ? " · " : ""}Issued {fmtDate(c.issued_at)}</p>
+                    <p className="text-sm font-bold text-[var(--foreground)]">{c.title ?? c.quiz_title ?? t("Skillship Certificate")}</p>
+                    <p className="text-xs text-[var(--muted-foreground)]">{c.subject ?? ""}{c.subject && c.issued_at ? " · " : ""}{t("Issued")} {fmtDate(c.issued_at)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -206,7 +208,7 @@ export default function CertificatesPage() {
                       className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-4 text-xs font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-                      Download
+                      {t("Download")}
                     </button>
                     <button type="button" onClick={() => viewCertificate(c)} aria-label="View certificate" title="View" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
