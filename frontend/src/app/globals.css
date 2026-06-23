@@ -846,4 +846,31 @@
   .site-bg::before,
   .site-bg::after,
   .cta-sun { animation: none !important; }
+
+  /* Freeze every continuous *decorative* loop on phones. The repaint-heavy ones
+     (background-position / box-shadow keyframes: brand-shift, glow-pulse,
+     site-grid-pan, final-cta-drift) repaint the whole element every frame and
+     are the main cause of scroll stutter; the transform-based floats/spins/pings
+     are cheap individually but there are ~12 running at once. All purely
+     decorative → static on mobile. The school-logo marquee is intentionally NOT
+     frozen (it's a cheap translateX and is functional, not ambient). */
+  .animate-float-slow,
+  .animate-float-delay,
+  .animate-tilt-soft,
+  .animate-glow-pulse,
+  .animate-brand-shift,
+  .animate-final-cta-drift,
+  .animate-ping,
+  [class*="animate-[ping"],
+  [class*="animate-[spin"],
+  [class*="animate-[site-grid-pan"] { animation: none !important; }
+
+  /* backdrop-filter forces the compositor to re-sample everything behind the
+     element on every frame — one of the worst mobile-scroll costs. Drop it on
+     phones; these elements already carry a translucent bg colour as a fallback,
+     so the glass simply becomes a flat tint (no legibility loss). */
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
 }
