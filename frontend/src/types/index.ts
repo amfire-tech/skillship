@@ -30,6 +30,10 @@ export interface User {
   // School logo as a base64 data-URL. Only returned on /auth/me/ (not on the
   // user list) so a school's students/teachers/principal can show their branding.
   school_logo?: string | null;
+  // Self-service avatar as a base64 data-URL. Only returned on /auth/me/
+  // (not on the user list). Mainly used to identify a Skillship (roaming)
+  // teacher on a school's "Today's Teacher" view.
+  profile_photo?: string | null;
   phone?: string;
   admission_number?: string;
   // First-login profile lock. Blank-generated student accounts start `false`:

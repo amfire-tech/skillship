@@ -140,7 +140,7 @@ class SkillshipAssignmentSerializer(serializers.ModelSerializer):
             "school", "school_name",
             "klass", "klass_label",
             "is_active",
-            "date_from", "date_to", "weekdays", "specific_dates", "note",
+            "date_from", "date_to", "weekdays", "specific_dates", "subject", "note",
             "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
@@ -170,3 +170,38 @@ class SkillshipAssignmentSerializer(serializers.ModelSerializer):
                 {"klass": "Class must belong to the selected school."}
             )
         return attrs
+
+
+class TodaysTeacherSerializer(serializers.ModelSerializer):
+    """One Skillship teacher scheduled at the principal's school TODAY —
+    everything a principal needs to recognise an unfamiliar roaming teacher
+    walking in: name, id, class, subject, and photo. Distinct from
+    SkillshipAssignmentSerializer (the MAIN_ADMIN CRUD shape) because it
+    carries the teacher's (potentially large) base64 photo, which must never
+    leak into the admin's bulk assignment list."""
+
+    teacher_id = serializers.UUIDField(source="teacher.id", read_only=True)
+    teacher_name = serializers.SerializerMethodField()
+    teacher_photo = serializers.SerializerMethodField()
+    klass_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SkillshipAssignment
+        fields = [
+            "id",
+            "teacher_id", "teacher_name", "teacher_photo",
+            "klass_label", "subject", "note",
+        ]
+        read_only_fields = fields
+
+    def get_teacher_name(self, obj) -> str:
+        t = obj.teacher
+        return (t.get_full_name() or t.username) if t else ""
+
+    def get_teacher_photo(self, obj) -> str | None:
+        t = obj.teacher
+        return (t.profile_photo or None) if t else None
+
+    def get_klass_label(self, obj) -> str:
+        k = obj.klass
+        return f"Grade {k.grade}-{k.section}" if k else ""

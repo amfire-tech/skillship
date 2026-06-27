@@ -365,10 +365,15 @@ class QuizViewSet(TenantScopedViewSet):
 
     def perform_destroy(self, instance):
         self._require_author()
-        if QuizAttempt.objects.filter(quiz=instance).exists():
+        has_attempts = QuizAttempt.objects.filter(quiz=instance).exists()
+        if has_attempts and self.request.user.role != Role.MAIN_ADMIN:
             raise ValidationError(
                 {"detail": "Cannot delete a quiz with attempts. Archive instead."}
             )
+        if has_attempts:
+            # MAIN_ADMIN can force a permanent delete — attempts are PROTECTed
+            # against accidental deletion, so clear them first; Answers cascade.
+            QuizAttempt.objects.filter(quiz=instance).delete()
         instance.delete()
 
     # ── State transitions ───────────────────────────────────────────────────

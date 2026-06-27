@@ -24,7 +24,7 @@ interface Assignment {
   klass: string | null; klass_label: string;
   is_active: boolean;
   date_from: string | null; date_to: string | null;
-  weekdays: number[]; specific_dates: string[]; note: string;
+  weekdays: number[]; specific_dates: string[]; subject: string; note: string;
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -46,6 +46,7 @@ export default function SkillshipTeachersPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [specificDates, setSpecificDates] = useState("");
+  const [subject, setSubject] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,12 +103,12 @@ export default function SkillshipTeachersPage() {
         body: JSON.stringify({
           teacher, school, klass: klass || null,
           weekdays, specific_dates: dates,
-          date_from: dateFrom || null, date_to: dateTo || null, note,
+          date_from: dateFrom || null, date_to: dateTo || null, subject, note,
         }),
       });
       if (res.ok) {
         toast("Skillship teacher assigned", "success");
-        setKlass(""); setWeekdays([]); setDateFrom(""); setDateTo(""); setSpecificDates(""); setNote("");
+        setKlass(""); setWeekdays([]); setDateFrom(""); setDateTo(""); setSpecificDates(""); setSubject(""); setNote("");
         await load();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -196,10 +197,14 @@ export default function SkillshipTeachersPage() {
               </label>
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <label className="grid gap-1.5">
               <span className="text-xs font-semibold text-[var(--muted-foreground)]">Specific dates (comma-separated)</span>
               <input value={specificDates} onChange={(e) => setSpecificDates(e.target.value)} placeholder="2026-07-01, 2026-07-08" className={inputCls} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-xs font-semibold text-[var(--muted-foreground)]">Subject</span>
+              <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Robotics" className={inputCls} />
             </label>
             <label className="grid gap-1.5">
               <span className="text-xs font-semibold text-[var(--muted-foreground)]">Note</span>
@@ -229,6 +234,7 @@ export default function SkillshipTeachersPage() {
                 <th className="px-5 py-3">Teacher</th>
                 <th className="px-5 py-3">School</th>
                 <th className="px-5 py-3">Class</th>
+                <th className="px-5 py-3">Subject</th>
                 <th className="px-5 py-3">Days</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3" />
@@ -236,7 +242,7 @@ export default function SkillshipTeachersPage() {
             </thead>
             <tbody>
               {!loading && assignments.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-xs text-[var(--muted-foreground)]">No assignments yet.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-xs text-[var(--muted-foreground)]">No assignments yet.</td></tr>
               )}
               {assignments.map((a) => {
                 const t = teachers.find((x) => x.id === a.teacher);
@@ -249,6 +255,7 @@ export default function SkillshipTeachersPage() {
                     <td className="px-5 py-3.5 font-medium text-[var(--foreground)]">{t ? fullName(t) : a.teacher.slice(0, 8)}</td>
                     <td className="px-5 py-3.5">{a.school_name}</td>
                     <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{a.klass_label || "Whole school"}</td>
+                    <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{a.subject || "—"}</td>
                     <td className="px-5 py-3.5 text-[var(--muted-foreground)]">{days}</td>
                     <td className="px-5 py-3.5">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${a.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"}`}>
@@ -303,6 +310,7 @@ function EditAssignmentModal({
   const [dateFrom, setDateFrom] = useState(assignment.date_from ?? "");
   const [dateTo, setDateTo] = useState(assignment.date_to ?? "");
   const [specificDates, setSpecificDates] = useState((assignment.specific_dates ?? []).join(", "));
+  const [subject, setSubject] = useState(assignment.subject ?? "");
   const [note, setNote] = useState(assignment.note ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -327,7 +335,7 @@ function EditAssignmentModal({
         body: JSON.stringify({
           klass: klass || null,
           weekdays, specific_dates: dates,
-          date_from: dateFrom || null, date_to: dateTo || null, note,
+          date_from: dateFrom || null, date_to: dateTo || null, subject, note,
         }),
       });
       if (res.ok) { onSaved(); }
@@ -387,6 +395,11 @@ function EditAssignmentModal({
           <label className="grid gap-1.5">
             <span className="text-xs font-semibold text-[var(--muted-foreground)]">Specific dates (comma-separated)</span>
             <input value={specificDates} onChange={(e) => setSpecificDates(e.target.value)} placeholder="2026-07-01, 2026-07-08" className={inputCls} />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold text-[var(--muted-foreground)]">Subject</span>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Robotics" className={inputCls} />
           </label>
 
           <label className="grid gap-1.5">

@@ -10,8 +10,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { SchoolContextSwitcher } from "@/components/layout/SchoolContextSwitcher";
@@ -23,7 +24,23 @@ import { CommandPalette } from "@/components/shared/CommandPalette";
 import { getDefaultRouteForRole } from "@/lib/role-guard";
 import type { UserRole } from "@/types";
 
-function PageTransition({ pathname, children }: { pathname: string; children: React.ReactNode }) {
+function PageTransition({ pathname, children, isMobile }: { pathname: string; children: React.ReactNode; isMobile: boolean }) {
+  // On phones the blocking `mode="wait"` adds a visible ~0.2s stall before every
+  // navigation and the y-translate thrashes the compositor — so on mobile we drop
+  // the exit-wait entirely and render an instant, transform-free fade. Desktop
+  // keeps the polished slide.
+  if (isMobile) {
+    return (
+      <motion.div
+        key={pathname}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.12 }}
+      >
+        {children}
+      </motion.div>
+    );
+  }
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
@@ -115,6 +132,7 @@ function buildSubAdminNav(grant: SubGrant): SidebarNavItem[] {
 
 const PRINCIPAL_NAV: SidebarNavItem[] = [
   { label: "School Overview",       href: "/dashboard/principal",                     icon: icon("dashboard") },
+  { label: "Today's Teacher",       href: "/dashboard/principal/today-teacher",       icon: icon("planner")   },
   { label: "Teachers Management",   href: "/dashboard/principal/teachers",            icon: icon("users")     },
   { label: "Student Management",    href: "/dashboard/principal/students",            icon: icon("users")     },
   { label: "Class Management",      href: "/dashboard/principal/classes",             icon: icon("academics") },
@@ -141,10 +159,17 @@ const TEACHER_DAILY_LOG_ITEM: SidebarNavItem = {
   label: "Daily Log", href: "/dashboard/teacher/daily-log", icon: icon("planner"),
 };
 
+// Skillship teachers also get a "My Profile" surface to set their photo —
+// the rest of their identity (school/class/subject) is read from their
+// existing schedule, so this page is just the avatar upload.
+const TEACHER_PROFILE_ITEM: SidebarNavItem = {
+  label: "My Profile", href: "/dashboard/teacher/profile", icon: icon("settings"),
+};
+
 function buildTeacherNav(isSkillship: boolean): SidebarNavItem[] {
   if (!isSkillship) return TEACHER_NAV;
   // Insert just after "My Classes" so the schedule + log live together up top.
-  return [TEACHER_NAV[0], TEACHER_DAILY_LOG_ITEM, ...TEACHER_NAV.slice(1)];
+  return [TEACHER_NAV[0], TEACHER_DAILY_LOG_ITEM, TEACHER_PROFILE_ITEM, ...TEACHER_NAV.slice(1)];
 }
 
 const STUDENT_NAV: SidebarNavItem[] = [
@@ -182,6 +207,11 @@ export default function DashboardLayout({
   const refreshAuth = useAuthStore((s) => s.refreshAuth);
   const [refreshAttempted, setRefreshAttempted] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  // Phones get drastically reduced motion: framer-motion's reducedMotion="always"
+  // skips transform/layout animation on every descendant motion component (the
+  // dashboards have ~270 of them) while keeping cheap opacity fades — the single
+  // biggest scroll/navigation smoothness win on real mobile hardware.
+  const isMobile = useIsMobile();
   // Sub-admin capability grant for the school they're acting in (null for every
   // other role / before grants load) — gates the sidebar nav below.
   const subGrant = useSubAdminAccess(currentGrant);
@@ -245,33 +275,37 @@ export default function DashboardLayout({
   // distraction-free screen the student must complete before they get the shell.
   if (pathname === COMPLETE_PROFILE_PATH) {
     return (
-      <div className="min-h-screen bg-[var(--muted)]/30">
-        <main id="main-content" className="overflow-x-clip p-4 md:p-6 lg:p-8">
-          <PageTransition pathname={pathname}>{children}</PageTransition>
-        </main>
-      </div>
+      <MotionConfig reducedMotion={isMobile ? "always" : "never"}>
+        <div className="min-h-screen bg-[var(--muted)]/30">
+          <main id="main-content" className="overflow-x-clip p-4 md:p-6 lg:p-8">
+            <PageTransition pathname={pathname} isMobile={isMobile}>{children}</PageTransition>
+          </main>
+        </div>
+      </MotionConfig>
     );
   }
 
   if (ADMIN_SHELL_ROLES.includes(user.role)) {
     return (
-      <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
-        {/* Mobile overlay */}
-        {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeSidebar} aria-hidden="true" />
-        )}
-        {/* Sidebar — slides in on mobile, always visible on md+ */}
-        <div className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:relative md:translate-x-0 md:z-auto ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <AdminSidebar onClose={closeSidebar} />
+      <MotionConfig reducedMotion={isMobile ? "always" : "never"}>
+        <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
+          {/* Mobile overlay */}
+          {mobileSidebarOpen && (
+            <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeSidebar} aria-hidden="true" />
+          )}
+          {/* Sidebar — slides in on mobile, always visible on md+ */}
+          <div className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:relative md:translate-x-0 md:z-auto ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            <AdminSidebar onClose={closeSidebar} />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <AdminTopbar onMenuClick={toggleSidebar} />
+            <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
+              <PageTransition pathname={pathname} isMobile={isMobile}>{children}</PageTransition>
+            </main>
+          </div>
+          <CommandPalette />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <AdminTopbar onMenuClick={toggleSidebar} />
-          <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
-            <PageTransition pathname={pathname}>{children}</PageTransition>
-          </main>
-        </div>
-        <CommandPalette />
-      </div>
+      </MotionConfig>
     );
   }
 
@@ -286,44 +320,48 @@ export default function DashboardLayout({
       : roleConfig!.nav;
     const roleLabel = isSubAdmin ? "Sub Admin" : roleConfig!.label;
     return (
-      <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
-        {/* Mobile overlay */}
-        {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeSidebar} aria-hidden="true" />
-        )}
-        {/* Sidebar — slides in on mobile, always visible on md+ */}
-        <div className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:relative md:translate-x-0 md:z-auto ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <Sidebar navItems={navItems} roleLabel={roleLabel} onClose={closeSidebar} />
+      <MotionConfig reducedMotion={isMobile ? "always" : "never"}>
+        <div className="dashboard-shell flex min-h-screen bg-[var(--muted)]/30">
+          {/* Mobile overlay */}
+          {mobileSidebarOpen && (
+            <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeSidebar} aria-hidden="true" />
+          )}
+          {/* Sidebar — slides in on mobile, always visible on md+ */}
+          <div className={`fixed inset-y-0 left-0 z-50 transition-transform duration-300 md:relative md:translate-x-0 md:z-auto ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            <Sidebar navItems={navItems} roleLabel={roleLabel} onClose={closeSidebar} />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Header onMenuClick={toggleSidebar} />
+            <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
+              {/* Skillship-teacher school switcher (self-hides for normal teachers) */}
+              {user.role === "TEACHER" && (
+                <div className="mb-4">
+                  <SchoolContextSwitcher />
+                </div>
+              )}
+              {/* Sub-admin territory switcher — sets the X-School-Context for all calls */}
+              {isSubAdmin && (
+                <div className="mb-4">
+                  <SubAdminSchoolSwitcher />
+                </div>
+              )}
+              <PageTransition pathname={pathname} isMobile={isMobile}>{children}</PageTransition>
+            </main>
+          </div>
+          <CommandPalette />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Header onMenuClick={toggleSidebar} />
-          <main id="main-content" className="min-w-0 flex-1 overflow-x-clip p-4 md:p-6 lg:p-8">
-            {/* Skillship-teacher school switcher (self-hides for normal teachers) */}
-            {user.role === "TEACHER" && (
-              <div className="mb-4">
-                <SchoolContextSwitcher />
-              </div>
-            )}
-            {/* Sub-admin territory switcher — sets the X-School-Context for all calls */}
-            {isSubAdmin && (
-              <div className="mb-4">
-                <SubAdminSchoolSwitcher />
-              </div>
-            )}
-            <PageTransition pathname={pathname}>{children}</PageTransition>
-          </main>
-        </div>
-        <CommandPalette />
-      </div>
+      </MotionConfig>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <main id="main-content" className="overflow-x-clip p-4 md:p-6 lg:p-8">
-        <PageTransition pathname={pathname}>{children}</PageTransition>
-      </main>
-      <CommandPalette />
-    </div>
+    <MotionConfig reducedMotion={isMobile ? "always" : "never"}>
+      <div className="min-h-screen bg-[var(--background)]">
+        <main id="main-content" className="overflow-x-clip p-4 md:p-6 lg:p-8">
+          <PageTransition pathname={pathname} isMobile={isMobile}>{children}</PageTransition>
+        </main>
+        <CommandPalette />
+      </div>
+    </MotionConfig>
   );
 }

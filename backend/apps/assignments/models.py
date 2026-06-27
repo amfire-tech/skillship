@@ -56,6 +56,11 @@ class SkillshipAssignment(TimeStampedModel):
     weekdays = models.JSONField(default=list, blank=True)
     # Ad-hoc specific dates as ISO strings, e.g. ["2026-06-24", "2026-06-26"].
     specific_dates = models.JSONField(default=list, blank=True)
+    # The subject this teacher takes for this assignment (e.g. "Robotics") —
+    # shown to the school's principal on the "Today's Teacher" view alongside
+    # the class. Free text since Skillship subjects aren't tied to the
+    # school's own Course catalogue.
+    subject = models.CharField(max_length=120, blank=True)
     note = models.CharField(max_length=255, blank=True)
 
     created_by = models.ForeignKey(

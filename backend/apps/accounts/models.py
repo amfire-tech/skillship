@@ -65,6 +65,12 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     admission_number = models.CharField(max_length=50, blank=True)
 
+    # Self-service avatar (base64 data-URL, same storage pattern as
+    # School.logo). Primarily for Skillship (roaming) teachers, whose photo is
+    # how a principal recognises the unfamiliar teacher walking into their
+    # school — but any user may set their own.
+    profile_photo = models.TextField(blank=True)
+
     # Per-user AI gate. MAIN_ADMIN can switch a specific teacher / student off so
     # they can no longer reach any AI feature (career pilot, quiz generation,
     # adaptive engine, content search). Default True so existing accounts keep

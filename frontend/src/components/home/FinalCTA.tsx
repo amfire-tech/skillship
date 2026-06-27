@@ -133,7 +133,7 @@ export function FinalCTA() {
           <span aria-hidden className="h-1 w-1 rounded-full bg-white/30" />
           <a href="mailto:info@skillship.in" className="hover:text-white">info@skillship.in</a>
           <span aria-hidden className="h-1 w-1 rounded-full bg-white/30" />
-          <a href="tel:+919081408577" className="hover:text-white">+91 9081 408 577</a>
+          <a href="tel:+919368408577" className="hover:text-white">+91 93684 08577</a>
         </motion.div>
       </div>
 

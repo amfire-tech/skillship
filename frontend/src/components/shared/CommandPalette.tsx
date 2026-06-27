@@ -22,6 +22,7 @@ interface PaletteItem {
 const ROUTES: Record<UserRole, PaletteItem[]> = {
   MAIN_ADMIN: [
     { label: "Overview",         href: "/dashboard/admin",                  group: "Admin" },
+    { label: "Demo Requests",    href: "/dashboard/admin/leads",            group: "Admin" },
     { label: "Schools",          href: "/dashboard/admin/schools",          group: "Admin" },
     { label: "New School",       href: "/dashboard/admin/schools/new",      group: "Admin" },
     { label: "Users",            href: "/dashboard/admin/users",            group: "Admin" },

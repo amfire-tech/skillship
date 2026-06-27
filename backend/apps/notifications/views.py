@@ -147,11 +147,12 @@ def _alert_recipients(school_id, roles, teacher_types=None, subadmin_id=None):
 class AdminAlertView(APIView):
     """POST /api/v1/notifications/admin/send/ — MAIN_ADMIN sends an alert.
 
-    Body: { school: <uuid>, roles: ["PRINCIPAL","TEACHER","STUDENT","SUB_ADMIN"],
+    Body: { school: <uuid> | "ALL", roles: ["PRINCIPAL","TEACHER","STUDENT","SUB_ADMIN"],
             title, body, category? }
-    Creates one in-app Notification per matching recipient in that school and
-    fires a best-effort browser push to each. Like the billing endpoints, this
-    is a plain APIView (not tenant-scoped) because MAIN_ADMIN has school=NULL.
+    school="ALL" fans the alert out to every active school. Creates one in-app
+    Notification per matching recipient per school and fires a best-effort
+    browser push to each. Like the billing endpoints, this is a plain APIView
+    (not tenant-scoped) because MAIN_ADMIN has school=NULL.
     """
 
     permission_classes = [IsAuthenticated, IsMainAdmin]
@@ -159,6 +160,7 @@ class AdminAlertView(APIView):
     def post(self, request):
         data = request.data
         school = data.get("school")
+        all_schools = school == "ALL"
         roles = data.get("roles") or []
         title = (data.get("title") or "").strip()
         body = (data.get("body") or "").strip()
@@ -178,12 +180,20 @@ class AdminAlertView(APIView):
                 {"roles": "Choose at least one of Principal, Teachers, Students or Sub-Admins."}
             )
 
+        if all_schools:
+            from apps.schools.models import School
+
+            school_ids = School.objects.filter(is_active=True).values_list("id", flat=True)
+        else:
+            school_ids = [school]
+
         sent = 0
-        for user in _alert_recipients(school, roles, teacher_types=teacher_types, subadmin_id=subadmin_id):
-            # Stamp the alert with the target school so a roaming recipient's
-            # (school=NULL) notification still belongs to the right tenant.
-            send_alert(user, title=title, body=body, category=category, school_id=school)
-            sent += 1
+        for school_id in school_ids:
+            for user in _alert_recipients(school_id, roles, teacher_types=teacher_types, subadmin_id=subadmin_id):
+                # Stamp the alert with the target school so a roaming recipient's
+                # (school=NULL) notification still belongs to the right tenant.
+                send_alert(user, title=title, body=body, category=category, school_id=school_id)
+                sent += 1
 
         return Response({"sent": sent}, status=status.HTTP_201_CREATED)
 

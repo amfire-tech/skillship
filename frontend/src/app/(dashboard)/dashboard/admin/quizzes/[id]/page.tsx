@@ -33,6 +33,21 @@ interface Quiz {
   created_at?: string;
 }
 
+interface QuestionOption {
+  id: string;
+  text: string;
+}
+
+interface QuizQuestion {
+  id: string;
+  text: string;
+  type: string;
+  options: QuestionOption[];
+  correct_option_ids?: string[];
+  accepted_answers?: string[];
+  explanation?: string | null;
+}
+
 // Friendly label for the role that approved (published) the quiz.
 const ROLE_LABEL: Record<string, string> = {
   MAIN_ADMIN: "Super Admin",
@@ -93,6 +108,8 @@ export default function QuizDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,10 +130,23 @@ export default function QuizDetailPage() {
     setLoading(false);
   }, [id]);
 
+  const loadQuestions = useCallback(async () => {
+    setQuestionsError(null);
+    const token = await getToken();
+    if (!token) { setQuestionsError("Session expired."); return; }
+    const res = await fetch(`${API_BASE}/quizzes/${id}/questions/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) { setQuestionsError("Failed to load questions."); return; }
+    const data = await res.json();
+    setQuestions(Array.isArray(data) ? data : (data?.results ?? []));
+  }, [id]);
+
   useEffect(() => {
     document.title = "Quiz Detail — Skillship";
     load();
-  }, [load]);
+    loadQuestions();
+  }, [load, loadQuestions]);
 
   async function save() {
     if (!quiz) return;
@@ -289,12 +319,54 @@ export default function QuizDetailPage() {
         )}
       </div>
 
-      {/* Questions placeholder */}
+      {/* Questions */}
       <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-[var(--foreground)]">Questions ({questionCount})</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">
-          This quiz has {questionCount} question{questionCount === 1 ? "" : "s"} in its bank. Review them from the Quiz Approval panel, or rebuild the set from the quiz wizard.
-        </p>
+        {questionsError ? (
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-red-500">{questionsError}</p>
+            <button onClick={loadQuestions} className="text-xs font-semibold text-primary underline">Retry</button>
+          </div>
+        ) : questions === null ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+          </div>
+        ) : questions.length === 0 ? (
+          <p className="text-sm text-[var(--muted-foreground)]">
+            This quiz has no questions yet. Build the question set from the quiz wizard.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {questions.map((q, qi) => (
+              <div key={q.id} className="rounded-xl bg-[var(--muted)]/40 p-3">
+                <p className="text-sm font-semibold text-[var(--foreground)]">{qi + 1}. {q.text}</p>
+                {q.options && q.options.length > 0 ? (
+                  <ul className="mt-2 space-y-1">
+                    {q.options.map((o) => {
+                      const correct = q.correct_option_ids?.includes(o.id);
+                      return (
+                        <li key={o.id} className={`flex items-center gap-2 text-xs ${correct ? "font-semibold text-primary" : "text-[var(--muted-foreground)]"}`}>
+                          <span className={`flex h-4 w-4 items-center justify-center rounded-full border text-[10px] ${correct ? "border-primary bg-primary/10" : "border-[var(--border)]"}`}>{o.id}</span>
+                          {o.text}
+                          {correct && <span className="ml-1 text-[10px] uppercase tracking-wide">✓ correct</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : q.accepted_answers && q.accepted_answers.length > 0 ? (
+                  <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+                    Accepted answers: <span className="font-medium text-primary">{q.accepted_answers.join(", ")}</span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs italic text-[var(--muted-foreground)]">Short-answer question</p>
+                )}
+                {q.explanation && (
+                  <p className="mt-2 text-xs text-[var(--muted-foreground)]"><span className="font-semibold">Explanation:</span> {q.explanation}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

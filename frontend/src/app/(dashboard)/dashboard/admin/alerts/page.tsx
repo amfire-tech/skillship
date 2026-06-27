@@ -138,6 +138,7 @@ export default function AdminAlertsPage() {
             <label className="text-xs font-semibold text-[var(--muted-foreground)]">School</label>
             <select value={school} onChange={(e) => setSchool(e.target.value)} className={inputCls}>
               {schools.length === 0 && <option value="">No schools found</option>}
+              <option value="ALL">All Schools</option>
               {schools.map((s) => <option key={s.id} value={s.id}>{s.name}{s.city ? ` · ${s.city}` : ""}</option>)}
             </select>
           </div>

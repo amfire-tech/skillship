@@ -10,14 +10,17 @@ Owner:   Navanish
 
 from __future__ import annotations
 
+from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.models import User
-from apps.common.permissions import IsMainAdmin
+from apps.common.permissions import IsMainAdmin, Role
 from apps.common.tenancy import require_school_id
 from apps.common.viewsets import TenantScopedViewSet
 
@@ -27,7 +30,21 @@ from .serializers import (
     DailyTeachingLogSerializer,
     SkillshipAssignmentSerializer,
     SubAdminGrantSerializer,
+    TodaysTeacherSerializer,
 )
+
+
+def _is_scheduled_today(assignment: SkillshipAssignment, today, iso_today: str) -> bool:
+    """Mirrors the frontend's TeachingScheduleCard `isToday` logic — within the
+    optional date_from/date_to range AND (today's weekday is a recurring visit
+    day OR today is one of the ad-hoc specific_dates)."""
+    if assignment.date_from and iso_today < assignment.date_from.isoformat():
+        return False
+    if assignment.date_to and iso_today > assignment.date_to.isoformat():
+        return False
+    if today.weekday() in (assignment.weekdays or []):
+        return True
+    return iso_today in (assignment.specific_dates or [])
 
 
 class SkillshipAssignmentViewSet(ModelViewSet):
@@ -37,8 +54,9 @@ class SkillshipAssignmentViewSet(ModelViewSet):
 
     def get_permissions(self):
         # `mine` is the one action a Skillship teacher calls on themselves
-        # (to populate their school switcher) — everything else is admin-only.
-        if self.action == "mine":
+        # (to populate their school switcher); `today` is the one action a
+        # PRINCIPAL calls about THEIR school — everything else is admin-only.
+        if self.action in ("mine", "today"):
             return [IsAuthenticated()]
         return super().get_permissions()
 
@@ -51,6 +69,25 @@ class SkillshipAssignmentViewSet(ModelViewSet):
             .order_by("school__name")
         )
         return Response(self.get_serializer(qs, many=True).data)
+
+    @action(detail=False, methods=["get"], url_path="today")
+    def today(self, request):
+        """The Skillship teacher(s) scheduled at the requesting PRINCIPAL's
+        school today — name, id, photo, class, subject. Computed in Python
+        (not the DB) since the schedule match needs weekday/date-range logic
+        identical to the teacher's own "My Teaching Schedule" card."""
+        if request.user.role != Role.PRINCIPAL:
+            raise PermissionDenied("Only a principal can view today's Skillship teachers.")
+        if request.user.school_id is None:
+            return Response([])
+        today = timezone.localdate()
+        iso_today = today.isoformat()
+        qs = (
+            SkillshipAssignment.objects.select_related("teacher", "klass")
+            .filter(school_id=request.user.school_id, is_active=True)
+        )
+        rows = [a for a in qs if _is_scheduled_today(a, today, iso_today)]
+        return Response(TodaysTeacherSerializer(rows, many=True).data)
 
     def get_queryset(self):
         qs = (

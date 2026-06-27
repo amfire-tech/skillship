@@ -200,30 +200,32 @@ export function Header({ crumbMap = {}, onMenuClick }: HeaderProps) {
               <p className="truncate text-xs text-[var(--muted-foreground)]">{user?.email ?? ""}</p>
             </div>
 
-            {/* Language switcher — students pick their dashboard language here */}
-            <div className="border-b border-[var(--border)] px-4 py-3">
-              <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
-                {t("Language")}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {LANGUAGES.map((l) => (
-                  <button
-                    key={l.code}
-                    type="button"
-                    onClick={() => setLang(l.code)}
-                    aria-pressed={lang === l.code}
-                    className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors ${
-                      lang === l.code
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary"
-                    }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
+            {/* Language switcher — student dashboard only */}
+            {user?.role === "STUDENT" && (
+              <div className="border-b border-[var(--border)] px-4 py-3">
+                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                  {t("Language")}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => setLang(l.code)}
+                      aria-pressed={lang === l.code}
+                      className={`rounded-lg border px-2 py-1 text-xs font-semibold transition-colors ${
+                        lang === l.code
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/30 hover:text-primary"
+                      }`}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <Link
               href={dashboardHref}

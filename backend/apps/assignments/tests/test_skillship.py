@@ -237,6 +237,49 @@ def test_mine_lists_own_active_assignments(api_client, skillship_teacher, school
     assert str(school_b.id) not in school_ids  # revoked → excluded
 
 
+# ── Today's Teacher (PRINCIPAL) ───────────────────────────────────────────────
+
+
+def test_today_lists_only_scheduled_for_principals_school(api_client, principal_a, skillship_teacher, school_a, school_b, login):
+    import datetime as _dt
+
+    today_weekday = _dt.date.today().weekday()
+    SkillshipAssignment.objects.create(
+        teacher=skillship_teacher, school=school_a, is_active=True,
+        weekdays=[today_weekday], subject="Robotics",
+    )
+    # Scheduled at a DIFFERENT school today — must not leak into school_a's view.
+    SkillshipAssignment.objects.create(
+        teacher=skillship_teacher, school=school_b, is_active=True, weekdays=[today_weekday],
+    )
+    login(api_client, principal_a)
+    res = api_client.get(f"{SKILLSHIP}today/")
+    assert res.status_code == 200, res.content
+    assert len(res.data) == 1
+    row = res.data[0]
+    assert row["teacher_id"] == str(skillship_teacher.id)
+    assert row["subject"] == "Robotics"
+
+
+def test_today_excludes_assignment_not_scheduled_today(api_client, principal_a, skillship_teacher, school_a, login):
+    import datetime as _dt
+
+    other_weekday = (_dt.date.today().weekday() + 1) % 7
+    SkillshipAssignment.objects.create(
+        teacher=skillship_teacher, school=school_a, is_active=True, weekdays=[other_weekday],
+    )
+    login(api_client, principal_a)
+    res = api_client.get(f"{SKILLSHIP}today/")
+    assert res.status_code == 200, res.content
+    assert res.data == []
+
+
+def test_today_forbidden_for_non_principal(api_client, skillship_teacher, login):
+    login(api_client, skillship_teacher)
+    res = api_client.get(f"{SKILLSHIP}today/")
+    assert res.status_code == 403
+
+
 def test_bulk_assign_students_to_skillship_teacher(api_client, main_admin, student_a, skillship_teacher, school_a, login):
     SkillshipAssignment.objects.create(teacher=skillship_teacher, school=school_a, is_active=True)
     login(api_client, main_admin)

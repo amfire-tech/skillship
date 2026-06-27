@@ -5,6 +5,10 @@
  *          School is auto-filled (read-only) from the account. On submit the
  *          backend enrols them into the class and LOCKS the profile; only the
  *          Super Admin can change it afterward. Drives: /auth/complete-profile/.
+ *          Always rendered in English regardless of any saved language
+ *          preference — this runs on shared school devices before the new
+ *          student has made any choice of their own, so a prior student's
+ *          stored locale must never leak into this form.
  * Owner:   Pranav
  */
 
@@ -15,14 +19,12 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { apiFetch } from "@/lib/auth";
 import { useAuthStore } from "@/store/authStore";
-import { useLanguage } from "@/providers/LanguageProvider";
 import type { User } from "@/types";
 
 export default function CompleteProfilePage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
-  const { t } = useLanguage();
 
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
@@ -83,12 +85,12 @@ export default function CompleteProfilePage() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_30px_80px_-30px_rgba(0,0,0,0.3)] dark:bg-[var(--background)]"
       >
-        <div className="h-1.5 w-full bg-gradient-to-r from-primary via-accent to-primary" />
+        <div className="h-1.5 w-full" style={{ backgroundImage: "var(--gradient-brand)" }} />
         <form onSubmit={submit} className="space-y-5 p-7">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[var(--foreground)]">{t("Set up your profile")}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[var(--foreground)]">Set up your profile</h1>
             <p className="mt-1.5 text-sm text-[var(--muted-foreground)]">
-              {t("Welcome to Skillship! Fill in your details to get started.")}
+              Welcome to Skillship! Fill in your details to get started.
             </p>
           </div>
 
@@ -99,7 +101,7 @@ export default function CompleteProfilePage() {
 
           {/* School — auto-filled, read-only */}
           <div className="grid gap-1.5">
-            <span className={labelCls}>{t("School")}</span>
+            <span className={labelCls}>School</span>
             <div className="flex h-11 items-center rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3.5 text-sm font-medium text-[var(--foreground)]">
               {schoolLabel}
             </div>
@@ -107,22 +109,22 @@ export default function CompleteProfilePage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5">
-              <span className={labelCls}>{t("First name")} *</span>
+              <span className={labelCls}>First name *</span>
               <input value={first} onChange={(e) => setFirst(e.target.value)} className={inputCls} autoFocus />
             </label>
             <label className="grid gap-1.5">
-              <span className={labelCls}>{t("Last name")}</span>
+              <span className={labelCls}>Last name</span>
               <input value={last} onChange={(e) => setLast(e.target.value)} className={inputCls} />
             </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="grid gap-1.5">
-              <span className={labelCls}>{t("Roll no")} *</span>
+              <span className={labelCls}>Roll no *</span>
               <input value={roll} onChange={(e) => setRoll(e.target.value)} placeholder="e.g. 23" className={inputCls} />
             </label>
             <label className="grid gap-1.5">
-              <span className={labelCls}>{t("Class")} *</span>
+              <span className={labelCls}>Class *</span>
               <input
                 type="number" min={1} max={12} value={grade}
                 onChange={(e) => setGrade(e.target.value.replace(/[^0-9]/g, ""))}
@@ -130,7 +132,7 @@ export default function CompleteProfilePage() {
               />
             </label>
             <label className="grid gap-1.5">
-              <span className={labelCls}>{t("Section")} *</span>
+              <span className={labelCls}>Section *</span>
               <input
                 value={section}
                 onChange={(e) => setSection(e.target.value.toUpperCase().slice(0, 4))}
@@ -145,9 +147,10 @@ export default function CompleteProfilePage() {
 
           <button
             type="submit" disabled={saving}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5 disabled:opacity-60"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-white shadow-[0_10px_24px_-10px_rgba(243,156,50,0.5)] transition-all hover:-translate-y-0.5 disabled:opacity-60"
+            style={{ backgroundImage: "var(--gradient-brand)" }}
           >
-            {saving ? t("Saving…") : t("Save & continue")}
+            {saving ? "Saving…" : "Save & continue"}
           </button>
         </form>
       </motion.div>

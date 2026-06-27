@@ -874,3 +874,52 @@
     backdrop-filter: none !important;
   }
 }
+
+/* ── Dashboard mobile operability ──────────────────────────────────────────
+   The dashboards are dense (wide data tables, multi-column forms). On phones
+   every wide table is wrapped in `.overflow-x-auto` so it scrolls sideways,
+   but on touch devices the scrollbar is hidden by default — users never
+   discover the off-screen columns ("can't see the whole content"). These
+   rules (1) enable momentum scrolling and (2) keep a slim, always-visible
+   scrollbar on the horizontal scrollers so the affordance is obvious, plus a
+   tiny touch hardening for stable, readable rendering. */
+.dashboard-shell .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  /* Slim, persistent scrollbar on touch so off-screen table columns are
+     visibly reachable instead of silently clipped. */
+  .dashboard-shell .overflow-x-auto {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--primary) 45%, transparent) transparent;
+  }
+  .dashboard-shell .overflow-x-auto::-webkit-scrollbar {
+    height: 5px;
+    -webkit-appearance: none;
+  }
+  .dashboard-shell .overflow-x-auto::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--primary) 45%, transparent);
+    border-radius: 9999px;
+  }
+
+  /* iOS Safari auto-zooms the whole page when a focused input's font-size is
+     below 16px — the dashboards use `text-sm` (14px) on most fields, so every
+     tap into a field jolts the layout. Force a 16px minimum on touch devices
+     only (desktop sizing is untouched) to keep focus stable. */
+  .dashboard-shell input,
+  .dashboard-shell select,
+  .dashboard-shell textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Keep text rendering stable across orientation changes and tap highlights
+   subtle on the dense dashboards. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.dashboard-shell button,
+.dashboard-shell a,
+.dashboard-shell [role="button"] {
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--primary) 18%, transparent);
+}

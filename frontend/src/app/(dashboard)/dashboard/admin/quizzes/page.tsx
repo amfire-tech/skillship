@@ -35,6 +35,7 @@ interface Quiz {
   total_attempts?: number;
   avg_score?: number | string | null;
   status?: "Published" | "Draft" | "Review" | string;
+  published_at?: string | null;
   updated_at?: string;
   created_at?: string;
 }
@@ -78,14 +79,21 @@ function formatScore(q: Quiz): string {
   return `${Math.round(n)}%`;
 }
 
-function formatUpdated(q: Quiz): string {
-  const raw = q.updated_at ?? q.created_at;
+function formatDate(raw: string | null | undefined): string {
   if (!raw) return "—";
   try {
     return new Date(raw).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   } catch {
     return raw;
   }
+}
+
+function formatUpdated(q: Quiz): string {
+  return formatDate(q.updated_at ?? q.created_at);
+}
+
+function formatPublished(q: Quiz): string {
+  return formatDate(q.published_at);
 }
 
 function getQuizStatus(q: Quiz): string {
@@ -120,6 +128,37 @@ const STATIC_SUBJECTS = [...QUIZ_SUBJECTS];
 const STATIC_GRADES = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"];
 const statuses = ["All Status", "Published", "Review", "Draft", "Archived"];
 
+type SortKey = "published_desc" | "published_asc" | "updated_desc" | "title_asc" | "questions_desc" | "attempts_desc";
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "published_desc", label: "Newest published" },
+  { value: "published_asc", label: "Oldest published" },
+  { value: "updated_desc", label: "Recently updated" },
+  { value: "title_asc", label: "Title (A–Z)" },
+  { value: "questions_desc", label: "Most questions" },
+  { value: "attempts_desc", label: "Most attempts" },
+];
+
+function sortQuizzes(list: Quiz[], sort: SortKey): Quiz[] {
+  const copy = [...list];
+  const time = (raw?: string | null) => (raw ? new Date(raw).getTime() : 0);
+  switch (sort) {
+    case "published_desc":
+      return copy.sort((a, b) => time(b.published_at) - time(a.published_at));
+    case "published_asc":
+      return copy.sort((a, b) => time(a.published_at) - time(b.published_at));
+    case "updated_desc":
+      return copy.sort((a, b) => time(b.updated_at ?? b.created_at) - time(a.updated_at ?? a.created_at));
+    case "title_asc":
+      return copy.sort((a, b) => a.title.localeCompare(b.title));
+    case "questions_desc":
+      return copy.sort((a, b) => getQuestionCount(b) - getQuestionCount(a));
+    case "attempts_desc":
+      return copy.sort((a, b) => (Number(b.total_attempts) || 0) - (Number(a.total_attempts) || 0));
+    default:
+      return copy;
+  }
+}
+
 // ── Page ───────────────────────────────────────────────────────
 export default function GlobalQuizPage() {
   const toast = useToast();
@@ -130,24 +169,36 @@ export default function GlobalQuizPage() {
   const [subject, setSubject] = useState("All Subjects");
   const [grade, setGrade] = useState("All Grades");
   const [status, setStatus] = useState("All Status");
+  const [sort, setSort] = useState<SortKey>("published_desc");
 
   useEffect(() => {
     document.title = "Quiz Management — Skillship";
   }, []);
 
   useEffect(() => {
-    apiFetch<PaginatedResponse<Quiz> | Quiz[]>("/quizzes/")
-      .then((data) => {
-        const list = Array.isArray(data) ? data : (data?.results ?? []);
-        setQuizzes(list);
-      })
-      .catch((err) => {
+    async function loadAll() {
+      const all: Quiz[] = [];
+      // The API paginates at 20/page (max 100) — page through every result so
+      // "All Quizzes" actually means all, not just the first page.
+      let path: string | null = "/quizzes/?page_size=100";
+      try {
+        while (path) {
+          const currentPath: string = path;
+          const data: PaginatedResponse<Quiz> | Quiz[] = await apiFetch(currentPath);
+          if (Array.isArray(data)) { all.push(...data); path = null; continue; }
+          all.push(...(data.results ?? []));
+          path = data.next ? data.next.replace(API_BASE, "") : null;
+        }
+        setQuizzes(all);
+      } catch (err) {
         if (process.env.NODE_ENV !== "production") {
           console.error("Failed to load quizzes:", err);
         }
         setQuizzes([]);
         toast("Failed to load quizzes. Please try again.", "error");
-      });
+      }
+    }
+    loadAll();
   }, []);
 
   const subjects = useMemo(() => {
@@ -166,17 +217,21 @@ export default function GlobalQuizPage() {
     })];
   }, [quizzes]);
 
-  const filtered = (quizzes ?? []).filter((q) => {
+  const filtered = sortQuizzes((quizzes ?? []).filter((q) => {
     const q2 = search.toLowerCase();
     const matchSearch = !q2 || q.title.toLowerCase().includes(q2) || (q.subject ?? "").toLowerCase().includes(q2);
     const matchSubject = subject === "All Subjects" || q.subject === subject;
     const matchGrade = grade === "All Grades" || getGrade(q) === grade;
     const matchStatus = status === "All Status" || getQuizStatus(q) === status;
     return matchSearch && matchSubject && matchGrade && matchStatus;
-  });
+  }), sort);
 
   async function deleteQuiz(q: Quiz) {
-    if (!confirm(`Delete "${q.title}"? This permanently removes it from history.`)) return;
+    const attempts = q.total_attempts ?? 0;
+    const warning = attempts > 0
+      ? `Delete "${q.title}"? It has ${attempts} attempt${attempts === 1 ? "" : "s"} — deleting it as super-admin permanently erases that history too. This cannot be undone.`
+      : `Delete "${q.title}"? This permanently removes it from history.`;
+    if (!confirm(warning)) return;
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); return; }
     try {
@@ -190,8 +245,7 @@ export default function GlobalQuizPage() {
         toast("Quiz deleted", "success");
       } else {
         const body = await res.json().catch(() => ({}));
-        // Quizzes with attempts can't be deleted — they must be archived from the quiz page.
-        toast(body?.detail ?? "Couldn't delete this quiz (it may have attempts).", "error");
+        toast(body?.detail ?? "Couldn't delete this quiz.", "error");
       }
     } catch {
       toast("Network error", "error");
@@ -243,6 +297,9 @@ export default function GlobalQuizPage() {
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
           {statuses.map((s) => <option key={s}>{s}</option>)}
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="h-10 rounded-lg border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+          {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </motion.div>
 
@@ -297,7 +354,9 @@ export default function GlobalQuizPage() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between text-xs">
-                  <span className="text-[var(--muted-foreground)]">Updated {formatUpdated(q)}</span>
+                  <span className="text-[var(--muted-foreground)]">
+                    {getQuizStatus(q) === "Published" ? `Published ${formatPublished(q)}` : `Updated ${formatUpdated(q)}`}
+                  </span>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => router.push(`/dashboard/admin/quizzes/${q.id}`)}

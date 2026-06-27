@@ -34,6 +34,7 @@ class UserSerializer(serializers.ModelSerializer):
     )
     school_name = serializers.SerializerMethodField()
     school_logo = serializers.SerializerMethodField()
+    profile_photo = serializers.SerializerMethodField()
     current_class = serializers.SerializerMethodField()
     # The class UUID (not just the label) so the admin edit form can preselect
     # the student's current class in the Class dropdown.
@@ -61,6 +62,15 @@ class UserSerializer(serializers.ModelSerializer):
         if not self.context.get("me") or not obj.school_id:
             return None
         return obj.school.logo or None
+
+    def get_profile_photo(self, obj):
+        # Same weight concern as school_logo above — only on the self-profile
+        # call. Other surfaces that need a teacher's photo for someone ELSE
+        # (e.g. a principal's "Today's Teacher" view) read it through a
+        # dedicated, purpose-built serializer instead of this one.
+        if not self.context.get("me"):
+            return None
+        return obj.profile_photo or None
 
     def get_assigned_teacher_name(self, obj):
         t = obj.assigned_teacher
@@ -144,6 +154,7 @@ class UserSerializer(serializers.ModelSerializer):
             "school",
             "school_name",
             "school_logo",
+            "profile_photo",
             "teacher_type",
             "phone",
             "admission_number",
@@ -488,6 +499,30 @@ class PasswordSetSerializer(serializers.Serializer):
             validate_password(value)
         except DjangoValidationError as exc:
             raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
+
+
+# Photos are tiny; cap the stored data-URL so a stray multi-MB image can't
+# bloat the row (and every /auth/me/ payload). Mirrors schools.MAX_LOGO_CHARS.
+MAX_PROFILE_PHOTO_CHARS = 700_000
+
+
+class ProfilePhotoSerializer(serializers.Serializer):
+    """Body for POST /api/v1/auth/profile-photo/ — self-service avatar upload."""
+
+    photo = serializers.CharField(allow_blank=True, trim_whitespace=False)
+
+    def validate_photo(self, value):
+        if not value:
+            return ""  # clears the photo
+        if not value.startswith("data:image/"):
+            raise serializers.ValidationError(
+                "Photo must be an image data-URL (data:image/...)."
+            )
+        if len(value) > MAX_PROFILE_PHOTO_CHARS:
+            raise serializers.ValidationError(
+                "Photo is too large. Please upload an image under ~500 KB."
+            )
         return value
 
 

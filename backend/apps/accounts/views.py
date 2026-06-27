@@ -275,6 +275,27 @@ class CompleteProfileView(APIView):
         return year
 
 
+class UpdateProfilePhotoView(APIView):
+    """POST /api/v1/auth/profile-photo/ — the logged-in user sets/clears their
+    own avatar (a base64 data-URL, same storage pattern as School.logo). Any
+    authenticated role may call this; it matters most for Skillship (roaming)
+    teachers, whose photo is how an unfamiliar school's principal recognises
+    them on the "Today's Teacher" view, but it's not restricted to them.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .serializers import ProfilePhotoSerializer
+
+        serializer = ProfilePhotoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.profile_photo = serializer.validated_data["photo"]
+        user.save(update_fields=["profile_photo"])
+        return Response(UserSerializer(user, context={"me": True}).data)
+
+
 class ChangePasswordView(APIView):
     """POST /api/v1/auth/change-password/ — the logged-in user changes their own
     password by proving the current one. Body: {current_password, new_password}.

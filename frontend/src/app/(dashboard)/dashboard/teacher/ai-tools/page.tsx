@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-type ToolKey = "generate" | "grade" | "search";
+type ToolKey = "generate" | "grade";
 
 interface Tool {
   key: ToolKey;
@@ -21,7 +21,7 @@ interface Tool {
   cta: string;
   href?: string;
   icon: React.ReactNode;
-  tone: "primary" | "violet" | "blue" | "amber";
+  tone: "primary" | "violet";
 }
 
 const TOOLS: Tool[] = [
@@ -45,15 +45,6 @@ const TOOLS: Tool[] = [
     tone: "violet",
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>,
   },
-  {
-    key: "search",
-    title: "Content Search",
-    description: "Natural-language search across school videos, PDFs, and notes — pgvector-backed semantic search.",
-    endpoint: "/ai/content/search/",
-    cta: "Search content",
-    tone: "blue",
-    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>,
-  },
   // Adaptive Quiz Engine removed from the teacher surface (2026-06-13): adaptive
   // attempts give each student a different question set, so scores aren't
   // comparable and can't feed the leaderboard. To be reintroduced on the
@@ -63,8 +54,6 @@ const TOOLS: Tool[] = [
 const TONE_BG: Record<Tool["tone"], string> = {
   primary: "bg-primary/10 text-primary",
   violet:  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
-  blue:    "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
-  amber:   "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
 };
 
 export default function AIToolsPage() {
@@ -96,9 +85,7 @@ export default function AIToolsPage() {
             </div>
 
             <div className="mt-4">
-              {t.key === "search" ? (
-                <ContentSearchNotice />
-              ) : t.href ? (
+              {t.href ? (
                 <Link href={t.href} className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5">
                   {t.cta}
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -108,27 +95,6 @@ export default function AIToolsPage() {
           </motion.div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ─── Content search — coming soon ─────────────────────────────────────────
-// Semantic content search needs your school's content library to be uploaded
-// and indexed first. Until that's set up we show a warm "coming soon" note
-// rather than a search box that would error — see the message copy below.
-function ContentSearchNotice() {
-  return (
-    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-      <p className="flex items-center gap-2 text-xs font-semibold text-primary">
-        <span aria-hidden="true">🚧</span> Coming soon
-      </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-[var(--muted-foreground)]">
-        Content Search is being prepared for your school. Once your class materials —
-        videos, PDFs and notes — are uploaded and indexed, you&apos;ll be able to search
-        them here in plain English. We&apos;ll switch this on shortly; if you&apos;d like it
-        enabled sooner, just reach out and we&apos;ll prioritise it for you. Thank you for
-        your patience! 🙏
-      </p>
     </div>
   );
 }
