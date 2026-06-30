@@ -11,7 +11,7 @@ Surface map:
   /api/v1/quizzes/rankings/              (student class/school leaderboard — ?scope=CLASS|SCHOOL)
   /api/v1/quizzes/{id}/submit-for-review/            (TEACHER+)
   /api/v1/quizzes/{id}/return-to-draft/              (REVIEW gate)
-  /api/v1/quizzes/{id}/publish/                      (PRINCIPAL/SUB_ADMIN)
+  /api/v1/quizzes/{id}/publish/                      (MAIN_ADMIN/SUB_ADMIN only)
   /api/v1/quizzes/{id}/archive/                      (TEACHER+)
   /api/v1/quizzes/{id}/start/                        (STUDENT — start/resume attempt)
   /api/v1/quizzes/{id}/rankings/                     (per-quiz leaderboard)
@@ -184,6 +184,15 @@ class QuizViewSet(TenantScopedViewSet):
 
     def get_queryset(self) -> QuerySet[Quiz]:
         qs = super().get_queryset()
+        u = self.request.user
+        # Apply two-party soft-delete visibility:
+        #   MAIN_ADMIN sees only quizzes it hasn't deleted.
+        #   Everyone else (teacher, principal, student…) sees only quizzes
+        #   the teacher hasn't deleted.
+        if u.role == Role.MAIN_ADMIN:
+            qs = qs.filter(deleted_by_admin=False)
+        else:
+            qs = qs.filter(deleted_by_teacher=False)
         if self.request.user.role == Role.STUDENT:
             qs = qs.filter(status=Quiz.Status.PUBLISHED)
             # Scope to what THIS student should see. Previously every student saw
@@ -365,15 +374,36 @@ class QuizViewSet(TenantScopedViewSet):
 
     def perform_destroy(self, instance):
         self._require_author()
-        has_attempts = QuizAttempt.objects.filter(quiz=instance).exists()
-        if has_attempts and self.request.user.role != Role.MAIN_ADMIN:
-            raise ValidationError(
-                {"detail": "Cannot delete a quiz with attempts. Archive instead."}
-            )
-        if has_attempts:
-            # MAIN_ADMIN can force a permanent delete — attempts are PROTECTed
-            # against accidental deletion, so clear them first; Answers cascade.
-            QuizAttempt.objects.filter(quiz=instance).delete()
+        u = self.request.user
+
+        # Two-party soft delete: each party marks their own flag. The quiz is
+        # permanently removed only when BOTH teacher and admin have deleted it.
+        if u.role == Role.TEACHER:
+            if instance.deleted_by_admin:
+                # Admin already deleted — permanent removal now.
+                self._hard_delete(instance)
+            else:
+                instance.deleted_by_teacher = True
+                instance.save(update_fields=["deleted_by_teacher"])
+        elif u.role == Role.MAIN_ADMIN:
+            if instance.deleted_by_teacher:
+                # Teacher already deleted — permanent removal now.
+                self._hard_delete(instance)
+            else:
+                instance.deleted_by_admin = True
+                instance.save(update_fields=["deleted_by_admin"])
+        else:
+            # PRINCIPAL / SUB_ADMIN follow the admin-side flag.
+            if instance.deleted_by_teacher:
+                self._hard_delete(instance)
+            else:
+                instance.deleted_by_admin = True
+                instance.save(update_fields=["deleted_by_admin"])
+
+    @staticmethod
+    def _hard_delete(instance) -> None:
+        """Permanently erase a quiz and its attempt history."""
+        QuizAttempt.objects.filter(quiz=instance).delete()
         instance.delete()
 
     # ── State transitions ───────────────────────────────────────────────────

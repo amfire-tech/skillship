@@ -243,7 +243,7 @@ export default function TeacherDailyLogPage() {
             <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--muted-foreground)] hover:border-primary/40 hover:text-primary ${photoBusy ? "pointer-events-none opacity-60" : ""}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
               {photoBusy ? "Processing…" : "Take / upload photo"}
-              <input type="file" accept="image/*" capture="environment" onChange={onPickPhoto} className="hidden" disabled={photoBusy} />
+              <input type="file" accept="image/*" onChange={onPickPhoto} className="hidden" disabled={photoBusy} />
             </label>
           )}
         </div>

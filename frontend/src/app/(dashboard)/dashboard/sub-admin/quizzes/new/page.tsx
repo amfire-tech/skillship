@@ -13,7 +13,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { API_BASE, getToken } from "@/lib/auth";
+import { API_BASE, getToken, apiFetch } from "@/lib/auth";
+import { asArray } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -392,6 +393,19 @@ function Step1BasicInfo({ basic, onChange, subjects }: { basic: BasicInfo; onCha
   );
 }
 
+// ─── Bank picker types ───────────────────────────────────────────────────
+interface BankOption { id: string; name: string; subject?: string; question_count?: number; }
+interface BankQuestion {
+  id: string;
+  text: string;
+  type: string;
+  difficulty: string;
+  points: number;
+  options: { id: string; text: string }[];
+  correct_option_ids: string[];
+  accepted_answers?: string[];
+}
+
 // ─── Step 2: Add Questions ──────────────────────────────────────────────
 function Step2Questions({
   questions, defaultSubject, defaultDifficulty, onAdd, onRemove,
@@ -405,6 +419,7 @@ function Step2Questions({
   const [text, setText] = useState("");
   const [opts, setOpts] = useState(["", "", "", ""]);
   const [correct, setCorrect] = useState(0);
+  const [bankPickerOpen, setBankPickerOpen] = useState(false);
 
   function addManual() {
     if (!text.trim()) return;
@@ -429,9 +444,29 @@ function Step2Questions({
         </span>
       </div>
 
+      {/* Pick from question bank — the primary path when bank has questions */}
+      <div className="rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--foreground)]">Pick from Question Bank</p>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Browse questions you already uploaded via CSV or the bank page.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBankPickerOpen(true)}
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-4 text-xs font-semibold text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.5)] transition-transform hover:-translate-y-0.5"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+            Browse Bank
+          </button>
+        </div>
+      </div>
+
       {/* Manual add */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/30 p-4 space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Add manually</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Or add manually (MCQ only)</p>
         <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="Enter question text…" className={inputCls} />
         <div className="space-y-2">
           {opts.map((o, i) => (
@@ -456,7 +491,7 @@ function Step2Questions({
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Quiz questions ({questions.length})</p>
         {questions.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--border)] px-6 py-10 text-center text-sm text-[var(--muted-foreground)]">
-            No questions yet. Add manually above or use the AI generator on the right.
+            No questions yet. Browse the bank above, add manually, or use the AI generator on the right.
           </div>
         ) : (
           questions.map((q, i) => (
@@ -480,7 +515,301 @@ function Step2Questions({
           ))
         )}
       </div>
+
+      {/* Bank Picker Modal */}
+      <AnimatePresence>
+        {bankPickerOpen && (
+          <BankPickerModal
+            defaultDifficulty={defaultDifficulty}
+            defaultSubject={defaultSubject}
+            alreadyAdded={questions.map((q) => q.text)}
+            onAdd={(qs) => { qs.forEach(onAdd); }}
+            onClose={() => setBankPickerOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+// ─── Bank Picker Modal ───────────────────────────────────────────────────
+function BankPickerModal({
+  defaultDifficulty,
+  defaultSubject,
+  alreadyAdded,
+  onAdd,
+  onClose,
+}: {
+  defaultDifficulty: Difficulty;
+  defaultSubject: string;
+  alreadyAdded: string[];
+  onAdd: (qs: DraftQuestion[]) => void;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const [banks, setBanks] = useState<BankOption[] | null>(null);
+  const [bankId, setBankId] = useState("");
+  const [bankQuestions, setBankQuestions] = useState<BankQuestion[] | null>(null);
+  const [loadingQ, setLoadingQ] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+
+  // Lock body scroll
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+
+  // Load all banks for this school
+  useEffect(() => {
+    (async () => {
+      const res = await apiFetch("/quizzes/banks/");
+      const list = res.ok ? asArray<BankOption>(await res.json()) : [];
+      setBanks(list);
+      if (list[0]) setBankId(list[0].id);
+    })();
+  }, []);
+
+  // Load questions when bank changes
+  useEffect(() => {
+    if (!bankId) { setBankQuestions([]); return; }
+    let cancelled = false;
+    setLoadingQ(true);
+    setBankQuestions(null);
+    setSelected(new Set());
+    (async () => {
+      const res = await apiFetch(`/quizzes/questions/?bank=${bankId}`);
+      if (cancelled) return;
+      const list = res.ok ? asArray<BankQuestion>(await res.json()) : [];
+      setBankQuestions(list);
+      setLoadingQ(false);
+    })();
+    return () => { cancelled = true; };
+  }, [bankId]);
+
+  const filtered = useMemo(() => {
+    if (!bankQuestions) return null;
+    const q = search.trim().toLowerCase();
+    if (!q) return bankQuestions;
+    return bankQuestions.filter((bq) => bq.text.toLowerCase().includes(q));
+  }, [bankQuestions, search]);
+
+  function toggleAll() {
+    if (!filtered) return;
+    const ids = filtered.map((q) => q.id);
+    if (ids.every((id) => selected.has(id))) {
+      setSelected((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; });
+    } else {
+      setSelected((s) => new Set(Array.from(s).concat(ids)));
+    }
+  }
+
+  function addSelected() {
+    if (!bankQuestions || selected.size === 0) return;
+    const picked = bankQuestions.filter((q) => selected.has(q.id));
+    const converted: DraftQuestion[] = picked.map((q) => {
+      // Convert bank's {id,text}[] options back to plain strings for the wizard.
+      const opts = (q.options ?? []).map((o) => o.text);
+      // Find the index of the correct option.
+      const correctId = q.correct_option_ids?.[0] ?? "";
+      const correctIdx = (q.options ?? []).findIndex((o) => o.id === correctId);
+      return {
+        text: q.text,
+        subject: defaultSubject,
+        difficulty: (q.difficulty as Difficulty) ?? defaultDifficulty,
+        options: opts.length >= 2 ? opts : ["True", "False"],
+        correct_answer_index: correctIdx >= 0 ? correctIdx : 0,
+      };
+    });
+    onAdd(converted);
+    toast(`${converted.length} question${converted.length === 1 ? "" : "s"} added to quiz`, "success");
+    onClose();
+  }
+
+  const noBanks = banks !== null && banks.length === 0;
+  const allFilteredSelected = !!(filtered?.length && filtered.every((q) => selected.has(q.id)));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-10 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog" aria-modal="true" aria-label="Pick questions from bank"
+    >
+      <motion.div
+        initial={{ scale: 0.96, y: 8, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.3)] dark:bg-[var(--background)]"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-primary via-accent to-primary" />
+        <div className="space-y-4 p-6">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">Pick from Question Bank</h3>
+              <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+                Select the questions you want in this quiz. They are copied into the quiz draft.
+              </p>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          {/* Bank selector */}
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Question bank</label>
+            <select
+              value={bankId}
+              onChange={(e) => setBankId(e.target.value)}
+              disabled={banks === null || noBanks}
+              className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)] disabled:opacity-60"
+            >
+              {banks === null && <option>Loading…</option>}
+              {noBanks && <option>No question banks yet — upload a CSV first</option>}
+              {banks?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}{b.question_count !== undefined ? ` (${b.question_count} questions)` : ""}
+                </option>
+              ))}
+            </select>
+            {noBanks && (
+              <p className="mt-1.5 text-[11px] text-[var(--muted-foreground)]">
+                Go to{" "}
+                <Link href="/dashboard/sub-admin/question-bank" className="font-semibold text-primary hover:underline">
+                  Question Bank
+                </Link>
+                {" "}and upload a CSV to populate a bank first.
+              </p>
+            )}
+          </div>
+
+          {/* Search + select-all */}
+          {!noBanks && (
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </span>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search questions…"
+                  className="h-9 w-full rounded-xl border border-[var(--border)] bg-white pl-8 pr-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+                />
+              </div>
+              {(filtered?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="h-9 whitespace-nowrap rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)]"
+                >
+                  {allFilteredSelected ? "Deselect all" : "Select all"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Question list */}
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--border)]">
+            {loadingQ || filtered === null ? (
+              <div className="space-y-2 p-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-10 animate-pulse rounded-lg bg-[var(--muted)]" />
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-10 text-center text-sm text-[var(--muted-foreground)]">
+                {bankQuestions?.length === 0
+                  ? "This bank has no questions yet — upload a CSV to add some."
+                  : "No questions match your search."}
+              </div>
+            ) : (
+              <ul className="divide-y divide-[var(--border)]/60">
+                {filtered.map((q) => {
+                  const isSelected = selected.has(q.id);
+                  const alreadyIn = alreadyAdded.includes(q.text);
+                  return (
+                    <li
+                      key={q.id}
+                      onClick={() => {
+                        if (alreadyIn) return;
+                        setSelected((s) => {
+                          const n = new Set(s);
+                          if (n.has(q.id)) n.delete(q.id); else n.add(q.id);
+                          return n;
+                        });
+                      }}
+                      className={`flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors ${
+                        alreadyIn
+                          ? "cursor-not-allowed opacity-40"
+                          : isSelected
+                          ? "bg-primary/8"
+                          : "hover:bg-[var(--muted)]/40"
+                      }`}
+                    >
+                      <div className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                        isSelected ? "border-primary bg-primary" : "border-[var(--border)] bg-white dark:bg-[var(--background)]"
+                      }`}>
+                        {isSelected && (
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm text-[var(--foreground)]">{q.text}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            q.type === "MCQ" ? "bg-blue-50 text-blue-700" :
+                            q.type === "TRUE_FALSE" ? "bg-purple-50 text-purple-700" :
+                            "bg-amber-50 text-amber-700"
+                          }`}>{q.type}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            q.difficulty === "EASY" ? "bg-emerald-50 text-emerald-700" :
+                            q.difficulty === "MEDIUM" ? "bg-amber-50 text-amber-700" :
+                            "bg-red-50 text-red-700"
+                          }`}>{q.difficulty}</span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">{q.points} pt{q.points !== 1 ? "s" : ""}</span>
+                          {alreadyIn && <span className="text-[10px] text-[var(--muted-foreground)]">already in quiz</span>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-[var(--border)] pt-3">
+            <span className="text-xs text-[var(--muted-foreground)]">
+              {selected.size > 0 ? `${selected.size} question${selected.size === 1 ? "" : "s"} selected` : "None selected"}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 rounded-full border border-[var(--border)] bg-white px-4 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={addSelected}
+                disabled={selected.size === 0}
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Add {selected.size > 0 ? `${selected.size} ` : ""}to Quiz →
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

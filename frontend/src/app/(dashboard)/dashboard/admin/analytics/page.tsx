@@ -248,7 +248,7 @@ export default function GlobalAnalyticsPage() {
           </div>
 
           {/* Per-school revenue — collected vs remaining */}
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
             <div className="border-b border-[var(--border)] p-5">
               <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Revenue by School</h3>
               <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">What each school has paid us and what is still due</p>
@@ -293,7 +293,7 @@ export default function GlobalAnalyticsPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
+        className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white"
       >
         <div className="border-b border-[var(--border)] p-5">
           <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">Regional Distribution</h3>

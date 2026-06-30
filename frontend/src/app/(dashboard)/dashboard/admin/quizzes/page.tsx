@@ -227,10 +227,7 @@ export default function GlobalQuizPage() {
   }), sort);
 
   async function deleteQuiz(q: Quiz) {
-    const attempts = q.total_attempts ?? 0;
-    const warning = attempts > 0
-      ? `Delete "${q.title}"? It has ${attempts} attempt${attempts === 1 ? "" : "s"} — deleting it as super-admin permanently erases that history too. This cannot be undone.`
-      : `Delete "${q.title}"? This permanently removes it from history.`;
+    const warning = `Remove "${q.title}" from your dashboard? It will still be visible to the teacher until they also delete it. Both parties must delete for permanent removal.`;
     if (!confirm(warning)) return;
     const token = await getToken();
     if (!token) { toast("Session expired", "error"); return; }

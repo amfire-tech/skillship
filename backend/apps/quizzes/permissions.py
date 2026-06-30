@@ -12,7 +12,7 @@ The matrix we enforce:
                         | STUDENT (without correct answers — at | (no student writes)
                         |  attempt time only, via QuizAttempt)  |
   Quiz                  | STUDENT only sees PUBLISHED in their  | TEACHER creates DRAFT.
-                        |  course;  TEACHER+ sees all statuses. | PRINCIPAL/SUB_ADMIN may publish.
+                        |  course;  TEACHER+ sees all statuses. | MAIN_ADMIN/SUB_ADMIN may publish.
   QuizAttempt           | Owner student; TEACHER+ for their     | Owner student (start/answer/submit).
                         |  course's quizzes.                    |
   Answer                | Through QuizAttempt only              | Through QuizAttempt only
@@ -31,7 +31,7 @@ from apps.common.permissions import Role
 
 
 _AUTHOR_ROLES = {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN}
-_REVIEW_ROLES = {Role.PRINCIPAL, Role.SUB_ADMIN}
+_REVIEW_ROLES = {Role.SUB_ADMIN}   # Only MAIN_ADMIN and (grant-gated) SUB_ADMIN can publish.
 _STAFF_ROLES  = {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN}
 
 
@@ -59,9 +59,14 @@ def _surface_ok(user) -> bool:
     A SUB_ADMIN is school-less (school_id is None) and reaches a school only via
     an active grant resolved per request — so we let them past the surface and
     enforce the concrete grant downstream (resolver on writes, _same_school +
-    capability on objects). Everyone else must have a home school.
+    capability on objects).
+
+    A Skillship TEACHER also has school_id=None; they declare their acting school
+    via X-School-Context. The _same_school object check (which calls
+    resolve_school_id) enforces the concrete school — so letting them past the
+    surface here is safe.
     """
-    if user.role == Role.SUB_ADMIN:
+    if user.role in {Role.SUB_ADMIN, Role.TEACHER}:
         return True
     return user.school_id is not None
 
@@ -88,10 +93,10 @@ class CanAuthorContent(BasePermission):
 
 
 class CanPublishQuiz(BasePermission):
-    """Only PRINCIPAL / SUB_ADMIN can move REVIEW → PUBLISHED.
+    """Only MAIN_ADMIN / SUB_ADMIN (with can_approve_quizzes grant) can move REVIEW → PUBLISHED.
 
-    TEACHER can submit-for-review, but cannot self-publish — the review gate
-    is the whole point of the workflow.
+    TEACHER and PRINCIPAL can submit-for-review but cannot publish — only the
+    super-admin or a delegated sub-admin may approve a quiz.
     """
 
     def has_permission(self, request, view):

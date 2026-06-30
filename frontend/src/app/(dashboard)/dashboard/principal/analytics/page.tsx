@@ -247,21 +247,23 @@ export default function PerformanceAnalyticsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Performance Analytics</h1>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">{schoolName}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <select value={range} onChange={(e) => setRange(e.target.value as Range)} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]">
-            <option value="1M">Last 1 Month</option>
-            <option value="3M">Last 3 Months</option>
-            <option value="6M">Last 6 Months</option>
-            <option value="12M">Last 12 Months</option>
-          </select>
-          <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]">
-            <option value="ALL">All Classes</option>
-            {classNames.map((c) => <option key={c}>{c}</option>)}
-          </select>
-          <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]">
-            <option value="ALL">All Subjects</option>
-            {subjects.map((s) => <option key={s}>{s}</option>)}
-          </select>
+        <div className="w-full overflow-x-auto sm:w-auto">
+          <div className="flex min-w-max items-center gap-2">
+            <select value={range} onChange={(e) => setRange(e.target.value as Range)} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]">
+              <option value="1M">Last 1 Month</option>
+              <option value="3M">Last 3 Months</option>
+              <option value="6M">Last 6 Months</option>
+              <option value="12M">Last 12 Months</option>
+            </select>
+            <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]">
+              <option value="ALL">All Classes</option>
+              {classNames.map((c) => <option key={c}>{c}</option>)}
+            </select>
+            <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-white px-3 text-sm font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]">
+              <option value="ALL">All Subjects</option>
+              {subjects.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 

@@ -76,7 +76,7 @@ export default function TeacherQuizzesPage() {
   }, []);
 
   const deleteQuiz = useCallback(async (q: Quiz) => {
-    if (!confirm(`Delete "${q.title}"? This permanently removes it from history.`)) return;
+    if (!confirm(`Remove "${q.title}" from your dashboard? It will still be visible to the Super Admin until they also delete it.`)) return;
     setBusyId(q.id);
     try {
       const res = await apiFetch(`/quizzes/${q.id}/`, { method: "DELETE" });
@@ -231,26 +231,14 @@ export default function TeacherQuizzesPage() {
                         >
                           View
                         </Link>
-                        {q.status === "PUBLISHED" && (
-                          <button
-                            type="button"
-                            onClick={() => archiveQuiz(q)}
-                            disabled={busyId === q.id}
-                            className="text-xs font-medium text-amber-600 hover:underline disabled:opacity-50"
-                          >
-                            Archive
-                          </button>
-                        )}
-                        {q.status !== "PUBLISHED" && (
-                          <button
-                            type="button"
-                            onClick={() => deleteQuiz(q)}
-                            disabled={busyId === q.id}
-                            className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
-                          >
-                            Delete
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => deleteQuiz(q)}
+                          disabled={busyId === q.id}
+                          className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>

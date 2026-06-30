@@ -110,6 +110,7 @@ export default function QuestionBankPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [createBankOpen, setCreateBankOpen] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -174,8 +175,18 @@ export default function QuestionBankPage() {
         return null;
       }
       const data = await res.json();
-      if (data?.created > 0) toast(`Imported ${data.created} question${data.created === 1 ? "" : "s"}.`, "success");
-      if ((data?.errors ?? []).length > 0) toast(`${data.errors.length} row${data.errors.length === 1 ? "" : "s"} skipped — see details.`, "info");
+      const errs = (data?.errors ?? []) as { row: number; message: string }[];
+      // A row-0 error with zero parsed rows means the WHOLE file was rejected
+      // (wrong/missing columns, empty, not a question CSV at all) — surface it
+      // as an error, not a "row skipped". Only when some rows actually parsed do
+      // we report a partial per-row outcome.
+      const fileLevel = (data?.total_rows ?? 0) === 0 && errs.length > 0;
+      if (fileLevel) {
+        toast(errs[0]?.message ?? "That file couldn't be read as a question CSV.", "error");
+      } else {
+        if (data?.created > 0) toast(`Imported ${data.created} question${data.created === 1 ? "" : "s"}.`, "success");
+        if (errs.length > 0) toast(`${errs.length} row${errs.length === 1 ? "" : "s"} skipped — see details.`, "info");
+      }
       await load();
       return data;
     } catch {
@@ -198,24 +209,34 @@ export default function QuestionBankPage() {
               : `${questions.length} question${questions.length === 1 ? "" : "s"} across all subjects`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => setCsvModalOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-60 dark:bg-[var(--background)]"
-          >
-            <UploadIcon />
-            {uploading ? "Uploading…" : "Bulk Upload CSV"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowAdd(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
-          >
-            <PlusIcon />
-            Add Question
-          </button>
+        <div className="w-full overflow-x-auto sm:w-auto">
+          <div className="flex min-w-max items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCreateBankOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-primary/40 hover:text-primary dark:bg-[var(--background)]"
+            >
+              <PlusIcon />
+              New Bank
+            </button>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => setCsvModalOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[var(--border)] bg-white px-5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-60 dark:bg-[var(--background)]"
+            >
+              <UploadIcon />
+              {uploading ? "Uploading…" : "Bulk Upload CSV"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-sm font-semibold text-white shadow-[0_12px_30px_-12px_rgba(5,150,105,0.5)] transition-all hover:-translate-y-0.5"
+            >
+              <PlusIcon />
+              Add Question
+            </button>
+          </div>
         </div>
       </div>
 
@@ -278,9 +299,9 @@ export default function QuestionBankPage() {
         </div>
 
         {/* Right pane */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {/* Difficulty pills + search */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="flex gap-1 rounded-full border border-[var(--border)] bg-white p-1 dark:bg-[var(--background)]">
               {(["ALL", "EASY", "MEDIUM", "HARD"] as const).map((d) => {
                 const active = activeDifficulty === d;
@@ -301,7 +322,7 @@ export default function QuestionBankPage() {
                 );
               })}
             </div>
-            <div className="relative min-w-[240px] flex-1">
+            <div className="relative w-full flex-1 sm:min-w-[240px]">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"><SearchIcon /></span>
               <input
                 type="search"
@@ -410,7 +431,166 @@ export default function QuestionBankPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Create Bank modal */}
+      <AnimatePresence>
+        {createBankOpen && (
+          <CreateBankModal
+            onClose={() => setCreateBankOpen(false)}
+            onCreated={async () => { setCreateBankOpen(false); toast("Bank created", "success"); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+
+// ─── Create Bank modal ───────────────────────────────────────────────────────
+
+function CreateBankModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [courses, setCourses] = useState<CourseSummary[] | null>(null);
+  const [name, setName] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const res = await apiFetch("/academics/courses/");
+      const data = res.ok ? await res.json() : { results: [] };
+      const list: CourseSummary[] = Array.isArray(data) ? data : (data?.results ?? []);
+      setCourses(list);
+      if (list[0]) setCourseId(list[0].id);
+    })();
+  }, []);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape" && !saving) onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; document.removeEventListener("keydown", onKey); };
+  }, [onClose, saving]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim()) { setError("Bank name is required."); return; }
+    if (!courseId) { setError("Pick a course."); return; }
+    setSaving(true);
+    const token = await getToken();
+    if (!token) { setError("Session expired."); setSaving(false); return; }
+    try {
+      const res = await fetch(`${API_BASE}/quizzes/banks/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), course: courseId, description: description.trim() }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const detail = body?.name?.[0] ?? body?.detail ?? `Failed (${res.status})`;
+        setError(detail);
+        return;
+      }
+      onCreated();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const noCourses = courses !== null && courses.length === 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-10 backdrop-blur-sm"
+      onClick={() => { if (!saving) onClose(); }}
+      role="dialog" aria-modal="true" aria-label="Create question bank"
+    >
+      <motion.div
+        initial={{ scale: 0.96, opacity: 0, y: 8 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_30px_80px_-20px_rgba(0,0,0,0.3)] dark:bg-[var(--background)]"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-primary via-accent to-primary" />
+        <form onSubmit={submit} className="space-y-4 p-6">
+          <div>
+            <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">Create Question Bank</h3>
+            <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+              A bank groups questions for one course. You can upload CSV questions into it afterwards.
+            </p>
+          </div>
+
+          <Field label="Bank name">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Robotics — Grade 9"
+              className={inputCls}
+              autoFocus
+            />
+          </Field>
+
+          <Field label="Course">
+            {courses === null ? (
+              <div className={`${inputCls} animate-pulse text-[var(--muted-foreground)]`}>Loading…</div>
+            ) : noCourses ? (
+              <p className="text-xs text-[var(--muted-foreground)]">No courses found. Create a course first in the academics section.</p>
+            ) : (
+              <select value={courseId} onChange={(e) => setCourseId(e.target.value)} className={inputCls}>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                ))}
+              </select>
+            )}
+          </Field>
+
+          <Field label="Description (optional)">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="What this bank covers…"
+              className={inputCls}
+            />
+          </Field>
+
+          {error && (
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="h-9 rounded-full border border-[var(--border)] bg-white px-4 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)] disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving || noCourses || courses === null}
+              className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Creating…" : "Create Bank"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -418,7 +598,52 @@ export default function QuestionBankPage() {
 // ─── Bulk CSV upload modal ───────────────────────────────────────────────────
 
 interface BankSummary { id: string; name: string; subject?: string; }
+interface CourseSummary { id: string; name: string; code: string; }
+
+/** Strip the trailing " — xxxxxx" suffix (6 hex chars) added by services.py to keep bank names unique. */
+function displayBankName(name: string): string {
+  return name.replace(/ — [0-9a-f]{6}$/i, "").trim();
+}
 type UploadResult = { created: number; errors: { row: number; message: string }[]; total_rows: number } | null;
+
+// A ready-to-edit sample. Download it, keep the header row exactly as-is,
+// replace the example rows with your own questions, then upload. The leading
+// ﻿ is a UTF-8 BOM so Excel opens it cleanly; the backend strips it.
+const CSV_HEADER =
+  "text,type,difficulty,points,option_a,option_b,option_c,option_d,correct,accepted_answers,tags,explanation";
+const CSV_SAMPLE_ROWS = [
+  `"What is 2 + 2?",MCQ,EASY,1,3,4,5,6,B,,math|arithmetic,"4 is the sum of 2 and 2."`,
+  `"Which planet is known as the Red Planet?",MCQ,MEDIUM,1,Venus,Mars,Jupiter,Saturn,B,,space,"Mars looks red because of iron oxide."`,
+  `"Select the prime numbers below.",MCQ,HARD,2,2,4,7,9,"A,C",,math,"2 and 7 are prime (multi-answer)."`,
+  `"The Earth is flat.",TRUE_FALSE,EASY,1,,,,,False,,geography,"The Earth is an oblate spheroid."`,
+  `"Water boils at 100 degrees Celsius at sea level.",TRUE_FALSE,EASY,1,,,,,True,,science,`,
+  `"What is the capital of India?",SHORT_ANSWER,MEDIUM,2,,,,,,delhi|new delhi,geography,"Either spelling is accepted."`,
+];
+const CSV_TEMPLATE = "﻿" + [CSV_HEADER, ...CSV_SAMPLE_ROWS].join("\r\n") + "\r\n";
+
+// Human-friendly view of the sample (the download has the full CSV).
+const EXAMPLE_PREVIEW: { text: string; type: string; difficulty: string; points: string; answer: string }[] = [
+  { text: "What is 2 + 2?", type: "MCQ", difficulty: "EASY", points: "1", answer: "option_a=3, option_b=4, option_c=5, option_d=6 · correct=B" },
+  { text: "Select the prime numbers.", type: "MCQ", difficulty: "HARD", points: "2", answer: "options A–D · correct=A,C (multi-answer)" },
+  { text: "The Earth is flat.", type: "TRUE_FALSE", difficulty: "EASY", points: "1", answer: "correct=False" },
+  { text: "Capital of India?", type: "SHORT_ANSWER", difficulty: "MEDIUM", points: "2", answer: "accepted_answers=delhi|new delhi" },
+];
+
+function downloadCsvTemplate() {
+  const blob = new Blob([CSV_TEMPLATE], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "skillship-questions-template.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function DownloadIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>;
+}
 
 function BulkUploadCsvModal({
   onClose,
@@ -434,6 +659,11 @@ function BulkUploadCsvModal({
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<UploadResult>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showExample, setShowExample] = useState(false);
+
+  const noBanks = banks !== null && banks.length === 0;
+  // The whole file was rejected (wrong/missing columns, empty) — nothing parsed.
+  const fileLevelError = result !== null && result.total_rows === 0 && result.errors.length > 0;
 
   useEffect(() => {
     (async () => {
@@ -455,6 +685,7 @@ function BulkUploadCsvModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setResult(null);
     if (!bankId) { setError("Pick a bank to import into."); return; }
     if (!file) { setError("Choose a CSV file."); return; }
     const r = await onUpload(bankId, file);
@@ -464,7 +695,7 @@ function BulkUploadCsvModal({
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 py-10 backdrop-blur-sm"
       onClick={() => { if (!uploading) onClose(); }}
       role="dialog" aria-modal="true" aria-label="Bulk upload CSV"
     >
@@ -479,10 +710,75 @@ function BulkUploadCsvModal({
           <div>
             <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">Bulk upload questions</h3>
             <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-              UTF-8 CSV with columns: <code>text, type, difficulty, points</code>.<br />
-              MCQ rows add <code>option_a/b/c/d</code> + <code>correct=A/B/C/D</code>.<br />
-              TRUE_FALSE: <code>correct=True/False</code>. SHORT_ANSWER: <code>accepted_answers=a|b|c</code>.
+              Upload a UTF-8 CSV. New to the format? Download the template — it already
+              has working example rows for every question type. Just replace them with your own.
             </p>
+          </div>
+
+          {/* Template + example — the fastest way to get a correct CSV */}
+          <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-[var(--foreground)]">Need a starting point?</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadCsvTemplate}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-accent px-3.5 text-xs font-semibold text-white shadow-[0_8px_20px_-10px_rgba(5,150,105,0.6)] transition-transform hover:-translate-y-0.5"
+                >
+                  <DownloadIcon />
+                  Download template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExample((s) => !s)}
+                  className="h-8 rounded-full border border-[var(--border)] bg-white px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)]"
+                >
+                  {showExample ? "Hide example" : "See example"}
+                </button>
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {showExample && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--border)] bg-white dark:bg-[var(--background)]">
+                    <table className="w-full min-w-[460px] text-[11px]">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] text-left text-[var(--muted-foreground)]">
+                          <th className="px-2.5 py-1.5 font-semibold">text</th>
+                          <th className="px-2.5 py-1.5 font-semibold">type</th>
+                          <th className="px-2.5 py-1.5 font-semibold">difficulty</th>
+                          <th className="px-2.5 py-1.5 font-semibold">points</th>
+                          <th className="px-2.5 py-1.5 font-semibold">answer columns</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {EXAMPLE_PREVIEW.map((r) => (
+                          <tr key={r.text} className="border-b border-[var(--border)]/60 last:border-0">
+                            <td className="px-2.5 py-1.5 text-[var(--foreground)]">{r.text}</td>
+                            <td className="px-2.5 py-1.5 font-mono text-primary">{r.type}</td>
+                            <td className="px-2.5 py-1.5">{r.difficulty}</td>
+                            <td className="px-2.5 py-1.5">{r.points}</td>
+                            <td className="px-2.5 py-1.5 text-[var(--muted-foreground)]">{r.answer}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <ul className="mt-2 space-y-0.5 text-[11px] text-[var(--muted-foreground)]">
+                    <li><strong>Required columns:</strong> <code>text, type, difficulty, points</code> (keep the header row).</li>
+                    <li><strong>MCQ:</strong> fill <code>option_a…option_d</code> and set <code>correct</code> to the letter(s), e.g. <code>B</code> or <code>A,C</code>.</li>
+                    <li><strong>TRUE_FALSE:</strong> set <code>correct</code> to <code>True</code> or <code>False</code>.</li>
+                    <li><strong>SHORT_ANSWER:</strong> set <code>accepted_answers</code> to pipe-separated values, e.g. <code>delhi|new delhi</code>.</li>
+                    <li><strong>Optional:</strong> <code>tags</code> (pipe-separated) and <code>explanation</code>.</li>
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <label className="block">
@@ -490,13 +786,22 @@ function BulkUploadCsvModal({
             <select
               value={bankId}
               onChange={(e) => setBankId(e.target.value)}
-              disabled={banks === null || uploading}
-              className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)]"
+              disabled={banks === null || noBanks || uploading}
+              className="mt-1 h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-[var(--background)] disabled:opacity-60"
             >
               {banks === null && <option>Loading…</option>}
-              {banks?.length === 0 && <option>No question banks yet — create one first.</option>}
-              {banks?.map((b) => <option key={b.id} value={b.id}>{b.name}{b.subject ? ` · ${b.subject}` : ""}</option>)}
+              {noBanks && <option>No question banks yet</option>}
+              {banks?.map((b) => <option key={b.id} value={b.id}>{displayBankName(b.name)}{b.subject ? ` · ${b.subject}` : ""}</option>)}
             </select>
+            {noBanks && (
+              <p className="mt-1.5 text-[11px] text-[var(--muted-foreground)]">
+                Question banks are created with the{" "}
+                <Link href="/dashboard/sub-admin/quizzes/new" className="font-semibold text-primary hover:underline">
+                  Quiz Builder
+                </Link>
+                . Create a quiz once and its bank will appear here.
+              </p>
+            )}
           </label>
 
           <label className="block">
@@ -504,9 +809,9 @@ function BulkUploadCsvModal({
             <input
               type="file"
               accept=".csv,text/csv"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              disabled={uploading}
-              className="mt-1 block w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/15 dark:bg-[var(--background)]"
+              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setResult(null); }}
+              disabled={uploading || noBanks}
+              className="mt-1 block w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm file:mr-3 file:rounded-full file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/15 disabled:opacity-60 dark:bg-[var(--background)]"
             />
           </label>
 
@@ -514,13 +819,25 @@ function BulkUploadCsvModal({
             <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
           )}
 
-          {result && (
+          {/* File-level rejection — the file isn't a question CSV at all */}
+          {fileLevelError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs dark:border-red-500/30 dark:bg-red-500/10">
+              <p className="font-semibold text-red-700 dark:text-red-300">This file isn&apos;t a valid question CSV.</p>
+              <p className="mt-1 text-red-600 dark:text-red-300/90">{result?.errors[0]?.message}</p>
+              <p className="mt-1.5 text-red-600/90 dark:text-red-300/80">
+                Download the template above, copy your questions into it, and upload that file.
+              </p>
+            </div>
+          )}
+
+          {/* Row-level outcome — at least one row parsed */}
+          {result && !fileLevelError && (
             <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-3 text-xs space-y-1">
               <p className="font-semibold text-[var(--foreground)]">
                 Imported {result.created} of {result.total_rows} row{result.total_rows === 1 ? "" : "s"}.
               </p>
               {result.errors.length > 0 && (
-                <details className="text-[var(--muted-foreground)]">
+                <details className="text-[var(--muted-foreground)]" open>
                   <summary className="cursor-pointer font-semibold text-red-600">
                     {result.errors.length} row{result.errors.length === 1 ? "" : "s"} skipped — show details
                   </summary>
@@ -543,11 +860,11 @@ function BulkUploadCsvModal({
               disabled={uploading}
               className="h-9 rounded-full border border-[var(--border)] bg-white px-4 text-xs font-semibold text-[var(--muted-foreground)] hover:text-primary dark:bg-[var(--background)] disabled:opacity-60"
             >
-              {result ? "Done" : "Cancel"}
+              {result && !fileLevelError ? "Done" : "Cancel"}
             </button>
             <button
               type="submit"
-              disabled={uploading || !file || !bankId}
+              disabled={uploading || !file || !bankId || noBanks}
               className="inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-r from-primary to-accent px-5 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(5,150,105,0.5)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploading ? "Uploading…" : "Upload"}

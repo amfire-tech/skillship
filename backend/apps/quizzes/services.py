@@ -55,7 +55,7 @@ _QUIZ_TRANSITIONS: dict[str, set[str]] = {
 }
 
 # Who can drive each transition.
-_REVIEW_ROLES = {Role.PRINCIPAL, Role.SUB_ADMIN, Role.MAIN_ADMIN}
+_REVIEW_ROLES = {Role.SUB_ADMIN, Role.MAIN_ADMIN}
 _AUTHOR_ROLES = {Role.TEACHER, Role.PRINCIPAL, Role.SUB_ADMIN, Role.MAIN_ADMIN}
 
 
@@ -77,7 +77,7 @@ def transition_quiz_status(quiz: Quiz, *, target: str, actor) -> Quiz:
 
     if target == Quiz.Status.PUBLISHED:
         if actor.role not in _REVIEW_ROLES:
-            raise ValidationError("Only PRINCIPAL or SUB_ADMIN can publish a quiz.")
+            raise ValidationError("Only MAIN_ADMIN or SUB_ADMIN can publish a quiz.")
         # Sanity: the bank must hold at least `total_questions` questions.
         available = Question.objects.filter(
             school_id=quiz.school_id, bank_id=quiz.bank_id

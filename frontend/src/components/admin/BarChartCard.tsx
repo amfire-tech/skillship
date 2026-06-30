@@ -21,7 +21,7 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.15 }}
-      className="rounded-2xl border border-[var(--border)] bg-white p-5"
+      className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-5"
     >
       <div>
         <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{title}</h3>
@@ -79,9 +79,9 @@ export function BarChartCard({ title, subtitle, data }: BarChartCardProps) {
         </div>
       </div>
 
-      <div className="mt-2 flex items-end gap-3 pl-6">
+      <div className="mt-2 flex items-end gap-3 overflow-hidden pl-6">
         {data.map((d) => (
-          <span key={d.label} className="flex-1 text-center text-xs text-[var(--muted-foreground)]">
+          <span key={d.label} className="min-w-0 flex-1 truncate text-center text-xs text-[var(--muted-foreground)]">
             {d.label}
           </span>
         ))}

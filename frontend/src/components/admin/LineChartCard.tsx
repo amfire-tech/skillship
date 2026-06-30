@@ -41,7 +41,7 @@ export function LineChartCard({ title, subtitle, data, yTicks }: LineChartCardPr
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 }}
-      className="rounded-2xl border border-[var(--border)] bg-white dark:bg-[var(--card)] p-5"
+      className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white dark:bg-[var(--card)] p-5"
     >
       <div>
         <h3 className="text-base font-bold tracking-tight text-[var(--foreground)]">{title}</h3>

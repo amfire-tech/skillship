@@ -107,7 +107,7 @@ export default function RevenuePage() {
 
       {/* Collected revenue — month-wise and annual */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
           <h2 className="mb-1 text-sm font-semibold text-[var(--foreground)]">Collected Revenue by Month</h2>
           <p className="mb-5 text-xs text-[var(--muted-foreground)]">Payments received, bucketed by month.</p>
           {data.monthly.length === 0 ? (
@@ -130,7 +130,7 @@ export default function RevenuePage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
           <h2 className="mb-1 text-sm font-semibold text-[var(--foreground)]">Collected Revenue by Year</h2>
           <p className="mb-5 text-xs text-[var(--muted-foreground)]">Total payments received each calendar year.</p>
           {data.yearly.length === 0 ? (
@@ -155,7 +155,7 @@ export default function RevenuePage() {
       </div>
 
       {/* Per-school table */}
-      <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
         <h2 className="mb-1 text-sm font-semibold text-[var(--foreground)]">Per-School Billing</h2>
         <p className="mb-4 text-xs text-[var(--muted-foreground)]">Charged, collected and remaining payment per school — highest remaining first.</p>
         <div className="overflow-x-auto">

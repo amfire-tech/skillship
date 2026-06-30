@@ -153,7 +153,7 @@ export default function SubAdminAnalyticsPage() {
       {/* Quiz status mix + Top schools */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         {/* Status mix */}
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm dark:bg-[var(--background)]">
           <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Quiz Status Mix</h2>
           <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
             {filteredQuizzes === null
@@ -176,19 +176,19 @@ export default function SubAdminAnalyticsPage() {
         </div>
 
         {/* Top schools */}
-        <div className="rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-sm dark:bg-[var(--background)]">
           <div className="border-b border-[var(--border)] px-6 py-4">
             <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">Schools by Enrolment</h2>
             <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">Top 5 schools in your territory</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[420px] text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
-                  <th className="px-6 py-3">School</th>
-                  <th className="px-6 py-3">Students</th>
-                  <th className="px-6 py-3">Teachers</th>
-                  <th className="px-6 py-3">Status</th>
+                  <th className="px-4 py-3 sm:px-6">School</th>
+                  <th className="px-4 py-3 sm:px-6">Students</th>
+                  <th className="px-4 py-3 sm:px-6">Teachers</th>
+                  <th className="px-4 py-3 sm:px-6">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -196,14 +196,14 @@ export default function SubAdminAnalyticsPage() {
                   Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="border-b border-[var(--border)]/60 last:border-0">
                       {Array.from({ length: 4 }).map((__, j) => (
-                        <td key={j} className="px-6 py-3.5">
+                        <td key={j} className="px-4 py-3.5 sm:px-6">
                           <div className="h-4 animate-pulse rounded bg-[var(--muted)]" style={{ width: `${50 + ((i * 7 + j * 11) % 40)}%` }} />
                         </td>
                       ))}
                     </tr>
                   ))
                 ) : topSchools.length === 0 ? (
-                  <tr><td colSpan={4} className="px-6 py-8">
+                  <tr><td colSpan={4} className="px-4 py-8 sm:px-6">
                     <EmptyState
                       title="No schools assigned"
                       description="Coordinate with the platform admin to add schools to your territory — analytics will populate as quizzes are run."
@@ -221,13 +221,13 @@ export default function SubAdminAnalyticsPage() {
                       tabIndex={0}
                       className="cursor-pointer border-b border-[var(--border)]/60 last:border-0 transition-colors hover:bg-[var(--muted)]/40 focus:bg-[var(--muted)]/40 focus:outline-none"
                     >
-                      <td className="px-6 py-3.5">
+                      <td className="px-4 py-3.5 sm:px-6">
                         <p className="font-semibold text-[var(--foreground)]">{s.name}</p>
                         <p className="text-xs text-[var(--muted-foreground)]">{[s.city, s.state].filter(Boolean).join(", ") || "—"}</p>
                       </td>
-                      <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.student_count?.toLocaleString("en-IN") ?? "—"}</td>
-                      <td className="px-6 py-3.5 text-[var(--muted-foreground)]">{s.teacher_count?.toLocaleString("en-IN") ?? "—"}</td>
-                      <td className="px-6 py-3.5">
+                      <td className="px-4 py-3.5 text-[var(--muted-foreground)] sm:px-6">{s.student_count?.toLocaleString("en-IN") ?? "—"}</td>
+                      <td className="px-4 py-3.5 text-[var(--muted-foreground)] sm:px-6">{s.teacher_count?.toLocaleString("en-IN") ?? "—"}</td>
+                      <td className="px-4 py-3.5 sm:px-6">
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.is_active ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 text-slate-500"}`}>
                           {s.is_active ? "Active" : "Inactive"}
                         </span>

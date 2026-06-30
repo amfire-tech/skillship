@@ -198,6 +198,13 @@ class Quiz(TenantModel):
     published_at = models.DateTimeField(null=True, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True)
 
+    # Two-party soft delete: a quiz is permanently removed only when BOTH
+    # the teacher and the super-admin have "deleted" it from their own view.
+    # Until both flags are set it remains visible to whichever party has not
+    # yet deleted it.
+    deleted_by_teacher = models.BooleanField(default=False, db_index=True)
+    deleted_by_admin   = models.BooleanField(default=False, db_index=True)
+
     created_by = models.ForeignKey(
         "accounts.User",
         on_delete=models.SET_NULL,
