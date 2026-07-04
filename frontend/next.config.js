@@ -51,9 +51,41 @@ const nextConfig = {
       { from: ["/store", "/shop"], to: "/marketplace" },
       // Workshops
       { from: ["/workshop"], to: "/workshops" },
-      // Legal
-      { from: ["/privacy-policy"], to: "/privacy" },
-      { from: ["/terms-of-service", "/terms-and-conditions", "/terms-conditions"], to: "/terms" },
+      // Legacy course pages from the OLD skillship.in (WordPress `/courses/<slug>/`).
+      // The current site sells instructor-led *workshops*, not these named online
+      // courses — so each dead course URL is sent to the matching workshop category,
+      // which honestly shows what we actually offer today instead of 404-ing (and
+      // avoids implying a course that no longer exists). Specific slugs first, then a
+      // catch-all for any other legacy course still sitting in Google's index.
+      {
+        from: ["/courses/complete-artificial-intelligence", "/complete-artificial-intelligence"],
+        to: "/workshops?category=ai",
+      },
+      {
+        from: [
+          "/courses/beginners-python-for-ai", "/beginners-python-for-ai",
+          "/courses/advanced-python-for-ai", "/advancedpython-forai",
+        ],
+        to: "/workshops?category=coding",
+      },
+      {
+        from: [
+          "/courses/web-development-for-kids", "/web-development-for-kids",
+          "/web-development-for-kids-2",
+        ],
+        to: "/workshops?category=coding",
+      },
+      { from: ["/courses/:slug*", "/courses"], to: "/workshops" },
+      // Legal — cover BOTH the modern spellings and the old site's slugs
+      // (`/term-and-condition`, `/privacy-and-policy`) that Google still indexes.
+      { from: ["/privacy-policy", "/privacy-and-policy", "/privacy-and-policies"], to: "/privacy" },
+      {
+        from: [
+          "/terms-of-service", "/terms-and-conditions", "/terms-conditions",
+          "/term-and-condition", "/term-and-conditions", "/terms-condition",
+        ],
+        to: "/terms",
+      },
       // Home aliases
       { from: ["/home", "/index", "/index.html"], to: "/" },
     ];
