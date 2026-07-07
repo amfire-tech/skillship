@@ -245,6 +245,13 @@ def generate_blank_credentials(
     logins once and dedupe new tokens against them (plus an in-batch set), so
     generating the next 500 never collides with the first 500.
 
+    Tokens are short and sequential (s001, s002, ... / t001, t002, ... for
+    teachers) rather than random, so a printed credential slip reads as
+    "dps-demo.s001" / "s001@dps-demo.skillship.in" instead of an 8-char hex
+    string — easy for an admin to hand out in order and for a student to
+    remember and re-type. Any already-taken token (from an earlier batch, or
+    a legacy random one) is simply skipped.
+
     Speed: full-strength PBKDF2 hashing is deliberately slow (~hundreds of ms
     each), so hashing a few hundred inline took a minute+. These accounts are
     blank and unused until the student logs in, so we hash the initial password
@@ -282,10 +289,15 @@ def generate_blank_credentials(
     }
 
     # Build `count` unique, unsaved accounts + their plaintext passwords.
+    # Tokens are short + sequential (s001, s002, ... / t001, t002, ...) so the
+    # printed slip is easy to read and remember, not a random hex string.
+    role_tag = "t" if is_teacher else "s"
     drafts: list[User] = []
     plaintexts: list[str] = []
+    seq = 1
     while len(drafts) < count:
-        token = secrets.token_hex(4)  # 8 hex chars (~4.3B space) → collisions rare
+        token = f"{role_tag}{seq:03d}"
+        seq += 1
         email = f"{token}{email_suffix}"
         username = f"{username_prefix}{token}"
         if email.lower() in taken_emails or username.lower() in taken_usernames:
