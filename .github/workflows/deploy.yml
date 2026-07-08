@@ -1,18 +1,29 @@
 # File:    .github/workflows/deploy.yml
-# Purpose: Build all three service images, push to GHCR, deploy to staging
-#          (auto on push-to-main), then promote to prod with manual approval.
-# Owner:   Navanish (Phase 5)
+# Purpose: On push to `prod`, build all three service images and push to GHCR,
+#          then (with manual approval) deploy them to the production VPS by
+#          pinning ALL services to this commit's exact SHA — never :latest.
+# Owner:   Navanish
 #
-# Required repo settings before this can run:
-#   1. GitHub → Settings → Environments: create `staging` (no protection) and
-#      `production` (required reviewers: ≥1). Both need these env-level secrets:
-#        - SSH_HOST          # e.g. staging.skillship.com
-#        - SSH_USER          # e.g. ubuntu
-#        - SSH_PRIVATE_KEY   # private key matching the host's authorized_keys
-#        - DEPLOY_DIR        # path on the VPS where the repo is checked out,
-#                            # e.g. /opt/skillship
-#   2. Repo Settings → Actions → General → "Workflow permissions":
-#      set to "Read and write" so GITHUB_TOKEN can push to GHCR.
+# How the production deploy works:
+#   The build job tags each image with the 7-char commit SHA (and :latest).
+#   The deploy job SSHes to the VPS and runs `/opt/skillship/deploy.sh <sha>`,
+#   which pins backend + frontend + ai-service to that SAME SHA, pulls,
+#   migrates, recreates, reloads nginx, and health-checks. Pinning one SHA for
+#   all three services is what prevents the frontend/backend drift that hid
+#   superadmin features on 2026-07-08 (frontend was stuck on a stale :latest).
+#
+# One-time setup required to turn auto-deploy ON:
+#   1. Settings -> Environments -> `production`: add required reviewer(s) (this
+#      is the "take permission" gate) plus these environment secrets:
+#        - SSH_HOST         # 72.61.244.74
+#        - SSH_USER         # root
+#        - SSH_PRIVATE_KEY  # private key present in the VPS ~/.ssh/authorized_keys
+#        - DEPLOY_DIR       # /opt/skillship   (must contain deploy.sh)
+#   2. Settings -> Secrets and variables -> Actions -> Variables: AUTO_DEPLOY=true
+#   3. Settings -> Actions -> General -> Workflow permissions: "Read and write"
+#      so GITHUB_TOKEN can push images to GHCR.
+#   Until (1)+(2) are done, the build job still runs and pushes images; the
+#   deploy job is simply skipped (never fails).
 
 name: Build & Deploy
 
@@ -143,40 +154,37 @@ jobs:
           echo "Staging never became healthy"
           exit 1
 
-  # ── 3. Manual-approval promotion → production ──────────────────────────
+  # ── 3. Manual-approval deploy → production ─────────────────────────────
   deploy-production:
     name: Deploy → production (manual gate)
-    needs: deploy-staging
+    needs: build            # runs straight off the images the build job pushed
     if: ${{ vars.AUTO_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     environment:
-      # GitHub-side "required reviewers" on this environment is what makes
-      # this job wait for human approval. Without that, this would auto-fire.
+      # GitHub-side "required reviewers" on this environment is what makes this
+      # job wait for a human click before deploying — the "take permission" gate.
       name: production
       url: https://skillship.in
     steps:
-      - uses: actions/checkout@v4
-
-      - name: SSH deploy
+      - name: SSH deploy (pin all 3 services to this commit's SHA)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 15m
           script: |
             set -euo pipefail
-            cd "${{ secrets.DEPLOY_DIR }}"
-            git fetch --quiet origin prod
-            git reset --hard origin/prod
-            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod pull
-            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod \
-              run --rm backend python manage.py migrate --noinput
-            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d
-            docker image prune -f --filter "until=168h"
+            # deploy.sh pins backend + frontend + ai-service to the SAME image
+            # tag, pulls, migrates, recreates, reloads nginx and health-checks.
+            # One command, no :latest drift. It exits non-zero on any failure,
+            # which fails this job.
+            bash "${{ secrets.DEPLOY_DIR }}/deploy.sh" "${{ needs.build.outputs.image_tag }}"
 
-      - name: Smoke test
+      - name: External smoke test
         run: |
           set -e
+          # Independent public-reachability check (DNS + nginx + TLS) from the runner.
           for i in $(seq 1 30); do
             if curl -fsS "https://skillship.in/healthz/" >/dev/null; then
               echo "Production healthz OK"
