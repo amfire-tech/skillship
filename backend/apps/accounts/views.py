@@ -561,13 +561,19 @@ class UsersViewSet(ModelViewSet):
     @staticmethod
     def _apply_filters(qs, params):
         """Apply the User Management screen's query filters (?role=, ?school=,
-        ?activation=, ?assigned=, ?search=) to `qs`. Shared by the paginated list
+        ?teacher_type=, ?activation=, ?assigned=, ?search=) to `qs`. Shared by the paginated list
         and the `student-ids` action so "select all matching" can never drift out
         of sync with what the list actually shows. Returns None on a malformed
         school id so callers can short-circuit to an empty result."""
         role = params.get("role")
         if role:
             qs = qs.filter(role=role)
+
+        # Teacher-type filter (only meaningful alongside ?role=TEACHER, but
+        # harmless otherwise since every user has SCHOOL as the default).
+        teacher_type = (params.get("teacher_type") or "").strip().upper()
+        if teacher_type in (User.TeacherType.SCHOOL, User.TeacherType.SKILLSHIP):
+            qs = qs.filter(teacher_type=teacher_type)
 
         school = params.get("school")
         if school:

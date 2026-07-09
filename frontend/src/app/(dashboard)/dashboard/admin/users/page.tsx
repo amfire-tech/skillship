@@ -28,6 +28,7 @@ interface ApiUser {
   profile_completed?: boolean;
   is_active: boolean;
   ai_enabled?: boolean;
+  teacher_type?: "SCHOOL" | "SKILLSHIP";
   date_joined: string;
 }
 
@@ -36,6 +37,7 @@ interface TeacherOpt { id: string; name: string }
 interface StudentStats { total: number; activated: number; generated: number; assigned: number; unassigned: number }
 
 type Activation = "all" | "activated" | "generated";
+type TeacherTypeFilter = "all" | "SCHOOL" | "SKILLSHIP";
 
 const PAGE_SIZE = 50;
 
@@ -94,6 +96,7 @@ export default function UserManagementPage() {
 
   const [activeRole, setActiveRole] = useState<Role>("STUDENT");
   const [activation, setActivation] = useState<Activation>("all");
+  const [teacherType, setTeacherType] = useState<TeacherTypeFilter>("all");
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [schoolId, setSchoolId] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -186,6 +189,7 @@ export default function UserManagementPage() {
     if (schoolId) qs.set("school", schoolId);
     if (search) qs.set("search", search);
     if (activeRole === "STUDENT" && activation !== "all") qs.set("activation", activation);
+    if (activeRole === "TEACHER" && teacherType !== "all") qs.set("teacher_type", teacherType);
     try {
       const res = await fetch(`${API_BASE}/users/?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -199,13 +203,14 @@ export default function UserManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeRole, schoolId, search, page, activation]);
+  }, [activeRole, schoolId, search, page, activation, teacherType]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  function selectRole(value: Role) { setActiveRole(value); setActivation("all"); setPage(1); }
+  function selectRole(value: Role) { setActiveRole(value); setActivation("all"); setTeacherType("all"); setPage(1); }
   function selectSchool(value: string) { setSchoolId(value); setPage(1); }
   function selectActivation(value: Activation) { setActivation(value); setPage(1); }
+  function selectTeacherType(value: TeacherTypeFilter) { setTeacherType(value); setPage(1); }
 
   const studentIdsOnPage = useMemo(
     () => users.filter((u) => u.role === "STUDENT").map((u) => u.id),
@@ -429,6 +434,33 @@ export default function UserManagementPage() {
         </div>
       )}
 
+      {/* Teacher-type sub-filter (Teachers only): School (home-school) teachers
+          vs Skillship (roaming, cross-school) teachers. */}
+      {activeRole === "TEACHER" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {([
+            { value: "all", label: "All teachers" },
+            { value: "SCHOOL", label: "School teachers" },
+            { value: "SKILLSHIP", label: "Skillship teachers" },
+          ] as { value: TeacherTypeFilter; label: string }[]).map((c) => {
+            const active = teacherType === c.value;
+            return (
+              <button
+                key={c.value}
+                onClick={() => selectTeacherType(c.value)}
+                className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-primary/40 hover:text-primary"
+                }`}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Count summary + bulk-assign hint */}
       <p className="text-sm text-[var(--muted-foreground)]">
         {loading ? "Loading…" : (
@@ -562,6 +594,9 @@ export default function UserManagementPage() {
                                 u.profile_completed
                                   ? <span className="mt-1 inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-500">Activated</span>
                                   : <span className="mt-1 inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">Generated · pending</span>
+                              )}
+                              {u.role === "TEACHER" && u.teacher_type === "SKILLSHIP" && (
+                                <span className="mt-1 inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[10px] font-bold text-accent">Skillship (roaming)</span>
                               )}
                             </div>
                           </div>

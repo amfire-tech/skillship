@@ -85,6 +85,37 @@ class TestListAndRetrieve:
         assert str(teacher_a.id) not in ids   # filtered out by role
         assert str(student_b.id) not in ids   # filtered out by school
 
+    def test_main_admin_can_filter_teachers_by_teacher_type(
+        self, api_client, main_admin, password, login, teacher_a
+    ):
+        """?teacher_type=SKILLSHIP narrows the Teachers tab to roaming teachers
+        only; ?teacher_type=SCHOOL (or omitted) keeps ordinary school teachers."""
+        skillship_teacher = User.objects.create_user(
+            username="skillship_teacher",
+            email="skillship-teacher@skillship.test",
+            password=password,
+            first_name="Roaming",
+            last_name="Teacher",
+            role=User.Role.TEACHER,
+            teacher_type=User.TeacherType.SKILLSHIP,
+            school=None,
+        )
+        login(api_client, main_admin, password)
+
+        response = api_client.get(f"{LIST_URL}?role=TEACHER&teacher_type=SKILLSHIP")
+        assert response.status_code == 200
+        results = response.data["results"] if "results" in response.data else response.data
+        ids = {item["id"] for item in results}
+        assert str(skillship_teacher.id) in ids
+        assert str(teacher_a.id) not in ids
+
+        response = api_client.get(f"{LIST_URL}?role=TEACHER&teacher_type=SCHOOL")
+        assert response.status_code == 200
+        results = response.data["results"] if "results" in response.data else response.data
+        ids = {item["id"] for item in results}
+        assert str(teacher_a.id) in ids
+        assert str(skillship_teacher.id) not in ids
+
 
 # ── Surface is closed to every non-admin role, on every action ──────────────
 
