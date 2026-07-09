@@ -133,6 +133,7 @@ function buildSubAdminNav(grant: SubGrant): SidebarNavItem[] {
 const PRINCIPAL_NAV: SidebarNavItem[] = [
   { label: "School Overview",       href: "/dashboard/principal",                     icon: icon("dashboard") },
   { label: "Today's Teacher",       href: "/dashboard/principal/today-teacher",       icon: icon("planner")   },
+  { label: "Teaching Logs",         href: "/dashboard/principal/teaching-logs",       icon: icon("reports")   },
   { label: "Teachers Management",   href: "/dashboard/principal/teachers",            icon: icon("users")     },
   { label: "Student Management",    href: "/dashboard/principal/students",            icon: icon("users")     },
   { label: "Class Management",      href: "/dashboard/principal/classes",             icon: icon("academics") },
