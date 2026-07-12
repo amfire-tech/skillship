@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "next-themes";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Phone, Download } from "lucide-react";
 import { SkillshipLockup } from "@/components/brand/SkillshipMark";
 
 const NAV_LINKS = [
@@ -25,6 +25,14 @@ const NAV_LINKS = [
 ];
 
 const CTA = { label: "Book a Demo", href: "/request-demo" } as const;
+
+// Contact number shown directly in the nav (also in the footer).
+const CONTACT = { display: "+91 93684 08577", tel: "+919368408577" } as const;
+
+// Android app download. The 200 MB APK is NOT bundled with the frontend — it's
+// served straight off the VPS disk by nginx (see infra/nginx/nginx.conf and the
+// nginx volume in infra/docker-compose.prod.yml). This link just points at that path.
+const APP_DOWNLOAD = { label: "Download App", href: "/codeAi.apk" } as const;
 
 function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -147,6 +155,34 @@ export function Navbar() {
 
         {/* CTA + Sign-in (desktop) */}
         <div className="hidden items-center gap-4 md:flex">
+          {/* Download the Android app (APK). Wide screens only — phones get it
+              in the mobile drawer below, so the md nav doesn't overflow. */}
+          <a
+            href={APP_DOWNLOAD.href}
+            download
+            className={`hidden items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-semibold transition-all duration-200 hover:-translate-y-0.5 lg:inline-flex ${
+              overDark
+                ? "border-white/25 text-white hover:border-white/60"
+                : "border-[color:var(--border-subtle)] text-[var(--ink-secondary)] hover:border-[var(--teal-500)]/40 hover:text-[var(--ink-primary)]"
+            }`}
+          >
+            <Download size={14} strokeWidth={1.9} />
+            {APP_DOWNLOAD.label}
+          </a>
+
+          {/* Contact number, shown directly in the nav (tap-to-call on mobile). */}
+          <a
+            href={`tel:${CONTACT.tel}`}
+            className={`hidden items-center gap-1.5 text-[13px] font-medium transition-colors lg:inline-flex ${
+              overDark
+                ? "text-white/85 hover:text-white"
+                : "text-[var(--ink-secondary)] hover:text-[var(--ink-primary)]"
+            }`}
+          >
+            <Phone size={14} strokeWidth={1.9} />
+            {CONTACT.display}
+          </a>
+
           <ThemeToggle />
           <Link
             href="/login"
@@ -222,6 +258,25 @@ export function Navbar() {
                 >
                   <span className="relative z-10">{CTA.label}</span>
                 </Link>
+              </li>
+              <li>
+                <a
+                  href={APP_DOWNLOAD.href}
+                  download
+                  className="mt-1 flex items-center justify-center gap-2 rounded-full border border-[color:var(--border-subtle)] px-5 py-3 text-[15px] font-semibold text-[var(--ink-primary)] transition-colors hover:bg-[var(--cream)]"
+                >
+                  <Download size={16} strokeWidth={1.9} />
+                  {APP_DOWNLOAD.label}
+                </a>
+              </li>
+              <li>
+                <a
+                  href={`tel:${CONTACT.tel}`}
+                  className="flex items-center justify-center gap-2 px-4 py-3 text-[14px] font-medium text-[var(--ink-secondary)]"
+                >
+                  <Phone size={15} strokeWidth={1.9} />
+                  {CONTACT.display}
+                </a>
               </li>
             </ul>
           </motion.div>
