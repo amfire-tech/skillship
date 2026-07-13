@@ -29,10 +29,11 @@ const CTA = { label: "Book a Demo", href: "/request-demo" } as const;
 // Contact number shown directly in the nav (also in the footer).
 const CONTACT = { display: "+91 93684 08577", tel: "+919368408577" } as const;
 
-// Android app download. The 200 MB APK is NOT bundled with the frontend — it's
-// served straight off the VPS disk by nginx (see infra/nginx/nginx.conf and the
-// nginx volume in infra/docker-compose.prod.yml). This link just points at that path.
-const APP_DOWNLOAD = { label: "Download App", href: "/codeAi.apk" } as const;
+// Desktop app download (Windows .exe installer). The 200 MB file is NOT
+// bundled with the frontend — it's served straight off the VPS disk by nginx
+// (see infra/nginx/nginx.conf and the nginx volume in infra/docker-compose.prod.yml).
+// This link just points at that path.
+const APP_DOWNLOAD = { label: "Download App", href: "/codeAi.exe" } as const;
 
 function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme, resolvedTheme } = useTheme();

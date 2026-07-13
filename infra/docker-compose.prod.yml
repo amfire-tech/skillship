@@ -165,9 +165,9 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_certs:/etc/letsencrypt:ro
-      # Large static downloads (e.g. the Android APK) live on the VPS host disk,
-      # served directly by nginx — kept out of git and the Docker image.
-      # Create the host dir and drop codeAi.apk into it before deploying.
+      # Large static downloads (e.g. the desktop app installer) live on the VPS
+      # host disk, served directly by nginx — kept out of git and the Docker
+      # image. Create the host dir and drop codeAi.exe into it before deploying.
       - /root/skillship-downloads:/srv/downloads:ro
     depends_on:
       backend:
