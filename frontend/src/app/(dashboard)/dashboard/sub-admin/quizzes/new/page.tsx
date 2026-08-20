@@ -985,7 +985,6 @@ function AIGeneratorPanel({
       // correct_option_ids (e.g. ["C"]). The wizard works with plain string
       // options + a correct_answer_index, so normalise both here.
       const items: DraftQuestion[] = (data?.questions ?? data ?? [])
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((q: any) => {
           const rawOpts: unknown[] = q.options ?? q.choices ?? [];
           const options: string[] = rawOpts.map((o) =>
