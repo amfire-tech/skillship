@@ -135,12 +135,14 @@ class TestQuizApproval:
         quiz.refresh_from_db()
         assert quiz.status == Quiz.Status.REVIEW
 
-    def test_principal_still_publishes(self, api_client, login, principal_a, school_a, teacher_a):
-        """'Both can approve' — delegating to a sub-admin doesn't lock others out."""
+    def test_principal_cannot_publish(self, api_client, login, principal_a, school_a, teacher_a):
+        """Publishing is gated to MAIN_ADMIN/SUB_ADMIN — PRINCIPAL can submit-for-review, not approve."""
         quiz = _review_quiz(school_a, teacher_a)
         login(api_client, principal_a)
         r = api_client.post(f"/api/v1/quizzes/{quiz.id}/publish/")
-        assert r.status_code == 200, r.content
+        assert r.status_code == 403
+        quiz.refresh_from_db()
+        assert quiz.status == Quiz.Status.REVIEW
 
 
 # ── Onboarding (per-school capability) ────────────────────────────────────────

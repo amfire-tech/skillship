@@ -1,7 +1,9 @@
 """Root URL configuration."""
 
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
+from django.views.static import serve as serve_static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
@@ -22,9 +24,15 @@ urlpatterns = [
     path("api/v1/career/", include("apps.career.urls")),
     path("api/v1/exam-alerts/", include("apps.exam_alerts.urls")),
     path("api/v1/demo-requests/", include("apps.leads.urls")),
+    path("api/v1/gallery/", include("apps.gallery.urls")),
     # Health check
     path("", include("apps.common.urls")),
     # OpenAPI schema + docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    # User-uploaded media (gallery photos, etc.) — FileSystemStorage, served by
+    # Django itself since nginx proxies /media/ straight through to the backend
+    # (see infra/nginx/nginx.conf). Not gated on DEBUG: unlike Django's built-in
+    # static() helper this needs to work in prod too until we move to S3/CDN.
+    path("media/<path:path>", serve_static, {"document_root": settings.MEDIA_ROOT}),
 ]

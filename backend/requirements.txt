@@ -18,3 +18,6 @@ sentry-sdk==2.19.2
 # Report exports (Phase 2)
 reportlab==4.2.5
 openpyxl==3.1.5
+
+# Image uploads (public gallery)
+Pillow==12.2.0

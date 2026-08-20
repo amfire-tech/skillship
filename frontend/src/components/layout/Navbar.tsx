@@ -21,6 +21,7 @@ const NAV_LINKS = [
   { label: "Platform",    href: "/" },
   { label: "For Schools", href: "/request-demo" },
   { label: "Courses",     href: "/workshops" },
+  { label: "Gallery",     href: "/gallery" },
   { label: "About",       href: "/about" },
 ];
 

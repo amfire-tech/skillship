@@ -113,9 +113,9 @@ class CanPublishQuiz(BasePermission):
         if not _same_school(request, obj):
             return False
         # A sub-admin may approve/return a quiz only in a school where the
-        # super-admin switched on can_approve_quizzes. PRINCIPAL/MAIN_ADMIN are
-        # unrestricted here — both they and the sub-admin can act ("both can
-        # approve"), and the resulting status stays visible to the super-admin.
+        # super-admin switched on can_approve_quizzes. PRINCIPAL never reaches
+        # this point — has_permission already rejects them, since only
+        # MAIN_ADMIN/SUB_ADMIN may publish. MAIN_ADMIN short-circuits above.
         if request.user.role == Role.SUB_ADMIN:
             from apps.assignments.access import subadmin_can
 
