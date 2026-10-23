@@ -18,6 +18,7 @@ from google.genai import types
 
 from app.config import settings
 from app.utils.json import parse_llm_json
+from app.utils.llm import generate_content
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +106,8 @@ async def run(
         "Return up to 8 colleges as JSON per the schema."
     )
 
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
+    response = await generate_content(
+        client,
         contents=user_prompt,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,

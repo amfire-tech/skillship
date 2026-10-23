@@ -13,6 +13,7 @@ from google.genai import types
 
 from app.config import settings
 from app.utils.json import parse_llm_json
+from app.utils.llm import generate_content
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +102,8 @@ async def run(
     ]
     contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
+    response = await generate_content(
+        client,
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,

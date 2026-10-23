@@ -4,17 +4,25 @@ Purpose: Typed settings loaded from env vars (pydantic-settings).
 Owner:   Navanish
 """
 
-from pydantic_settings import BaseSettings
+from pathlib import Path
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_SERVICE_DIR = Path(__file__).resolve().parent.parent  # ai-service/
+_REPO_ROOT = _SERVICE_DIR.parent
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    # Gemini
-    GEMINI_API_KEY: str
+    # Gemini — the root .env names it GOOGLE_API_KEY; GEMINI_API_KEY still works.
+    GEMINI_API_KEY: str = Field(validation_alias=AliasChoices("GOOGLE_API_KEY", "GEMINI_API_KEY"))
 
     # Model Configuration
     MODEL_NAME: str = "gemini-2.5-flash"
+    # Used when MODEL_NAME hits its rate/quota limit (429). Empty disables fallback.
+    FALLBACK_MODEL_NAME: str = "gemini-3.5-flash-lite"
     EMBEDDING_MODEL: str = "models/text-embedding-004"
 
     # Service Configuration
@@ -30,9 +38,13 @@ class Settings(BaseSettings):
     # Dev mock mode — set true when Gemini API is unavailable
     USE_MOCK_AI: bool = False
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # Root .env first, ai-service/.env second (later file wins on duplicate keys).
+    # Missing files are skipped, so containers relying on real env vars are unaffected.
+    model_config = SettingsConfigDict(
+        env_file=(_REPO_ROOT / ".env", _SERVICE_DIR / ".env"),
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 # Global settings instance

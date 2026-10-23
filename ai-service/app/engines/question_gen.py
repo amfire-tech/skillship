@@ -16,6 +16,7 @@ from google.genai import types
 from app.config import settings
 from app.schemas.common import Difficulty, Option, Question, QuestionType
 from app.utils.json import parse_llm_json
+from app.utils.llm import generate_content
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +183,8 @@ async def generate(
     last_error: Exception | None = None
     for attempt in range(1, _MAX_GEN_ATTEMPTS + 1):
         try:
-            response = await client.aio.models.generate_content(
-                model=settings.MODEL_NAME,
+            response = await generate_content(
+                client,
                 contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json"),
             )

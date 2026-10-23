@@ -17,6 +17,7 @@ from google.genai import types
 
 from app.config import settings
 from app.utils.json import parse_llm_json
+from app.utils.llm import generate_content
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,8 @@ def _context_message(student_context: dict) -> str:
 
 
 async def _generate(client: genai.Client, system_prompt: str, student_context: dict) -> dict:
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
+    response = await generate_content(
+        client,
         contents=[{"role": "user", "parts": [{"text": _context_message(student_context)}]}],
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -171,8 +172,8 @@ async def run_roadmap_detail(
         logger.info("Mock mode: detailed roadmap for %s (G%s/%s)", career_title, grade, board)
         return _shape_detail(_mock_detail(career_title, grade, board), career_title)
 
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
+    response = await generate_content(
+        client,
         contents=[{"role": "user", "parts": [{"text": _detail_message(
             career_title=career_title, grade=grade, board=board, strengths=strengths,
         )}]}],
@@ -301,8 +302,8 @@ async def run_checklist(
         logger.info("Mock mode: %s-day checklist for %s", days, career_title)
         return _shape_checklist(_mock_checklist(career_title, days), days)
 
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
+    response = await generate_content(
+        client,
         contents=[{"role": "user", "parts": [{"text": _checklist_message(
             career_title=career_title, grade=grade, board=board,
             strengths=strengths, needs_work=needs_work, days=days,
