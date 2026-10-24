@@ -314,7 +314,8 @@ class QuizAuthoringSerializer(serializers.Serializer):
 
     title = serializers.CharField(max_length=200)
     subject = serializers.CharField(max_length=120, required=False, allow_blank=True, default="General")
-    grade = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    # One class ("Class 8") or several ("Class 6, Class 7"); normalised below.
+    grade = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
     section = serializers.CharField(max_length=10, required=False, allow_blank=True, default="")
     instructions = serializers.CharField(required=False, allow_blank=True, default="")
     difficulty = serializers.CharField(max_length=10, required=False, allow_blank=True, default="MEDIUM")
@@ -326,6 +327,16 @@ class QuizAuthoringSerializer(serializers.Serializer):
     certificate_enabled = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=["DRAFT", "REVIEW"], required=False, default="DRAFT")
     questions = _AuthoringQuestionSerializer(many=True)
+
+    def validate_grade(self, value):
+        """'Class 7, class 6,Class 7' → 'Class 6, Class 7' (deduped, ordered).
+        Student visibility matches each grade number in this label."""
+        import re
+
+        nums = sorted({int(n) for n in re.findall(r"\d+", value or "")})
+        if any(n < 1 or n > 12 for n in nums):
+            raise serializers.ValidationError("Classes must be between 1 and 12.")
+        return ", ".join(f"Class {n}" for n in nums)
 
     def validate_questions(self, value):
         if not value:
