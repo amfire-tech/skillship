@@ -15,7 +15,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE, getToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
-import ClassMultiSelect, { firstClass } from "@/components/quiz/ClassMultiSelect";
+import ClassMultiSelect from "@/components/quiz/ClassMultiSelect";
 import { QUIZ_SUBJECTS } from "@/lib/subjects";
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -57,8 +57,7 @@ const STEPS = [
   { id: 4, label: "Review & Submit" },
 ];
 
-// Class/Section are domain enums (CBSE/ICSE/State) — fixed by Indian school taxonomy.
-const GRADES = Array.from({ length: 12 }).map((_, i) => `Class ${i + 1}`);
+// Sections are a domain enum — fixed by Indian school taxonomy. Classes: see ClassMultiSelect.
 const SECTIONS = ["All", "A", "B", "C", "D"];
 
 // ─── Page ───────────────────────────────────────────────────────────────
@@ -305,7 +304,8 @@ export default function QuizCreationWizard() {
         <AIGeneratorPanel
           defaultSubject={basic.subject}
           defaultDifficulty={basic.difficulty}
-          defaultGrade={firstClass(basic.grade)}
+          grade={basic.grade}
+          onGradeChange={(g) => setBasic((b) => ({ ...b, grade: g }))}
           onGenerated={(qs) => { setQuestions((cur) => [...cur, ...qs]); setStep((s) => (s < 2 ? 2 : s)); }}
         />
       </div>
@@ -708,24 +708,24 @@ function mapAiQuestions(data: unknown, subject: string, difficulty: Difficulty):
 type GenMode = "topic" | "pdf";
 
 function AIGeneratorPanel({
-  defaultSubject, defaultDifficulty, defaultGrade, onGenerated,
+  defaultSubject, defaultDifficulty, grade, onGradeChange, onGenerated,
 }: {
   defaultSubject: string;
   defaultDifficulty: Difficulty;
-  defaultGrade: string;
+  // Shared with Basic Info — picking classes here sets the quiz's classes too.
+  grade: string;
+  onGradeChange: (grade: string) => void;
   onGenerated: (qs: DraftQuestion[]) => void;
 }) {
   const toast = useToast();
   const [mode, setMode] = useState<GenMode>("topic");
   const [subject, setSubject] = useState(defaultSubject);
   const [topic, setTopic] = useState("");
-  const [grade, setGrade] = useState(defaultGrade);
   const [difficulty, setDifficulty] = useState<Difficulty>(defaultDifficulty);
   const [count, setCount] = useState(10);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { setGrade(defaultGrade); }, [defaultGrade]);
   useEffect(() => { setDifficulty(defaultDifficulty); }, [defaultDifficulty]);
   useEffect(() => { if (defaultSubject) setSubject(defaultSubject); }, [defaultSubject]);
 
@@ -841,13 +841,10 @@ function AIGeneratorPanel({
             <Field label="Specific topic (optional)">
               <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g., Infrared Sensors, Python Loops" className={inputCls} />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Class">
-                <select value={grade} onChange={(e) => setGrade(e.target.value)} className={inputCls}>
-                  <option value="">Class</option>
-                  {GRADES.map((g) => <option key={g}>{g}</option>)}
-                </select>
-              </Field>
+            <Field label="Classes">
+              <ClassMultiSelect compact value={grade} onChange={onGradeChange} />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Difficulty">
                 <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className={inputCls}>
                   <option value="EASY">Easy</option>
@@ -862,7 +859,7 @@ function AIGeneratorPanel({
           </>
         ) : (
           <>
-            <p className="text-xs text-[var(--muted-foreground)]">Upload a PDF — questions are generated from its content. Pick the class; difficulty is inferred from the document. The quiz subject comes from Basic Info on the left.</p>
+            <p className="text-xs text-[var(--muted-foreground)]">Upload a PDF — questions are generated from its content. Pick the classes; difficulty is inferred from the document. The quiz subject comes from Basic Info on the left.</p>
             <Field label="PDF file (≤ 10 MB)">
               <input
                 type="file"
@@ -872,13 +869,10 @@ function AIGeneratorPanel({
               />
             </Field>
             {pdfFile && <p className="truncate text-[11px] text-[var(--muted-foreground)]">Selected: {pdfFile.name}</p>}
+            <Field label="Classes">
+              <ClassMultiSelect compact value={grade} onChange={onGradeChange} />
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Class">
-                <select value={grade} onChange={(e) => setGrade(e.target.value)} className={inputCls}>
-                  <option value="">Class</option>
-                  {GRADES.map((g) => <option key={g}>{g}</option>)}
-                </select>
-              </Field>
               <Field label="Count">
                 <input type="number" min={1} max={30} value={count} onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value) || 10)))} className={inputCls} />
               </Field>
