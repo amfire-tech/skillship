@@ -12,6 +12,7 @@ from google.genai import types
 
 from app.config import settings
 from app.utils.json import parse_llm_json
+from app.utils.llm import generate_content
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,8 @@ async def grade_short(
         f"Student answer: {student_answer}"
     )
 
-    response = await client.aio.models.generate_content(
-        model=settings.MODEL_NAME,
+    response = await generate_content(
+        client,
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=_SYSTEM,

@@ -45,7 +45,7 @@ if _sentry_dsn:
 async def lifespan(app: FastAPI):
     # Gemini client (always required)
     app.state.gemini = genai.Client(api_key=settings.GEMINI_API_KEY)
-    logger.info(f"Skillship AI Service starting (Model: {settings.MODEL_NAME})")
+    logger.info(f"Skillship AI Service starting (Model: {settings.MODEL_NAME}, fallback: {settings.FALLBACK_MODEL_NAME or 'none'})")
 
     # DB connection (optional — routes that need it will 503 if unavailable)
     try:
