@@ -24,6 +24,9 @@
 #      so GITHUB_TOKEN can push images to GHCR.
 #   Until (1)+(2) are done, the build job still runs and pushes images; the
 #   deploy job is simply skipped (never fails).
+#   The VPS needs no stored GHCR credential: the deploy job logs it in with the
+#   run's GITHUB_TOKEN and logs out afterwards. (A stored PAT expired once and
+#   silently broke every pull.) There is no staging server, so no staging job.
 
 name: Build & Deploy
 
@@ -104,62 +107,15 @@ jobs:
             NEXT_PUBLIC_API_BASE_URL=${{ vars.NEXT_PUBLIC_API_BASE_URL }}
             NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
 
-  # ── 2. Auto-deploy main → staging ───────────────────────────────────────
-  deploy-staging:
-    name: Deploy → staging
-    needs: build
-    # Gated OFF until a VPS + SSH secrets exist. The build job above still runs
-    # and pushes images to GHCR. To turn on auto-deploy later, add repo Variable
-    # AUTO_DEPLOY=true (Settings → Secrets and variables → Actions → Variables).
-    if: ${{ vars.AUTO_DEPLOY == 'true' }}
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: https://staging.skillship.in
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: SSH deploy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host:     ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key:      ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.DEPLOY_DIR }}"
-            git fetch --quiet origin prod
-            git reset --hard origin/prod
-            # Pull the freshly-built images CI just pushed.
-            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod pull
-            # Apply Django migrations once before bringing the services up.
-            # The backend image already has manage.py + code on board.
-            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod \
-              run --rm backend python manage.py migrate --noinput
-            docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d
-            # Cull any old image layers to keep the VPS disk healthy.
-            docker image prune -f --filter "until=168h"
-
-      - name: Smoke test
-        run: |
-          set -e
-          # Give the stack ~30s to settle (nginx waits on healthy backend+frontend).
-          for i in $(seq 1 30); do
-            if curl -fsS "https://staging.skillship.in/healthz/" >/dev/null; then
-              echo "Staging healthz OK"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "Staging never became healthy"
-          exit 1
-
-  # ── 3. Manual-approval deploy → production ─────────────────────────────
+  # ── 2. Deploy → production ─────────────────────────────
   deploy-production:
     name: Deploy → production (manual gate)
     needs: build            # runs straight off the images the build job pushed
     if: ${{ vars.AUTO_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read        # lets GITHUB_TOKEN pull our GHCR images on the VPS
     environment:
       # GitHub-side "required reviewers" on this environment is what makes this
       # job wait for a human click before deploying — the "take permission" gate.
@@ -173,13 +129,21 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 15m
+          envs: GHCR_USER,GHCR_TOKEN
           script: |
             set -euo pipefail
+            # Log the VPS into GHCR with this run's short-lived GITHUB_TOKEN, so
+            # pulls never depend on a long-lived PAT that silently expires.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
             # deploy.sh pins backend + frontend + ai-service to the SAME image
             # tag, pulls, migrates, recreates, reloads nginx and health-checks.
             # One command, no :latest drift. It exits non-zero on any failure,
             # which fails this job.
             bash "${{ secrets.DEPLOY_DIR }}/deploy.sh" "${{ needs.build.outputs.image_tag }}"
+        env:
+          GHCR_USER:  ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: External smoke test
         run: |
