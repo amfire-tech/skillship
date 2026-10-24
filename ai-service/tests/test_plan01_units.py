@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 from app.engines.adaptive_quiz import next_difficulty
-from app.engines.question_gen import _parse
+from app.engines.question_gen import _build_prompt, _parse
 from app.rag.chunker import chunk
-from app.schemas.common import Difficulty
+from app.schemas.common import Difficulty, QuestionType
 from app.utils.json import parse_llm_json
 
 
@@ -83,3 +83,14 @@ def test_question_parser_rejects_bad_mcq():
     """
     with pytest.raises(ValueError):
         _parse(raw, requested_count=1)
+
+
+@pytest.mark.parametrize(("grade", "expected"), [
+    ("Class 6, Class 7, Class 8", "for **Class 6, Class 7, Class 8** students"),
+    ("Class 8", "for **Class 8** students"),
+    ("8", "for **Class 8** students"),
+    ("", "for **school** students"),
+])
+def test_question_prompt_names_the_target_classes(grade, expected):
+    prompt = _build_prompt("Robotics", grade, 5, Difficulty.MEDIUM, [QuestionType.MCQ], "")
+    assert expected in prompt

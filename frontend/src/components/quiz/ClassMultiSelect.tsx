@@ -31,9 +31,12 @@ export function firstClass(value: string): string {
 export default function ClassMultiSelect({
   value,
   onChange,
+  compact = false,
 }: {
   value: string;
   onChange: (value: string) => void;
+  /** Always 4 per row — for narrow side panels. */
+  compact?: boolean;
 }) {
   const selected = toNumbers(value);
 
@@ -43,7 +46,7 @@ export default function ClassMultiSelect({
 
   return (
     <div className="grid gap-2">
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+      <div className={`grid grid-cols-4 gap-2 ${compact ? "" : "sm:grid-cols-6"}`}>
         {CLASS_LABELS.map((label, i) => {
           const n = i + 1;
           const on = selected.includes(n);

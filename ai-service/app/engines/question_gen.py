@@ -52,9 +52,16 @@ def _build_prompt(topic, grade, count, difficulty, q_types, course_context) -> s
         )
     else:
         context_block = ""
+    # "Class 8" / "Class 6, Class 7" pass through; a bare "8" becomes "Class 8";
+    # blank (quick generator) lets the model pitch for school students generally.
+    grade_label = (grade or "").strip()
+    if not grade_label:
+        grade_label = "school"
+    elif grade_label.isdigit():
+        grade_label = f"Class {grade_label}"
     replacements = {
         "{topic}": topic,
-        "{grade}": grade,
+        "{grade}": grade_label,
         "{count}": str(count),
         "{difficulty}": difficulty.value,
         "{types}": type_labels,

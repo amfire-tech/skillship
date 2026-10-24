@@ -203,6 +203,48 @@ class TestGeneratePdfView:
         # DRF will report content-type rejection as a 400 ValidationError on `file`.
         assert r.status_code == 400
 
+    def test_multi_class_grade_forwarded(self, api_client, login, teacher_a, monkeypatch):
+        from apps.ai_bridge import client as client_mod
+
+        seen = {}
+
+        def capture(*args, **kwargs):
+            seen.update(kwargs["form_fields"])
+            return {"questions": [{"text": "Q1"}], "model_used": "gemini-test"}
+
+        monkeypatch.setattr(client_mod.ai_client, "generate_from_pdf", capture)
+        login(api_client, teacher_a)
+        every = ", ".join(f"Class {n}" for n in range(1, 13))
+        r = api_client.post(
+            GENERATE_PDF_URL,
+            {"file": self._pdf_file(), "topic": "Photosynthesis", "grade": every},
+            format="multipart",
+        )
+        assert r.status_code == 200, r.content
+        assert seen["grade"] == every
+
+
+# ── quiz/generate — topic generator accepts several classes ──────────────────
+
+
+@pytest.mark.django_db
+class TestGenerateView:
+    def test_multi_class_grade_forwarded(self, api_client, login, teacher_a, monkeypatch):
+        from apps.ai_bridge import client as client_mod
+
+        seen = {}
+
+        def capture(payload, *args, **kwargs):
+            seen.update(payload)
+            return {"questions": [{"text": "Q1"}], "model_used": "gemini-test"}
+
+        monkeypatch.setattr(client_mod.ai_client, "generate_questions", capture)
+        login(api_client, teacher_a)
+        every = ", ".join(f"Class {n}" for n in range(1, 13))
+        r = api_client.post(GENERATE_URL, {"topic": "Robotics: sensors", "grade": every}, format="json")
+        assert r.status_code == 200, r.content
+        assert seen["grade"] == every
+
 
 # ── Tenant isolation: jobs from school B never appear in school A's row count ─
 
