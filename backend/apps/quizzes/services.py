@@ -178,16 +178,17 @@ def author_quiz(*, actor, school_id, data: dict) -> Quiz:
     from apps.academics.models import Course
 
     subject = (data.get("subject") or "General").strip() or "General"
-    grade_num = _parse_grade(data.get("grade") or "")
+    # The grade label may list several classes ("Class 6, Class 7").
+    grade_nums = [_parse_grade(g) for g in (data.get("grade") or "").split(",")]
     default_difficulty = (data.get("difficulty") or "MEDIUM").upper()
 
     course, _ = Course.objects.get_or_create(
         school_id=school_id,
         name=subject,
         defaults={
-            "code": f"{subject[:6].upper().replace(' ', '')}-{grade_num}",
-            "grade_min": grade_num,
-            "grade_max": grade_num,
+            "code": f"{subject[:6].upper().replace(' ', '')}-{grade_nums[0]}",
+            "grade_min": min(grade_nums),
+            "grade_max": max(grade_nums),
         },
     )
 

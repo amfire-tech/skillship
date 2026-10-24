@@ -16,6 +16,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE, getToken } from "@/lib/auth";
 import { useToast } from "@/components/ui/Toast";
+import ClassMultiSelect, { firstClass } from "@/components/quiz/ClassMultiSelect";
 import { QUIZ_SUBJECTS } from "@/lib/subjects";
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -103,7 +104,7 @@ export default function AdminQuizCreationWizard() {
     if (!schoolId) return "Select the school to assign this quiz to.";
     if (!basic.title.trim() || basic.title.trim().length < 5) return "Title must be at least 5 characters.";
     if (!basic.subject) return "Pick a subject.";
-    if (!basic.grade) return "Pick a class.";
+    if (!basic.grade) return "Pick at least one class.";
     return null;
   }
 
@@ -333,7 +334,7 @@ export default function AdminQuizCreationWizard() {
           schoolId={schoolId}
           defaultSubject={basic.subject}
           defaultDifficulty={basic.difficulty}
-          defaultGrade={basic.grade}
+          defaultGrade={firstClass(basic.grade)}
           onGenerated={(qs) => { setQuestions((cur) => [...cur, ...qs]); setStep((s) => (s < 2 ? 2 : s)); }}
         />
       </div>
@@ -389,13 +390,10 @@ function Step1BasicInfo({ basic, onChange, schools, schoolId, onSchool }: {
             </select>
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Class *">
-            <select value={basic.grade} onChange={(e) => set("grade", e.target.value)} className={inputCls}>
-              <option value="">Class</option>
-              {GRADES.map((g) => <option key={g}>{g}</option>)}
-            </select>
-          </Field>
+        <Field label="Classes *">
+          <ClassMultiSelect value={basic.grade} onChange={(v) => set("grade", v)} />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Section">
             <select value={basic.section} onChange={(e) => set("section", e.target.value)} className={inputCls}>
               {SECTIONS.map((s) => <option key={s}>{s}</option>)}
